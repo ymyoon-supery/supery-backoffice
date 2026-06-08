@@ -1,4 +1,5 @@
 import { createServerClient, type SetAllCookies } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextResponse, type NextRequest } from 'next/server'
 
@@ -36,8 +37,13 @@ export async function GET(request: NextRequest) {
 
   const user = data.user
 
-  // Upsert employee record — creates on first login, updates email/avatar on subsequent
-  const { error: upsertError } = await supabase
+  // Use service role to bypass RLS — new users have no employee record yet
+  const adminClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+
+  const { error: upsertError } = await adminClient
     .from('employees')
     .upsert(
       {
