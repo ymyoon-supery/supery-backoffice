@@ -1,0 +1,16 @@
+{
+  "active": false,
+  "current_phase": "spec-complete",
+  "completed_at": "2026-06-05T07:10:00Z",
+  "interview_id": "supery-backoffice-001",
+  "final_ambiguity": "0.145",
+  "spec_path": ".omc/specs/deep-interview-supery-backoffice.md",
+  "status": "PASSED",
+  "rounds_completed": 8,
+  "_meta": {
+    "mode": "deep-interview",
+    "sessionId": null,
+    "updatedAt": "2026-06-05T07:18:18.574Z",
+    "updatedBy": "state_write_tool"
+  }
+}

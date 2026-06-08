@@ -1,0 +1,374 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1780647766213,
+  "projectRoot": "C:\\Anitgravity_ymyoon\\supery-backoffice",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "next",
+        "version": "15.0.0",
+        "category": "fullstack"
+      },
+      {
+        "name": "react",
+        "version": "19.0.0",
+        "category": "frontend"
+      },
+      {
+        "name": "react-dom",
+        "version": "19.0.0",
+        "category": "frontend"
+      }
+    ],
+    "packageManager": "npm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "cd \"C:\\Anitgravity_ymyoon\\supery-backoffice\" && npx tsc --noEmit 2>&1; echo \"exit:$?\"",
+    "testCommand": null,
+    "lintCommand": "npm run lint",
+    "devCommand": "npm run dev",
+    "scripts": {
+      "dev": "next dev",
+      "build": "next build",
+      "start": "next start",
+      "lint": "next lint",
+      "typecheck": "tsc --noEmit"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {},
+  "hotPaths": [
+    {
+      "path": "",
+      "accessCount": 16,
+      "lastAccessed": 1780703434793,
+      "type": "directory"
+    },
+    {
+      "path": "app\\api\\outbox\\process\\route.ts",
+      "accessCount": 13,
+      "lastAccessed": 1780703747200,
+      "type": "file"
+    },
+    {
+      "path": "middleware.ts",
+      "accessCount": 10,
+      "lastAccessed": 1780703376320,
+      "type": "file"
+    },
+    {
+      "path": "app\\api\\auth\\callback\\route.ts",
+      "accessCount": 10,
+      "lastAccessed": 1780703376433,
+      "type": "file"
+    },
+    {
+      "path": "lib\\supabase\\server.ts",
+      "accessCount": 8,
+      "lastAccessed": 1780702733869,
+      "type": "file"
+    },
+    {
+      "path": "supabase\\migrations\\006_storage_rls.sql",
+      "accessCount": 7,
+      "lastAccessed": 1780703662723,
+      "type": "file"
+    },
+    {
+      "path": "app\\api\\google\\directory-sync\\route.ts",
+      "accessCount": 6,
+      "lastAccessed": 1780703376142,
+      "type": "file"
+    },
+    {
+      "path": "lib\\google\\calendar.ts",
+      "accessCount": 5,
+      "lastAccessed": 1780703381704,
+      "type": "file"
+    },
+    {
+      "path": "package.json",
+      "accessCount": 3,
+      "lastAccessed": 1780702701500,
+      "type": "file"
+    },
+    {
+      "path": "vercel.json",
+      "accessCount": 3,
+      "lastAccessed": 1780703406117,
+      "type": "file"
+    },
+    {
+      "path": "supabase\\migrations\\001_initial_schema.sql",
+      "accessCount": 3,
+      "lastAccessed": 1780703407314,
+      "type": "file"
+    },
+    {
+      "path": "supabase\\migrations\\004_rpc_functions.sql",
+      "accessCount": 3,
+      "lastAccessed": 1780703408119,
+      "type": "file"
+    },
+    {
+      "path": "supabase\\migrations\\005_realtime.sql",
+      "accessCount": 3,
+      "lastAccessed": 1780703408579,
+      "type": "file"
+    },
+    {
+      "path": "lib\\supabase\\client.ts",
+      "accessCount": 2,
+      "lastAccessed": 1780702719092,
+      "type": "file"
+    },
+    {
+      "path": "app\\(admin)\\layout.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1780702720431,
+      "type": "file"
+    },
+    {
+      "path": ".env.local.example",
+      "accessCount": 2,
+      "lastAccessed": 1780702745151,
+      "type": "file"
+    },
+    {
+      "path": "lib\\cache\\tags.ts",
+      "accessCount": 2,
+      "lastAccessed": 1780702745558,
+      "type": "file"
+    },
+    {
+      "path": "app\\(dashboard)\\layout.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1780702764306,
+      "type": "file"
+    },
+    {
+      "path": "app\\(auth)\\login\\page.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1780702764913,
+      "type": "file"
+    },
+    {
+      "path": "components\\attendance\\GPSCheckIn.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1780702781382,
+      "type": "file"
+    },
+    {
+      "path": "components\\attendance\\TimeTracker.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1780702781537,
+      "type": "file"
+    },
+    {
+      "path": "app\\(dashboard)\\approval\\leave\\actions.ts",
+      "accessCount": 2,
+      "lastAccessed": 1780702801946,
+      "type": "file"
+    },
+    {
+      "path": "postcss.config.mjs",
+      "accessCount": 1,
+      "lastAccessed": 1780647774400,
+      "type": "file"
+    },
+    {
+      "path": "app\\globals.css",
+      "accessCount": 1,
+      "lastAccessed": 1780647805266,
+      "type": "file"
+    },
+    {
+      "path": "app\\layout.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1780647808365,
+      "type": "file"
+    },
+    {
+      "path": "components\\providers\\ReactQueryProvider.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1780647810275,
+      "type": "file"
+    },
+    {
+      "path": "supabase\\migrations\\003_rls_helpers.sql",
+      "accessCount": 1,
+      "lastAccessed": 1780647851793,
+      "type": "file"
+    },
+    {
+      "path": "supabase\\migrations\\002_rls_policies.sql",
+      "accessCount": 1,
+      "lastAccessed": 1780647870255,
+      "type": "file"
+    },
+    {
+      "path": "supabase\\migrations\\005_outbox_processor.sql",
+      "accessCount": 1,
+      "lastAccessed": 1780647918619,
+      "type": "file"
+    },
+    {
+      "path": "components\\auth\\LoginButton.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1780648978296,
+      "type": "file"
+    },
+    {
+      "path": "components\\layout\\Sidebar.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1780649018910,
+      "type": "file"
+    },
+    {
+      "path": "components\\layout\\Header.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1780649024900,
+      "type": "file"
+    },
+    {
+      "path": "lib\\utils.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780649033173,
+      "type": "file"
+    },
+    {
+      "path": "app\\(dashboard)\\page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1780649037974,
+      "type": "file"
+    },
+    {
+      "path": "lib\\google\\directory.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780649115719,
+      "type": "file"
+    },
+    {
+      "path": "components\\attendance\\ManualLocationInput.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1780649130956,
+      "type": "file"
+    },
+    {
+      "path": "app\\api\\geocode\\route.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780649149109,
+      "type": "file"
+    },
+    {
+      "path": "app\\(dashboard)\\attendance\\actions.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780649179887,
+      "type": "file"
+    },
+    {
+      "path": "app\\(dashboard)\\attendance\\page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1780649192864,
+      "type": "file"
+    },
+    {
+      "path": "app\\(dashboard)\\approval\\leave\\new\\page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1780649208148,
+      "type": "file"
+    },
+    {
+      "path": "components\\approval\\LeaveForm.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1780649225509,
+      "type": "file"
+    },
+    {
+      "path": "app\\(dashboard)\\approval\\expense\\actions.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780649245562,
+      "type": "file"
+    },
+    {
+      "path": "app\\(dashboard)\\approval\\expense\\new\\page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1780649257876,
+      "type": "file"
+    },
+    {
+      "path": "components\\approval\\ExpenseForm.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1780649280766,
+      "type": "file"
+    },
+    {
+      "path": "app\\(dashboard)\\approval\\inbox\\page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1780649294965,
+      "type": "file"
+    },
+    {
+      "path": "components\\approval\\ApprovalInboxClient.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1780649319285,
+      "type": "file"
+    },
+    {
+      "path": "lib\\google\\drive.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780649335094,
+      "type": "file"
+    },
+    {
+      "path": "lib\\google\\chat.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780649338951,
+      "type": "file"
+    },
+    {
+      "path": "app\\(admin)\\attendance\\page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1780649374873,
+      "type": "file"
+    },
+    {
+      "path": "components\\admin\\AttendanceEditor.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1780649390011,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

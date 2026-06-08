@@ -1,0 +1,107 @@
+# Ralph Progress Log — SuperY WorkSync 백오피스
+
+## Iteration 1 — 2026-06-05
+
+### Plan
+- 스펙: .omc/specs/deep-interview-supery-backoffice.md (모호성 14.5%)
+- 계획: .omc/plans/supery-backoffice-plan.md (Architect+Critic 3회 컨센서스)
+- PRD: .omc/state/prd.json (11 user stories)
+
+### Stack
+- Next.js 15 (App Router) + TypeScript + Tailwind + shadcn/ui
+- Supabase (PostgreSQL + Auth + Storage + Realtime)
+- Google Workspace APIs (Directory, Calendar, Drive, Chat)
+- pdf-lib (서버리스 PDF), ExcelJS (Excel 출력)
+- TanStack Query (Client Component 인터랙션)
+- Vercel 배포 (2 Cron: Directory sync + Outbox processor)
+
+### Key Architecture Decisions
+- Hybrid RSC + Server Actions (Client Component에 TanStack Query 없이 useTransition 사용)
+- SECURITY DEFINER + SET search_path = public, pg_temp 하드닝 (5개 함수 전체 적용)
+- outbox_events 테이블 + claim_outbox_batch() RPC (FOR UPDATE SKIP LOCKED)
+- CREATE UNIQUE INDEX uniq_attendance_daily ((recorded_at AT TIME ZONE 'Asia/Seoul')::date) — 인라인 UNIQUE 대신 표현식 인덱스
+- leave_approval_steps / expense_approval_steps 분리 FK 테이블 (폴리모픽 FK 방지)
+- validate_and_submit_leave() / approve_leave_step() / approve_expense_step() 원자적 RPC
+- @radix-ui/react-badge 존재하지 않는 패키지 → 제거 (shadcn Badge는 커스텀 컴포넌트)
+- CookieOptionsWithName 타입은 @supabase/ssr에서 import (strict 모드 호환)
+- Supabase 조인 결과 타입 → as unknown as Type 이중 단언 필요 (배열 반환 특성)
+
+## Iteration 2 — 2026-06-06
+
+### 완료된 Stories (US-001 ~ US-010)
+
+#### US-001: 프로젝트 기초 설정 ✅
+- package.json, tsconfig.json, next.config.ts, tailwind.config.ts, postcss.config.mjs
+- lib/supabase/client.ts, lib/supabase/server.ts (createServiceClient 포함)
+- middleware.ts (세션 갱신 + 라우트 보호)
+- lib/cache/tags.ts (CACHE_TAGS: attendance/adminReport/orgChart/approvalInbox/leaveBalance/expenseList/statusBoard)
+- lib/utils.ts (cn 함수)
+- app/layout.tsx, app/globals.css (shadcn CSS 변수 + Inter 폰트)
+- components/providers/ReactQueryProvider.tsx
+- .env.local.example (13개 환경변수)
+
+#### US-002: 데이터베이스 마이그레이션 ✅
+- 001_initial_schema.sql: 8개 테이블 + uniq_attendance_daily 표현식 인덱스
+- 002_rls_helpers.sql: SECURITY DEFINER 헬퍼 6개 (search_path 하드닝)
+- 003_rls_policies.sql: 전 테이블 RLS 정책
+- 004_rpc_functions.sql: validate_and_submit_leave, approve_leave_step, approve_expense_step, submit_expense_report
+- 005_realtime.sql: attendance_records/leave_approval_steps/expense_approval_steps publication
+- 006_storage_rls.sql: receipts/reports 버킷 + owner 폴더 RLS
+- 007_outbox_functions.sql: claim_outbox_batch, complete_outbox_event, fail_outbox_event (지수 백오프)
+
+#### US-003: 인증 & Google OAuth ✅
+- app/(auth)/login/page.tsx + components/auth/LoginButton.tsx
+- app/api/auth/callback/route.ts (OAuth 코드 교환 + employees upsert)
+- app/(dashboard)/layout.tsx (세션 확인)
+- app/(admin)/layout.tsx (ADMIN 역할 확인 + 리디렉션)
+- components/layout/Sidebar.tsx, components/layout/Header.tsx (Server Action signOut)
+
+#### US-004: Google Directory 동기화 ✅
+- lib/google/directory.ts (syncAll — 페이지네이션 + cron_logs 기록)
+- app/api/google/directory-sync/route.ts (CRON_SECRET 검증)
+- vercel.json (directory-sync: 0 17 * * *, outbox/process: * * * * *)
+
+#### US-005: 타임 트래킹 ✅
+- components/attendance/TimeTracker.tsx (상태머신: BEFORE_WORK→WORKING⇌BREAK⇌FIELD→DONE)
+- app/(dashboard)/attendance/actions.ts (recordAttendance Server Action, 중복 감지 error.code 23505)
+- app/(dashboard)/attendance/page.tsx (오늘 타임라인 + unstable_cache)
+
+#### US-006: GPS 현장 체크인 ✅
+- components/attendance/GPSCheckIn.tsx (navigator.geolocation + 권한 거부 시 ManualLocationInput 폴백)
+- components/attendance/ManualLocationInput.tsx
+- app/api/geocode/route.ts (Kakao Maps REST API 서버 프록시, KAKAO_REST_API_KEY 보관)
+
+#### US-007: 연차/반차 결재 ✅
+- app/(dashboard)/approval/leave/new/page.tsx + components/approval/LeaveForm.tsx
+- app/(dashboard)/approval/leave/actions.ts (submitLeave → validate_and_submit_leave RPC, approveLeave)
+- app/(dashboard)/approval/inbox/page.tsx + components/approval/ApprovalInboxClient.tsx (대기/내역 탭)
+
+#### US-008: 지출결의서 결재 ✅
+- app/(dashboard)/approval/expense/new/page.tsx + components/approval/ExpenseForm.tsx
+- app/(dashboard)/approval/expense/actions.ts (submitExpense → submit_expense_report RPC, approveExpense)
+- 영수증 업로드: capture="environment" + Supabase Storage receipts/{employeeId}/{timestamp}_{filename}
+
+#### US-009: Outbox 프로세서 & Google API ✅
+- app/api/outbox/process/route.ts (claim_outbox_batch → switch dispatch → complete/fail)
+- lib/google/calendar.ts (insertEvent, deleteEvent — OAuth token 기반)
+- lib/google/drive.ts (uploadPDF — Service Account JWT, Readable stream)
+- lib/google/chat.ts (sendWebhook, buildApprovalMessage)
+
+#### US-010: 관리자 기능 ✅
+- app/(admin)/attendance/page.tsx + components/admin/AttendanceEditor.tsx (note 수정)
+- app/(admin)/attendance/actions.ts (correctAttendance Server Action)
+- app/(admin)/reports/page.tsx (주간 52시간 초과 직원 목록)
+- app/api/reports/excel/route.ts (ExcelJS .xlsx, 재택/외근/직출 컬럼 분리)
+- components/admin/StatusBoard.tsx (Supabase Realtime 구독, INSERT 이벤트 실시간 반영)
+- app/(admin)/employees/page.tsx (실시간 현황판 데이터 로드)
+- app/(admin)/settings/page.tsx (Drive 폴더 ID, Chat Webhook URL 설정 폼)
+
+### 진행 중
+- US-011: TypeScript 타입 오류 수정 중 (tsc --noEmit 재실행)
+
+### 학습 (다음 이터레이션 참조)
+- @radix-ui/react-badge@^1.0.0 → npm 404. shadcn Badge는 Radix 컴포넌트가 아님
+- Supabase strict TS: cookiesToSet: CookieOptionsWithName[] 필요 (implicit any 방지)
+- Supabase join 타입: 단일 관계도 배열로 추론됨 → as unknown as Type 필요
+- byEmployee Map 타입: typeof records 대신 NonNullable<typeof records>[number][] 사용
+- migration 파일 순서: helpers(002) 반드시 policies(003) 앞에 위치해야 함

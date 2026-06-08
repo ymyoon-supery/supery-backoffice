@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/google/directory-sync",
+      "schedule": "0 17 * * *"
+    },
+    {
+      "path": "/api/outbox/process",
+      "schedule": "* * * * *"
+    }
+  ]
+}

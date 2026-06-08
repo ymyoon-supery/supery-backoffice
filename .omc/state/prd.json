@@ -1,0 +1,157 @@
+{
+  "version": "1.0",
+  "project": "SuperY WorkSync 백오피스",
+  "plan": ".omc/plans/supery-backoffice-plan.md",
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "프로젝트 기초 설정",
+      "description": "Next.js 15, TypeScript, Tailwind, shadcn/ui, Supabase SSR 클라이언트, 캐시 태그 설정",
+      "passes": true,
+      "acceptanceCriteria": [
+        "package.json에 next@15, @supabase/ssr, @supabase/supabase-js, pdf-lib, exceljs, @tanstack/react-query, googleapis, google-auth-library 의존성 포함",
+        "next.config.ts 파일 존재",
+        "tsconfig.json strict 모드 활성화",
+        "tailwind.config.ts 존재",
+        "lib/supabase/client.ts가 createBrowserClient 내보내기",
+        "lib/supabase/server.ts가 createServerClient 내보내기",
+        "middleware.ts가 Supabase 세션 갱신 처리",
+        "lib/cache/tags.ts가 CACHE_TAGS 객체 내보내기 (attendance, adminReport, orgChart, approvalInbox 키 포함)",
+        ".env.local.example에 13개 환경변수 문서화"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "데이터베이스 마이그레이션",
+      "description": "6개 Supabase 마이그레이션 파일 — DDL, RLS 헬퍼, RLS 정책, RPC 함수, Realtime, Storage",
+      "passes": true,
+      "acceptanceCriteria": [
+        "supabase/migrations/001_initial_schema.sql에 organizations, employees(auth_user_id FK 포함), attendance_records, attendance_corrections, leave_requests, expense_reports, approval_lines, leave_approval_steps, expense_approval_steps, approval_audit_log, outbox_events(idempotency_key UNIQUE), cron_logs 테이블 정의",
+        "CREATE UNIQUE INDEX uniq_attendance_daily가 ((recorded_at AT TIME ZONE 'Asia/Seoul')::date) 표현식 사용 (인라인 UNIQUE 아님)",
+        "supabase/migrations/002_rls_helpers.sql에 is_admin(), is_manager_of(), own_employee_id() 함수 — 모두 SECURITY DEFINER + SET search_path = public, pg_temp",
+        "supabase/migrations/003_rls_policies.sql에 attendance_records RLS 정책 적용 (own_records, admin_all, manager_team)",
+        "supabase/migrations/004_rpc_functions.sql에 validate_and_submit_leave(), approve_leave_step(), approve_expense_step() — 모두 SECURITY DEFINER + SET search_path = public, pg_temp",
+        "supabase/migrations/005_realtime.sql에 attendance_records, leave_approval_steps, expense_approval_steps publication 추가",
+        "supabase/migrations/006_storage_rls.sql에 receipts 버킷 생성 + owner_read, owner_insert, admin_all RLS 정책"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "인증 & Google OAuth",
+      "description": "Google SSO via Supabase Auth, OAuth 콜백에서 employees 레코드 생성",
+      "passes": true,
+      "acceptanceCriteria": [
+        "app/(auth)/login/page.tsx가 Google SSO 로그인 버튼 렌더링",
+        "app/api/auth/callback/route.ts가 OAuth 콜백 처리 + employees upsert (auth_user_id = session.user.id)",
+        "middleware.ts가 인증 없는 사용자를 /login으로 리디렉션 (보호된 라우트)",
+        "app/(dashboard)/layout.tsx가 인증 세션 확인",
+        "app/(admin)/layout.tsx가 ADMIN 역할 확인 + 미인가 시 리디렉션"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Google Directory 동기화 Cron",
+      "description": "매일 KST 02:00 Google Directory API 증분 동기화",
+      "passes": true,
+      "acceptanceCriteria": [
+        "lib/google/directory.ts가 syncAll() 함수 내보내기 — googleapis Admin SDK 사용",
+        "syncAll()이 organizations.sync_token 읽고 갱신 (증분 동기화)",
+        "syncAll()이 cron_logs에 성공/실패 기록",
+        "app/api/google/directory-sync/route.ts가 CRON_SECRET 검증 후 syncAll() 호출",
+        "vercel.json에 두 개 cron: directory-sync('0 17 * * *'), outbox/process('* * * * *')"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "타임 트래킹",
+      "description": "직원 출/휴식/외근/퇴근 상태 머신 + 태스크 매핑",
+      "passes": true,
+      "acceptanceCriteria": [
+        "components/attendance/TimeTracker.tsx가 상태 머신 구현: BEFORE_WORK → WORKING ⇌ BREAK ⇌ FIELD → DONE",
+        "상태 전환 시 Server Action이 attendance_records INSERT (supabase.rpc 호출)",
+        "WORKING→BREAK, WORKING→FIELD 전환 시 TaskInputModal이 강제 노출 (미입력 시 전환 불가)",
+        "app/(dashboard)/attendance/page.tsx가 오늘 타임라인 + 주간 누적 시간 표시",
+        "components/attendance/ManualLocationInput.tsx 존재"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "GPS 현장 체크인",
+      "description": "모바일 GPS 캡처 + Kakao Maps 역지오코딩",
+      "passes": true,
+      "acceptanceCriteria": [
+        "components/attendance/GPSCheckIn.tsx가 navigator.geolocation.getCurrentPosition() 호출",
+        "app/api/geocode/route.ts가 Kakao Maps REST API 프록시 (API 키 서버 보관)",
+        "GPS 권한 거부 시 ManualLocationInput 폴백 표시",
+        "GPS 좌표 + 역지오코딩 주소가 attendance_records에 저장"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "연차/반차 결재",
+      "description": "연차 신청서 + 3단 결재 워크플로우",
+      "passes": true,
+      "acceptanceCriteria": [
+        "app/(dashboard)/approval/leave/new/page.tsx가 연차 유형 선택(연차/오전반차/오후반차) + 날짜 선택",
+        "신청 제출이 validate_and_submit_leave() RPC 호출 (원자적 검증+INSERT)",
+        "잔여 휴가 일수가 실시간으로 표시되며 초과 시 Submit 비활성화",
+        "app/(dashboard)/approval/inbox/page.tsx가 내가 결재할 항목 목록 표시",
+        "Inbox에서 승인 버튼이 approve_leave_step() RPC 호출"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "지출결의서 결재",
+      "description": "영수증 첨부 + 지출 결재 워크플로우",
+      "passes": true,
+      "acceptanceCriteria": [
+        "app/(dashboard)/approval/expense/new/page.tsx가 지출 항목, 금액, 설명 입력 폼 제공",
+        "영수증 업로드: <input type='file' capture='environment' accept='image/*'> 사용",
+        "영수증이 Supabase Storage receipts/{userId}/{timestamp}_{filename} 경로에 업로드",
+        "지출 신청이 expense_reports INSERT + expense_approval_steps 초기화",
+        "Inbox에서 승인 버튼이 approve_expense_step() RPC 호출"
+      ]
+    },
+    {
+      "id": "US-009",
+      "title": "Outbox 프로세서 & Google API",
+      "description": "1분 Cron으로 outbox_events 처리 (Calendar, Drive, Chat)",
+      "passes": true,
+      "acceptanceCriteria": [
+        "app/api/outbox/process/route.ts가 FOR UPDATE SKIP LOCKED로 PENDING/RETRY 이벤트 fetch",
+        "lib/google/calendar.ts가 insertEvent() 내보내기",
+        "lib/google/drive.ts가 uploadPDF() 내보내기 (pdf-lib 사용)",
+        "lib/google/chat.ts가 sendWebhook() 내보내기",
+        "처리 성공: status=SUCCESS, processed_at 갱신",
+        "처리 실패: retry_count 증가, max 초과 시 FAILED"
+      ]
+    },
+    {
+      "id": "US-010",
+      "title": "관리자 기능",
+      "description": "근태 수정, 52시간 리포트, 실시간 현황판",
+      "passes": true,
+      "acceptanceCriteria": [
+        "app/(admin)/attendance/page.tsx가 직원별 근태 기록 목록 표시",
+        "components/admin/AttendanceEditor.tsx가 수정 폼 + attendance_corrections INSERT",
+        "app/(admin)/reports/page.tsx가 주간 52시간 초과 직원 목록 표시",
+        "app/api/reports/excel/route.ts가 ExcelJS로 .xlsx 생성 (재택/외근/직출 컬럼 분리)",
+        "components/admin/StatusBoard.tsx가 Supabase Realtime 구독으로 실시간 직원 상태 표시",
+        "app/(admin)/settings/page.tsx가 Drive 경로, Chat Webhook URL 설정 폼 제공"
+      ]
+    },
+    {
+      "id": "US-011",
+      "title": "타입 & 배포 설정",
+      "description": "TypeScript 타입 정의 및 배포 설정",
+      "passes": true,
+      "acceptanceCriteria": [
+        "types/database.ts가 모든 DB 테이블의 TypeScript 인터페이스 정의",
+        "vercel.json 존재 (2개 cron 설정 포함)",
+        ".env.local.example에 13개 환경변수와 설명 포함",
+        "next.config.ts 존재",
+        "전체 프로젝트에서 TypeScript 타입 오류 없음 (핵심 파일 기준)"
+      ]
+    }
+  ]
+}
