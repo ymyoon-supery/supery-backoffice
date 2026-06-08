@@ -8,12 +8,12 @@ function getCalendarClient(accessToken: string) {
 }
 
 function getServiceCalendarClient(subjectEmail: string) {
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
-  if (!raw) throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY not set')
-  const creds = JSON.parse(raw) as { client_email: string; private_key: string }
+  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL
+  const privateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, '\n')
+  if (!email || !privateKey) throw new Error('Google service account env vars not set')
   const auth = new JWT({
-    email: creds.client_email,
-    key: creds.private_key,
+    email,
+    key: privateKey,
     scopes: ['https://www.googleapis.com/auth/calendar'],
     subject: subjectEmail,
   })

@@ -71,8 +71,8 @@
   "hotPaths": [
     {
       "path": "",
-      "accessCount": 16,
-      "lastAccessed": 1780703434793,
+      "accessCount": 19,
+      "lastAccessed": 1780904914784,
       "type": "directory"
     },
     {
@@ -101,8 +101,14 @@
     },
     {
       "path": "supabase\\migrations\\006_storage_rls.sql",
+      "accessCount": 8,
+      "lastAccessed": 1780903116856,
+      "type": "file"
+    },
+    {
+      "path": "lib\\google\\calendar.ts",
       "accessCount": 7,
-      "lastAccessed": 1780703662723,
+      "lastAccessed": 1780901373258,
       "type": "file"
     },
     {
@@ -112,9 +118,27 @@
       "type": "file"
     },
     {
-      "path": "lib\\google\\calendar.ts",
-      "accessCount": 5,
-      "lastAccessed": 1780703381704,
+      "path": ".env.local.example",
+      "accessCount": 6,
+      "lastAccessed": 1780901387400,
+      "type": "file"
+    },
+    {
+      "path": "supabase\\migrations\\001_initial_schema.sql",
+      "accessCount": 4,
+      "lastAccessed": 1780902855362,
+      "type": "file"
+    },
+    {
+      "path": "supabase\\migrations\\004_rpc_functions.sql",
+      "accessCount": 4,
+      "lastAccessed": 1780903054552,
+      "type": "file"
+    },
+    {
+      "path": "supabase\\migrations\\005_realtime.sql",
+      "accessCount": 4,
+      "lastAccessed": 1780903115713,
       "type": "file"
     },
     {
@@ -130,21 +154,9 @@
       "type": "file"
     },
     {
-      "path": "supabase\\migrations\\001_initial_schema.sql",
+      "path": "components\\admin\\AttendanceEditor.tsx",
       "accessCount": 3,
-      "lastAccessed": 1780703407314,
-      "type": "file"
-    },
-    {
-      "path": "supabase\\migrations\\004_rpc_functions.sql",
-      "accessCount": 3,
-      "lastAccessed": 1780703408119,
-      "type": "file"
-    },
-    {
-      "path": "supabase\\migrations\\005_realtime.sql",
-      "accessCount": 3,
-      "lastAccessed": 1780703408579,
+      "lastAccessed": 1780904964889,
       "type": "file"
     },
     {
@@ -157,12 +169,6 @@
       "path": "app\\(admin)\\layout.tsx",
       "accessCount": 2,
       "lastAccessed": 1780702720431,
-      "type": "file"
-    },
-    {
-      "path": ".env.local.example",
-      "accessCount": 2,
-      "lastAccessed": 1780702745151,
       "type": "file"
     },
     {
@@ -199,6 +205,12 @@
       "path": "app\\(dashboard)\\approval\\leave\\actions.ts",
       "accessCount": 2,
       "lastAccessed": 1780702801946,
+      "type": "file"
+    },
+    {
+      "path": "components\\layout\\Sidebar.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1780904914129,
       "type": "file"
     },
     {
@@ -247,12 +259,6 @@
       "path": "components\\auth\\LoginButton.tsx",
       "accessCount": 1,
       "lastAccessed": 1780648978296,
-      "type": "file"
-    },
-    {
-      "path": "components\\layout\\Sidebar.tsx",
-      "accessCount": 1,
-      "lastAccessed": 1780649018910,
       "type": "file"
     },
     {
@@ -361,12 +367,6 @@
       "path": "app\\(admin)\\attendance\\page.tsx",
       "accessCount": 1,
       "lastAccessed": 1780649374873,
-      "type": "file"
-    },
-    {
-      "path": "components\\admin\\AttendanceEditor.tsx",
-      "accessCount": 1,
-      "lastAccessed": 1780649390011,
       "type": "file"
     }
   ],

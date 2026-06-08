@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
-import { correctAttendance } from '@/app/(admin)/attendance/actions'
+import { correctAttendance } from '@/app/(admin)/admin/attendance/actions'
 import { Pencil } from 'lucide-react'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

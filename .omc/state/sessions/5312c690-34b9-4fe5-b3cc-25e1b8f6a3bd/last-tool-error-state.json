@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"ls C:\\\\Anitgravity_ymyoon\\\\supery-backoffice\",\"description\":\"List project root\"}",
-  "error": "Exit code 2\nls: cannot access 'C:Anitgravity_ymyoonsupery-backoffice': No such file or directory",
-  "timestamp": "2026-06-05T23:49:11.714Z",
+  "tool_input_preview": "{\"command\":\"Get-ChildItem -Recurse \\\"C:\\\\Anitgravity_ymyoon\\\\supery-backoffice\\\\app\\\\(admin)\\\" | Select-Object FullName\",\"description\":\"List admin directory structure\"}",
+  "error": "Exit code 127\n/usr/bin/bash: line 6: Get-ChildItem: command not found\n/usr/bin/bash: line 6: Select-Object: command not found",
+  "timestamp": "2026-06-08T07:48:14.925Z",
   "retry_count": 1
 }
