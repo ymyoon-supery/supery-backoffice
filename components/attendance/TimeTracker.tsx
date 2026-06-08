@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect, useRef, useCallback } from 'react'
 import { toast } from 'sonner'
 import { Clock, Coffee, MapPin, LogOut } from 'lucide-react'
 import GPSCheckIn from './GPSCheckIn'
@@ -19,12 +19,57 @@ const STATE_LABEL: Record<WorkState, string> = {
   DONE: '퇴근',
 }
 
+const INACTIVITY_MS = 20 * 60 * 1000
+
 export default function TimeTracker({ initialState }: { initialState?: WorkState }) {
   const [state, setState] = useState<WorkState>(initialState ?? 'BEFORE_WORK')
   const [geoData, setGeoData] = useState<GeoData | null>(null)
   const [showGPS, setShowGPS] = useState(false)
   const [pendingNext, setPendingNext] = useState<WorkState | null>(null)
   const [isPending, startTransition] = useTransition()
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const stateRef = useRef(state)
+
+  useEffect(() => { stateRef.current = state }, [state])
+
+  const triggerAutoBreak = useCallback(() => {
+    if (stateRef.current !== 'WORKING' && stateRef.current !== 'FIELD') return
+    startTransition(async () => {
+      const result = await recordAttendance({
+        type: 'CHECK_IN',
+        location: null,
+        latitude: null,
+        longitude: null,
+        isField: false,
+        note: '자동 휴식 (20분 비활동)',
+      })
+      if (!result?.error) {
+        setState('BREAK')
+        toast.info('20분 동안 활동이 없어 자동으로 휴식 처리되었습니다.')
+      }
+    })
+  }, [startTransition])
+
+  const resetTimer = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    if (stateRef.current === 'WORKING' || stateRef.current === 'FIELD') {
+      timerRef.current = setTimeout(triggerAutoBreak, INACTIVITY_MS)
+    }
+  }, [triggerAutoBreak])
+
+  useEffect(() => {
+    if (state !== 'WORKING' && state !== 'FIELD') {
+      if (timerRef.current) clearTimeout(timerRef.current)
+      return
+    }
+    const events = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'] as const
+    events.forEach(e => document.addEventListener(e, resetTimer, { passive: true }))
+    resetTimer()
+    return () => {
+      events.forEach(e => document.removeEventListener(e, resetTimer))
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [state, resetTimer])
 
   function requestTransition(next: WorkState) {
     if ((next === 'BREAK' || next === 'FIELD') && !geoData) {
