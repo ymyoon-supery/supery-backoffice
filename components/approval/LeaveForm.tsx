@@ -6,21 +6,23 @@ import { toast } from 'sonner'
 import { submitLeave } from '@/app/(dashboard)/approval/leave/actions'
 import { differenceInCalendarDays, format } from 'date-fns'
 
-type LeaveType = 'ANNUAL' | 'SICK' | 'HALF_DAY' | 'OTHER'
+type LeaveType = 'ANNUAL' | 'HALF_DAY' | 'SICK' | 'COMP' | 'OTHER'
+
+const LEAVE_TYPES: LeaveType[] = ['ANNUAL', 'HALF_DAY', 'SICK', 'COMP', 'OTHER']
 
 const LEAVE_LABELS: Record<LeaveType, string> = {
   ANNUAL: '연차',
-  SICK: '병가',
   HALF_DAY: '반차',
+  SICK: '병가(무급)',
+  COMP: '보상휴가',
   OTHER: '기타',
 }
 
-const DAYS_USED: Record<LeaveType, number | null> = {
-  ANNUAL: null,
-  SICK: null,
+const FIXED_DAYS: Partial<Record<LeaveType, number>> = {
   HALF_DAY: 0.5,
-  OTHER: null,
 }
+
+const DEDUCTS_LEAVE = new Set<LeaveType>(['ANNUAL', 'HALF_DAY'])
 
 export default function LeaveForm({ remainingLeaves }: { remainingLeaves: number }) {
   const router = useRouter()
@@ -31,18 +33,20 @@ export default function LeaveForm({ remainingLeaves }: { remainingLeaves: number
   const [reason, setReason] = useState('')
 
   const computedDays = (() => {
-    const fixed = DAYS_USED[leaveType]
-    if (fixed !== null) return fixed
+    const fixed = FIXED_DAYS[leaveType]
+    if (fixed !== undefined) return fixed
     if (!startDate || !endDate) return 0
-    const diff = differenceInCalendarDays(new Date(endDate), new Date(startDate)) + 1
-    return Math.max(diff, 0)
+    return Math.max(differenceInCalendarDays(new Date(endDate), new Date(startDate)) + 1, 0)
   })()
 
+  const exceedsBalance = DEDUCTS_LEAVE.has(leaveType) && computedDays > remainingLeaves
+
   const canSubmit =
-    startDate &&
-    (leaveType === 'HALF_DAY' || endDate) &&
+    !!startDate &&
+    (leaveType === 'HALF_DAY' || !!endDate) &&
     computedDays > 0 &&
-    (leaveType === 'SICK' || leaveType === 'OTHER' || computedDays <= remainingLeaves)
+    !exceedsBalance &&
+    (leaveType !== 'OTHER' || reason.trim().length > 0)
 
   function handleSubmit() {
     startTransition(async () => {
@@ -53,10 +57,7 @@ export default function LeaveForm({ remainingLeaves }: { remainingLeaves: number
         daysUsed: computedDays,
         reason: reason || null,
       })
-      if (result.error) {
-        toast.error(result.error)
-        return
-      }
+      if (result.error) { toast.error(result.error); return }
       toast.success('연차 신청이 접수되었습니다.')
       router.push('/approval/inbox')
     })
@@ -69,14 +70,15 @@ export default function LeaveForm({ remainingLeaves }: { remainingLeaves: number
         <span className="font-semibold text-gray-900">{remainingLeaves}일</span>
       </div>
 
+      {/* 휴가 유형 */}
       <div className="space-y-1">
         <label className="text-sm font-medium text-gray-700">휴가 유형</label>
         <div className="flex gap-2 flex-wrap">
-          {(Object.keys(LEAVE_LABELS) as LeaveType[]).map((t) => (
+          {LEAVE_TYPES.map((t) => (
             <button
               key={t}
               type="button"
-              onClick={() => setLeaveType(t)}
+              onClick={() => { setLeaveType(t); setReason('') }}
               className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
                 leaveType === t
                   ? 'bg-primary text-white border-primary'
@@ -89,6 +91,28 @@ export default function LeaveForm({ remainingLeaves }: { remainingLeaves: number
         </div>
       </div>
 
+      {/* 병가 경고 */}
+      {leaveType === 'SICK' && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
+          병가(무급)는 급여가 지급되지 않습니다.
+          {remainingLeaves > 0 ? (
+            <>
+              {' '}잔여 연차({remainingLeaves}일)를 먼저 사용하시는 것을 권장합니다.{' '}
+              <button
+                type="button"
+                onClick={() => setLeaveType('ANNUAL')}
+                className="underline font-medium hover:text-amber-900"
+              >
+                연차로 변경
+              </button>
+            </>
+          ) : (
+            ' 잔여 연차가 없어 병가(무급)으로 처리됩니다.'
+          )}
+        </div>
+      )}
+
+      {/* 날짜 */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <label className="text-sm font-medium text-gray-700">시작일</label>
@@ -117,20 +141,23 @@ export default function LeaveForm({ remainingLeaves }: { remainingLeaves: number
       {computedDays > 0 && (
         <p className="text-sm text-gray-600">
           사용 일수: <strong>{computedDays}일</strong>
-          {leaveType === 'ANNUAL' && computedDays > remainingLeaves && (
+          {exceedsBalance && (
             <span className="text-red-500 ml-2">잔여 연차 초과</span>
           )}
         </p>
       )}
 
+      {/* 사유 / 기타 내용 */}
       <div className="space-y-1">
-        <label className="text-sm font-medium text-gray-700">사유 (선택)</label>
+        <label className="text-sm font-medium text-gray-700">
+          {leaveType === 'OTHER' ? '기타 내용 *' : '사유 (선택)'}
+        </label>
         <textarea
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           rows={3}
           className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
-          placeholder="휴가 사유를 입력하세요"
+          placeholder={leaveType === 'OTHER' ? '기타 휴가 내용을 입력하세요 (필수)' : '휴가 사유를 입력하세요'}
         />
       </div>
 
