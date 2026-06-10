@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect, useRef, useCallback } from 'react'
 import { toast } from 'sonner'
-import { Clock, Coffee, MapPin, LogOut } from 'lucide-react'
+import { Clock, MapPin, LogOut, Building2, Home, Car } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { recordAttendance } from '@/app/(dashboard)/attendance/actions'
 
@@ -18,14 +18,16 @@ const STATE_LABEL: Record<WorkState, string> = {
 }
 
 const INACTIVITY_MS = 15 * 60 * 1000
-// Click/touchstart excluded for FIELD resume to avoid conflict with manual 업무복귀 button
 const ALL_EVENTS = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'] as const
+// click/touchstart excluded for FIELD: prevents conflict with manual 업무복귀 button
 const FIELD_EVENTS = ['mousemove', 'keydown', 'scroll'] as const
 
 export default function TimeTracker({ initialState }: { initialState?: WorkState }) {
   const [state, setState] = useState<WorkState>(initialState ?? 'BEFORE_WORK')
+  const [showCheckInOptions, setShowCheckInOptions] = useState(false)
   const [showFieldForm, setShowFieldForm] = useState(false)
   const [fieldNote, setFieldNote] = useState('')
+  const [fieldIsCheckIn, setFieldIsCheckIn] = useState(false)
   const [isAutoBreak, setIsAutoBreak] = useState(false)
   const [isPending, startTransition] = useTransition()
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -52,8 +54,7 @@ export default function TimeTracker({ initialState }: { initialState?: WorkState
       await recordAttendance({
         type: 'BREAK_END',
         location: null, latitude: null, longitude: null,
-        isField: false,
-        note: '자동 업무 복귀',
+        isField: false, note: '자동 업무 복귀',
       })
       setState('WORKING')
       toast.success('업무 복귀 처리되었습니다.')
@@ -62,13 +63,12 @@ export default function TimeTracker({ initialState }: { initialState?: WorkState
 
   const resumeFromField = useCallback(() => {
     if (stateRef.current !== 'FIELD') return
-    stateRef.current = 'WORKING' // optimistic guard against double-call
+    stateRef.current = 'WORKING'
     startTransition(async () => {
       const result = await recordAttendance({
         type: 'FIELD_END',
         location: null, latitude: null, longitude: null,
-        isField: false,
-        note: '외근 복귀 (자동 감지)',
+        isField: false, note: '외근 복귀 (자동 감지)',
       })
       if (!result?.error) {
         setState('WORKING')
@@ -87,8 +87,7 @@ export default function TimeTracker({ initialState }: { initialState?: WorkState
       const result = await recordAttendance({
         type: 'BREAK_START',
         location: null, latitude: null, longitude: null,
-        isField: false,
-        note: '자동 휴식 (15분 비활동)',
+        isField: false, note: '자동 휴식 (15분 비활동)',
       })
       if (!result?.error) {
         setState('BREAK')
@@ -114,12 +113,10 @@ export default function TimeTracker({ initialState }: { initialState?: WorkState
       ALL_EVENTS.forEach(e => document.addEventListener(e, handleActivity, { passive: true }))
       return () => ALL_EVENTS.forEach(e => document.removeEventListener(e, handleActivity))
     }
-
     if (state === 'FIELD') {
       FIELD_EVENTS.forEach(e => document.addEventListener(e, handleActivity, { passive: true }))
       return () => FIELD_EVENTS.forEach(e => document.removeEventListener(e, handleActivity))
     }
-
     if (state === 'WORKING') {
       ALL_EVENTS.forEach(e => document.addEventListener(e, handleActivity, { passive: true }))
       timerRef.current = setTimeout(triggerAutoBreak, INACTIVITY_MS)
@@ -130,14 +127,42 @@ export default function TimeTracker({ initialState }: { initialState?: WorkState
     }
   }, [state, isAutoBreak, handleActivity, triggerAutoBreak])
 
-  function confirmField() {
-    setShowFieldForm(false)
+  function handleCheckIn(location: 'OFFICE' | 'REMOTE' | 'FIELD') {
+    setShowCheckInOptions(false)
+    if (location === 'FIELD') {
+      setFieldNote('')
+      setFieldIsCheckIn(true)
+      setShowFieldForm(true)
+      return
+    }
     startTransition(async () => {
       const result = await recordAttendance({
-        type: 'FIELD_START',
+        type: 'CHECK_IN',
+        location: null, latitude: null, longitude: null,
+        isField: false,
+        note: location === 'REMOTE' ? '재택' : null,
+      })
+      if (result?.error) { toast.error(result.error); return }
+      setState('WORKING')
+      toast.success('출근 기록 완료')
+    })
+  }
+
+  function handleFieldStart() {
+    setFieldNote('')
+    setFieldIsCheckIn(false)
+    setShowFieldForm(true)
+  }
+
+  function confirmField() {
+    setShowFieldForm(false)
+    const note = fieldNote.trim() || '외근'
+    startTransition(async () => {
+      const result = await recordAttendance({
+        type: fieldIsCheckIn ? 'CHECK_IN' : 'FIELD_START',
         location: null, latitude: null, longitude: null,
         isField: true,
-        note: fieldNote.trim() || '외근',
+        note: fieldIsCheckIn ? `외근 - ${note}` : note,
       })
       if (result?.error) { toast.error(result.error); return }
       setState('FIELD')
@@ -152,8 +177,7 @@ export default function TimeTracker({ initialState }: { initialState?: WorkState
     let note: string | null = null
 
     if (next === 'WORKING') {
-      if (current === 'BEFORE_WORK') { type = 'CHECK_IN' }
-      else if (current === 'BREAK') { type = 'BREAK_END'; note = '업무 복귀' }
+      if (current === 'BREAK') { type = 'BREAK_END'; note = '업무 복귀' }
       else if (current === 'FIELD') { type = 'FIELD_END'; note = '외근 복귀' }
       else { type = 'CHECK_IN' }
     } else if (next === 'DONE') {
@@ -183,7 +207,7 @@ export default function TimeTracker({ initialState }: { initialState?: WorkState
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl p-8 shadow-2xl max-w-sm w-full mx-4 text-center space-y-4">
             <div className="w-14 h-14 rounded-full bg-yellow-100 flex items-center justify-center mx-auto">
-              <Coffee size={26} className="text-yellow-600" />
+              <Clock size={26} className="text-yellow-600" />
             </div>
             <div>
               <h3 className="text-lg font-semibold text-gray-900">자동 휴식 처리됨</h3>
@@ -221,6 +245,46 @@ export default function TimeTracker({ initialState }: { initialState?: WorkState
           )} />
         </div>
 
+        {/* Check-in location options */}
+        {showCheckInOptions && (
+          <div className="border border-dashed border-gray-200 rounded-lg p-4 space-y-3">
+            <p className="text-xs text-gray-500">근무 형태를 선택해주세요.</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleCheckIn('OFFICE')}
+                disabled={isPending}
+                className="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-lg border border-gray-200 hover:border-primary hover:bg-primary/5 text-gray-700 hover:text-primary transition-colors disabled:opacity-50"
+              >
+                <Building2 size={18} />
+                <span className="text-xs font-medium">회사</span>
+              </button>
+              <button
+                onClick={() => handleCheckIn('REMOTE')}
+                disabled={isPending}
+                className="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-lg border border-gray-200 hover:border-primary hover:bg-primary/5 text-gray-700 hover:text-primary transition-colors disabled:opacity-50"
+              >
+                <Home size={18} />
+                <span className="text-xs font-medium">재택</span>
+              </button>
+              <button
+                onClick={() => handleCheckIn('FIELD')}
+                disabled={isPending}
+                className="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition-colors disabled:opacity-50"
+              >
+                <Car size={18} />
+                <span className="text-xs font-medium">외근</span>
+              </button>
+            </div>
+            <button
+              onClick={() => setShowCheckInOptions(false)}
+              className="text-xs text-gray-400 hover:text-gray-600 w-full text-center"
+            >
+              취소
+            </button>
+          </div>
+        )}
+
+        {/* Field note form */}
         {showFieldForm && (
           <div className="border border-dashed border-blue-200 rounded-lg p-4 space-y-3 bg-blue-50/30">
             <p className="text-xs text-gray-500">외근 사유를 입력해주세요.</p>
@@ -239,9 +303,12 @@ export default function TimeTracker({ initialState }: { initialState?: WorkState
                 disabled={isPending}
                 className="flex-1 bg-blue-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
               >
-                외근 시작
+                {fieldIsCheckIn ? '외근 출근' : '외근 시작'}
               </button>
-              <button onClick={() => setShowFieldForm(false)} className="px-4 text-sm text-gray-500 hover:text-gray-700">
+              <button
+                onClick={() => { setShowFieldForm(false); setFieldIsCheckIn(false) }}
+                className="px-4 text-sm text-gray-500 hover:text-gray-700"
+              >
                 취소
               </button>
             </div>
@@ -249,14 +316,14 @@ export default function TimeTracker({ initialState }: { initialState?: WorkState
         )}
 
         <div className="flex flex-wrap gap-2">
-          {state === 'BEFORE_WORK' && (
+          {state === 'BEFORE_WORK' && !showCheckInOptions && !showFieldForm && (
             <ActionButton icon={<Clock size={15} />} label="출근"
-              onClick={() => commitTransition('WORKING')} disabled={isPending} variant="primary" />
+              onClick={() => setShowCheckInOptions(true)} disabled={isPending} variant="primary" />
           )}
           {state === 'WORKING' && (
             <>
               <ActionButton icon={<MapPin size={15} />} label="외근 시작"
-                onClick={() => { setFieldNote(''); setShowFieldForm(true) }} disabled={isPending} />
+                onClick={handleFieldStart} disabled={isPending} />
               <ActionButton icon={<LogOut size={15} />} label="퇴근"
                 onClick={() => commitTransition('DONE')} disabled={isPending} variant="destructive" />
             </>
