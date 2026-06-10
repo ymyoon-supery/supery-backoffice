@@ -15,7 +15,7 @@ export default function LoginButton() {
         redirectTo: `${location.origin}/api/auth/callback`,
         queryParams: {
           access_type: 'offline',
-          prompt: 'consent',
+          prompt: 'select_account',
         },
         scopes: [
           'https://www.googleapis.com/auth/calendar',
