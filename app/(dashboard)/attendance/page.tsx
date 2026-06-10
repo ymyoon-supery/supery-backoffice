@@ -20,7 +20,9 @@ export default async function AttendancePage() {
   if (!employee) redirect('/login')
 
   const today = new Date()
-  const todayStr = format(today, 'yyyy-MM-dd')
+  // KST 기준 날짜 (UTC+9 고정 오프셋)
+  const kstNow = new Date(today.getTime() + 9 * 60 * 60 * 1000)
+  const todayStr = format(kstNow, 'yyyy-MM-dd')
   const weekStart = format(startOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd')
   const weekEnd = format(endOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd')
 
@@ -40,17 +42,19 @@ export default async function AttendancePage() {
   )
 
   const records = await getRecords()
-  const todayRecords = records.filter((r) =>
-    r.recorded_at.startsWith(todayStr),
-  )
+  // KST 날짜 기준으로 오늘 기록 필터 (recorded_at은 UTC ISO이므로 변환 후 비교)
+  const todayRecords = records.filter((r) => {
+    const kst = new Date(new Date(r.recorded_at).getTime() + 9 * 60 * 60 * 1000)
+    return format(kst, 'yyyy-MM-dd') === todayStr
+  })
 
   const lastRecord = todayRecords[todayRecords.length - 1]
   const initialState =
-    lastRecord?.type === 'CHECK_OUT'
-      ? 'DONE'
-      : lastRecord?.type === 'CHECK_IN'
-        ? 'WORKING'
-        : 'BEFORE_WORK'
+    lastRecord?.type === 'CHECK_OUT' ? 'DONE'
+    : lastRecord?.type === 'BREAK_START' ? 'BREAK'
+    : lastRecord?.type === 'FIELD_START' ? 'FIELD'
+    : lastRecord?.type === 'CHECK_IN' || lastRecord?.type === 'BREAK_END' || lastRecord?.type === 'FIELD_END' ? 'WORKING'
+    : 'BEFORE_WORK'
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -61,7 +65,7 @@ export default async function AttendancePage() {
       <div className="bg-white rounded-xl border border-gray-100">
         <div className="px-5 py-4 border-b border-gray-50">
           <h2 className="text-sm font-medium text-gray-700">
-            오늘 기록 ({format(today, 'M월 d일 EEEE', { locale: ko })})
+            오늘 기록 ({format(kstNow, 'M월 d일 EEEE', { locale: ko })})
           </h2>
         </div>
         {todayRecords.length === 0 ? (
@@ -73,8 +77,14 @@ export default async function AttendancePage() {
             {todayRecords.map((r) => (
               <li key={r.id} className="flex items-center justify-between px-5 py-3 text-sm">
                 <span className="text-gray-600">
-                  {r.type === 'CHECK_IN' ? '출근' : '퇴근'}
-                  {r.is_field && (
+                  {r.type === 'CHECK_IN' ? '출근'
+                    : r.type === 'CHECK_OUT' ? '퇴근'
+                    : r.type === 'BREAK_START' ? '휴식 시작'
+                    : r.type === 'BREAK_END' ? '업무 복귀'
+                    : r.type === 'FIELD_START' ? '외근 시작'
+                    : r.type === 'FIELD_END' ? '외근 복귀'
+                    : r.type}
+                  {r.is_field && r.type === 'CHECK_IN' && (
                     <span className="ml-2 text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">외근</span>
                   )}
                   {r.note && (
@@ -83,7 +93,7 @@ export default async function AttendancePage() {
                 </span>
                 <div className="text-right">
                   <span className="text-gray-900 font-medium">
-                    {format(new Date(r.recorded_at), 'HH:mm')}
+                    {format(new Date(new Date(r.recorded_at).getTime() + 9 * 60 * 60 * 1000), 'HH:mm')}
                   </span>
                   {r.location && (
                     <p className="text-xs text-gray-400">{r.location}</p>
