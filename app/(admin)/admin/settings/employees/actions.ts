@@ -72,6 +72,7 @@ export type UpdateEmployeeInput = {
   position: string | null
   role: 'ADMIN' | 'MANAGER' | 'EMPLOYEE'
   hiredAt: string | null
+  remainingLeaves: number | null // null → 부여연차와 동기화
 }
 
 export async function updateEmployee(input: UpdateEmployeeInput) {
@@ -79,7 +80,7 @@ export async function updateEmployee(input: UpdateEmployeeInput) {
   if (authError) return { error: authError }
 
   const hiredDate = input.hiredAt ? new Date(input.hiredAt) : null
-  const annualLeaveDays = hiredDate ? calcAnnualLeave(hiredDate) : undefined
+  const annualLeaveDays = hiredDate ? calcAnnualLeave(hiredDate) : null
 
   const updateData: Record<string, unknown> = {
     name: input.name.trim(),
@@ -89,8 +90,13 @@ export async function updateEmployee(input: UpdateEmployeeInput) {
     role: input.role,
     hired_at: input.hiredAt || null,
   }
-  if (annualLeaveDays !== undefined) {
+
+  if (annualLeaveDays !== null) {
     updateData.annual_leave_days = annualLeaveDays
+    // 관리자가 잔여연차를 직접 지정하면 그 값, 아니면 부여연차와 동기화
+    updateData.remaining_leaves = input.remainingLeaves ?? annualLeaveDays
+  } else if (input.remainingLeaves !== null) {
+    updateData.remaining_leaves = input.remainingLeaves
   }
 
   const client = adminClient()

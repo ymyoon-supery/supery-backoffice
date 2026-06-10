@@ -25,12 +25,14 @@ const ROLES = [
 
 const emptyForm: {
   name: string; email: string; departmentId: string; rank: string
-  position: string; role: 'ADMIN' | 'MANAGER' | 'EMPLOYEE'; groupId: string; hiredAt: string
+  position: string; role: 'ADMIN' | 'MANAGER' | 'EMPLOYEE'
+  groupId: string; hiredAt: string; remainingLeaves: string
 } = {
-  name: '', email: '', departmentId: '', rank: '', position: '팀원', role: 'EMPLOYEE', groupId: '', hiredAt: '',
+  name: '', email: '', departmentId: '', rank: '', position: '팀원',
+  role: 'EMPLOYEE', groupId: '', hiredAt: '', remainingLeaves: '',
 }
 
-function previewLeave(hiredAt: string): number | null {
+function calcDisplay(hiredAt: string | null): number | null {
   if (!hiredAt) return null
   return calcAnnualLeave(new Date(hiredAt))
 }
@@ -45,7 +47,9 @@ export default function EmployeesClient({ employees: init, groups, teams }: {
   const [isPending, startTransition] = useTransition()
 
   const filteredTeams = form.groupId ? teams.filter(t => t.group_id === form.groupId) : teams
-  const leavePreview = previewLeave(form.hiredAt)
+
+  // 입사일 기반 계산값 미리보기
+  const calcDays = calcDisplay(form.hiredAt)
 
   function openAdd() {
     setEditId(null)
@@ -55,6 +59,7 @@ export default function EmployeesClient({ employees: init, groups, teams }: {
 
   function openEdit(emp: Employee) {
     const team = teams.find(t => t.id === emp.department_id)
+    const calcDaysForEmp = calcDisplay(emp.hired_at)
     setEditId(emp.id)
     setForm({
       name: emp.name,
@@ -65,6 +70,8 @@ export default function EmployeesClient({ employees: init, groups, teams }: {
       role: emp.role as 'ADMIN' | 'MANAGER' | 'EMPLOYEE',
       groupId: team?.group_id ?? '',
       hiredAt: emp.hired_at ?? '',
+      // 잔여연차: 입사일 기반 계산값 or 기존 DB값
+      remainingLeaves: String(calcDaysForEmp ?? emp.remaining_leaves),
     })
     setShowForm(true)
   }
@@ -72,6 +79,8 @@ export default function EmployeesClient({ employees: init, groups, teams }: {
   function handleSubmit() {
     if (!form.name.trim()) { toast.error('이름을 입력하세요.'); return }
     if (!editId && !form.email.trim()) { toast.error('이메일을 입력하세요.'); return }
+
+    const parsedRemaining = form.remainingLeaves !== '' ? parseFloat(form.remainingLeaves) : null
 
     startTransition(async () => {
       let result
@@ -84,9 +93,11 @@ export default function EmployeesClient({ employees: init, groups, teams }: {
           position: form.position || null,
           role: form.role,
           hiredAt: form.hiredAt || null,
+          remainingLeaves: parsedRemaining,
         } as UpdateEmployeeInput)
         if (!result.error) {
-          const newLeave = form.hiredAt ? calcAnnualLeave(new Date(form.hiredAt)) : undefined
+          const newAnnual = calcDays ?? undefined
+          const newRemaining = parsedRemaining ?? newAnnual ?? undefined
           setEmployees(prev => prev.map(e => e.id === editId ? {
             ...e,
             name: form.name,
@@ -95,7 +106,8 @@ export default function EmployeesClient({ employees: init, groups, teams }: {
             position: form.position || null,
             role: form.role,
             hired_at: form.hiredAt || null,
-            annual_leave_days: newLeave ?? e.annual_leave_days,
+            annual_leave_days: newAnnual ?? e.annual_leave_days,
+            remaining_leaves: newRemaining ?? e.remaining_leaves,
           } : e))
           toast.success('직원 정보가 수정됐습니다.')
         }
@@ -110,7 +122,7 @@ export default function EmployeesClient({ employees: init, groups, teams }: {
           hiredAt: form.hiredAt || null,
         } as CreateEmployeeInput)
         if (!result.error) {
-          const days = form.hiredAt ? calcAnnualLeave(new Date(form.hiredAt)) : 15
+          const days = calcDays ?? 15
           setEmployees(prev => [...prev, {
             id: crypto.randomUUID(), name: form.name, email: form.email,
             role: form.role, rank: form.rank || null, position: form.position || null,
@@ -168,11 +180,33 @@ export default function EmployeesClient({ employees: init, groups, teams }: {
             </div>
             <div className="space-y-1">
               <label className="text-xs text-gray-500">입사일자</label>
-              <input type="date" value={form.hiredAt} onChange={e => setForm(p => ({ ...p, hiredAt: e.target.value }))}
+              <input type="date" value={form.hiredAt}
+                onChange={e => {
+                  const newHiredAt = e.target.value
+                  const newCalc = calcDisplay(newHiredAt)
+                  setForm(p => ({
+                    ...p,
+                    hiredAt: newHiredAt,
+                    remainingLeaves: newCalc !== null ? String(newCalc) : p.remainingLeaves,
+                  }))
+                }}
                 className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary/30" />
-              {leavePreview !== null && (
-                <p className="text-xs text-primary">→ {new Date().getFullYear()}년 연차 {leavePreview}일 자동 계산</p>
+              {calcDays !== null && (
+                <p className="text-xs text-primary">→ {new Date().getFullYear()}년 부여연차 {calcDays}일 (근로기준법 제60조)</p>
               )}
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-gray-500">
+                잔여연차
+                {editId && <span className="ml-1 text-gray-400">(직접 조정 가능)</span>}
+              </label>
+              <input
+                type="number" min="0" max="25" step="0.5"
+                value={form.remainingLeaves}
+                onChange={e => setForm(p => ({ ...p, remainingLeaves: e.target.value }))}
+                placeholder={calcDays !== null ? String(calcDays) : '15'}
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary/30"
+              />
             </div>
             <div className="space-y-1">
               <label className="text-xs text-gray-500">그룹</label>
@@ -234,7 +268,8 @@ export default function EmployeesClient({ employees: init, groups, teams }: {
               <th className="px-4 py-3">직급</th>
               <th className="px-4 py-3">직위</th>
               <th className="px-4 py-3">입사일</th>
-              <th className="px-4 py-3 text-right">연차(잔여/부여)</th>
+              <th className="px-4 py-3 text-right">부여연차</th>
+              <th className="px-4 py-3 text-right">잔여연차</th>
               <th className="px-4 py-3">권한</th>
               <th className="px-4 py-3">연결</th>
               <th className="px-4 py-3 w-16"></th>
@@ -244,6 +279,8 @@ export default function EmployeesClient({ employees: init, groups, teams }: {
             {active.map(emp => {
               const team = teams.find(t => t.id === emp.department_id)
               const group = team ? groups.find(g => g.id === team.group_id) : null
+              // 입사일 있으면 동적 계산, 없으면 DB값 표시
+              const displayAnnual = calcDisplay(emp.hired_at) ?? emp.annual_leave_days
               return (
                 <tr key={emp.id} className="hover:bg-gray-50/50">
                   <td className="px-4 py-3 font-medium text-gray-900">{emp.name}</td>
@@ -259,13 +296,14 @@ export default function EmployeesClient({ employees: init, groups, teams }: {
                       : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-500">
-                    {emp.hired_at
-                      ? emp.hired_at.slice(0, 10)
-                      : <span className="text-gray-300">—</span>}
+                    {emp.hired_at ? emp.hired_at.slice(0, 10) : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <span className="text-xs tabular-nums text-gray-700">
-                      {emp.remaining_leaves}<span className="text-gray-400">/{emp.annual_leave_days}일</span>
+                    <span className="text-sm font-medium tabular-nums text-gray-700">{displayAnnual}일</span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <span className={`text-sm font-medium tabular-nums ${emp.remaining_leaves <= 3 ? 'text-red-500' : 'text-gray-700'}`}>
+                      {emp.remaining_leaves}일
                     </span>
                   </td>
                   <td className="px-4 py-3">
@@ -288,7 +326,7 @@ export default function EmployeesClient({ employees: init, groups, teams }: {
               )
             })}
             {active.length === 0 && (
-              <tr><td colSpan={10} className="px-4 py-10 text-center text-gray-400">등록된 직원이 없습니다.</td></tr>
+              <tr><td colSpan={11} className="px-4 py-10 text-center text-gray-400">등록된 직원이 없습니다.</td></tr>
             )}
           </tbody>
         </table>
