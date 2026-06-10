@@ -1,29 +1,33 @@
 /**
- * 회계년도(1/1 ~ 12/31) 기준 연차 계산 (근로기준법 제60조)
+ * 입사일 기준 실발생 연차 계산 (근로기준법 제60조)
  *
- * - 입사 당해년도  : 입사 후 완성된 월수만큼 (최대 11일)
- * - 1년 이상 근속  : 15일
- * - 3년 이상 근속  : 15일 + floor((근속연수 - 1) / 2), 최대 25일
+ * - 1년 미만: 개근 완성 월수 + 진행 중인 월의 경과일/30 (소수점 1자리, 최대 11)
+ * - 1년 이상: 15일
+ * - 3년 이상: 15 + floor((근속연수 - 1) / 2), 최대 25일
  */
-export function calcAnnualLeave(hiredAt: Date, forYear: number = new Date().getFullYear()): number {
-  const hiredYear = hiredAt.getFullYear()
-  const hiredMonthIdx = hiredAt.getMonth() // 0 = 1월
+export function calcAnnualLeave(hiredAt: Date, asOf: Date = new Date()): number {
+  // asOf 기준 완성된 근속 개월수
+  let completedMonths = (asOf.getFullYear() - hiredAt.getFullYear()) * 12
+                      + (asOf.getMonth() - hiredAt.getMonth())
+  if (asOf.getDate() < hiredAt.getDate()) completedMonths--
+  completedMonths = Math.max(completedMonths, 0)
 
-  if (hiredYear > forYear) return 0
-
-  // 입사 당해년도: 입사월 다음달부터 12월까지의 완성 월수
-  if (hiredYear === forYear) {
-    const monthsWorked = 11 - hiredMonthIdx // 입사 이후 남은 완성 월수
-    return Math.min(Math.max(monthsWorked, 0), 11)
+  if (completedMonths < 12) {
+    // 마지막 월 기념일 이후 경과일 / 30 으로 소수 부분 계산
+    const lastAnniv = new Date(
+      hiredAt.getFullYear(),
+      hiredAt.getMonth() + completedMonths,
+      hiredAt.getDate(),
+    )
+    const daysIntoMonth = Math.max(
+      Math.floor((asOf.getTime() - lastAnniv.getTime()) / 86400000),
+      0,
+    )
+    const fraction = Math.round((daysIntoMonth / 30) * 10) / 10
+    return Math.min(Math.round((completedMonths + fraction) * 10) / 10, 11)
   }
 
-  // 회계년도 1/1 기준 근속 개월수 (= forYear 시작 전까지 완성된 근속월)
-  const serviceMonths = (forYear - hiredYear) * 12 - hiredMonthIdx
-
-  // 1년 미만: forYear에 1년 만근일까지 남은 완성 월수 (12 - 기근속월)
-  if (serviceMonths < 12) return Math.min(Math.max(12 - serviceMonths, 0), 11)
-
-  const fullYears = Math.floor(serviceMonths / 12)
+  const fullYears = Math.floor(completedMonths / 12)
   if (fullYears < 3) return 15
   return Math.min(15 + Math.floor((fullYears - 1) / 2), 25)
 }
