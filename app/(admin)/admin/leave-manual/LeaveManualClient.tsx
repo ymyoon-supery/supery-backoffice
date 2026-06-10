@@ -7,13 +7,13 @@ import { differenceInCalendarDays } from 'date-fns'
 import { adminAddLeaveRecord } from './actions'
 
 type Employee = { id: string; name: string; email: string; remaining_leaves: number }
-type LeaveType = 'ANNUAL' | 'HALF_DAY' | 'SICK' | 'COMP' | 'OTHER'
+type LeaveType = 'ANNUAL' | 'HALF_DAY' | 'SICK' | 'GROUP' | 'COMP' | 'OTHER'
 
-const LEAVE_TYPES: LeaveType[] = ['ANNUAL', 'HALF_DAY', 'SICK', 'COMP', 'OTHER']
+const LEAVE_TYPES: LeaveType[] = ['ANNUAL', 'HALF_DAY', 'SICK', 'GROUP', 'COMP', 'OTHER']
 const LEAVE_LABELS: Record<LeaveType, string> = {
-  ANNUAL: '연차', HALF_DAY: '반차', SICK: '병가(무급)', COMP: '보상휴가', OTHER: '기타',
+  ANNUAL: '연차', HALF_DAY: '반차', SICK: '병가(무급)', GROUP: '공동연차', COMP: '보상휴가', OTHER: '기타',
 }
-const DEDUCTS = new Set<LeaveType>(['ANNUAL', 'HALF_DAY'])
+const DEDUCTS = new Set<LeaveType>(['ANNUAL', 'HALF_DAY', 'GROUP'])
 
 type RecentEntry = { name: string; type: string; start: string; end: string; days: number }
 

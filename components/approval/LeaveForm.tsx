@@ -6,14 +6,15 @@ import { toast } from 'sonner'
 import { submitLeave } from '@/app/(dashboard)/approval/leave/actions'
 import { differenceInCalendarDays, format } from 'date-fns'
 
-type LeaveType = 'ANNUAL' | 'HALF_DAY' | 'SICK' | 'COMP' | 'OTHER'
+type LeaveType = 'ANNUAL' | 'HALF_DAY' | 'SICK' | 'GROUP' | 'COMP' | 'OTHER'
 
-const LEAVE_TYPES: LeaveType[] = ['ANNUAL', 'HALF_DAY', 'SICK', 'COMP', 'OTHER']
+const LEAVE_TYPES: LeaveType[] = ['ANNUAL', 'HALF_DAY', 'SICK', 'GROUP', 'COMP', 'OTHER']
 
 const LEAVE_LABELS: Record<LeaveType, string> = {
   ANNUAL: '연차',
   HALF_DAY: '반차',
   SICK: '병가(무급)',
+  GROUP: '공동연차',
   COMP: '보상휴가',
   OTHER: '기타',
 }
@@ -22,7 +23,7 @@ const FIXED_DAYS: Partial<Record<LeaveType, number>> = {
   HALF_DAY: 0.5,
 }
 
-const DEDUCTS_LEAVE = new Set<LeaveType>(['ANNUAL', 'HALF_DAY'])
+const DEDUCTS_LEAVE = new Set<LeaveType>(['ANNUAL', 'HALF_DAY', 'GROUP'])
 
 export default function LeaveForm({ remainingLeaves }: { remainingLeaves: number }) {
   const router = useRouter()

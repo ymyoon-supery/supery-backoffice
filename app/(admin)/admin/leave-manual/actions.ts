@@ -29,7 +29,7 @@ export type ManualLeaveInput = {
   reason: string | null
 }
 
-const DEDUCTS_LEAVE = ['ANNUAL', 'HALF_DAY']
+const DEDUCTS_LEAVE = ['ANNUAL', 'HALF_DAY', 'GROUP']
 
 export async function adminAddLeaveRecord(input: ManualLeaveInput) {
   const { error: authError } = await requireAdmin()
