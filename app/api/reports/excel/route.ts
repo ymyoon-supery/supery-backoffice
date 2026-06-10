@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import ExcelJS from 'exceljs'
-import { format } from 'date-fns'
+import { format, differenceInMinutes } from 'date-fns'
 
 export const runtime = 'nodejs'
 
@@ -47,7 +47,8 @@ export async function GET(request: NextRequest) {
     { header: '날짜', key: 'date', width: 12 },
     { header: '출근', key: 'checkIn', width: 10 },
     { header: '퇴근', key: 'checkOut', width: 10 },
-    { header: '근무시간(분)', key: 'workMinutes', width: 14 },
+    { header: '순 근무시간(분)', key: 'workMinutes', width: 15 },
+    { header: '휴식시간(분)', key: 'breakMinutes', width: 13 },
     { header: '재택/외근', key: 'workType', width: 12 },
     { header: '위치', key: 'location', width: 30 },
   ]
@@ -59,10 +60,21 @@ export async function GET(request: NextRequest) {
     fgColor: { argb: 'FFE8F0FE' },
   }
 
-  // Group by employee + date
-  type DayKey = string
-  type DayRecord = { name: string; email: string; dept: string; checkIn?: string; checkOut?: string; isField: boolean; location?: string }
-  const byDay = new Map<DayKey, DayRecord>()
+  type DayRecord = {
+    name: string
+    email: string
+    dept: string
+    checkIn?: string
+    checkOut?: string
+    checkInTs?: Date
+    checkOutTs?: Date
+    breakMinutes: number
+    lastBreakStart?: Date
+    isField: boolean
+    location?: string
+  }
+
+  const byDay = new Map<string, DayRecord>()
 
   for (const r of records ?? []) {
     const emp = r.employees as unknown as { name: string; email: string; departments: { name: string } | null } | null
@@ -73,25 +85,38 @@ export async function GET(request: NextRequest) {
       name: emp.name,
       email: emp.email,
       dept: emp.departments?.name ?? '',
+      breakMinutes: 0,
       isField: false,
     }
+
+    const ts = new Date(r.recorded_at)
+
     if (r.type === 'CHECK_IN') {
-      existing.checkIn = format(new Date(r.recorded_at), 'HH:mm')
+      existing.checkIn = format(ts, 'HH:mm')
+      existing.checkInTs = ts
       existing.isField = r.is_field
       existing.location = r.location ?? undefined
-    } else {
-      existing.checkOut = format(new Date(r.recorded_at), 'HH:mm')
+    } else if (r.type === 'CHECK_OUT') {
+      existing.checkOut = format(ts, 'HH:mm')
+      existing.checkOutTs = ts
+    } else if (r.type === 'BREAK_START') {
+      existing.lastBreakStart = ts
+    } else if (r.type === 'BREAK_END' && existing.lastBreakStart) {
+      existing.breakMinutes += differenceInMinutes(ts, existing.lastBreakStart)
+      existing.lastBreakStart = undefined
+    } else if (r.type === 'FIELD_START') {
+      existing.isField = true
     }
+
     byDay.set(key, existing)
   }
 
   for (const [key, day] of byDay) {
     const date = key.split(':')[1]
     let workMinutes = 0
-    if (day.checkIn && day.checkOut) {
-      const [ih, im] = day.checkIn.split(':').map(Number)
-      const [oh, om] = day.checkOut.split(':').map(Number)
-      workMinutes = (oh * 60 + om) - (ih * 60 + im)
+    if (day.checkInTs && day.checkOutTs) {
+      const gross = differenceInMinutes(day.checkOutTs, day.checkInTs)
+      workMinutes = Math.max(0, gross - day.breakMinutes)
     }
     sheet.addRow({
       name: day.name,
@@ -101,6 +126,7 @@ export async function GET(request: NextRequest) {
       checkIn: day.checkIn ?? '',
       checkOut: day.checkOut ?? '',
       workMinutes: workMinutes > 0 ? workMinutes : '',
+      breakMinutes: day.breakMinutes > 0 ? day.breakMinutes : '',
       workType: day.isField ? '외근' : '사무실',
       location: day.location ?? '',
     })

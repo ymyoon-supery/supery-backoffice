@@ -5,7 +5,7 @@ import { revalidateTag } from 'next/cache'
 import { CACHE_TAGS } from '@/lib/cache/tags'
 
 type RecordAttendanceInput = {
-  type: 'CHECK_IN' | 'CHECK_OUT'
+  type: 'CHECK_IN' | 'CHECK_OUT' | 'BREAK_START' | 'BREAK_END' | 'FIELD_START' | 'FIELD_END'
   location: string | null
   latitude: number | null
   longitude: number | null

@@ -9,6 +9,7 @@ import { recordAttendance } from '@/app/(dashboard)/attendance/actions'
 
 type WorkState = 'BEFORE_WORK' | 'WORKING' | 'BREAK' | 'FIELD' | 'DONE'
 type GeoData = { location: string; latitude: number; longitude: number }
+type AttendanceType = 'CHECK_IN' | 'CHECK_OUT' | 'BREAK_START' | 'BREAK_END' | 'FIELD_START' | 'FIELD_END'
 
 const STATE_LABEL: Record<WorkState, string> = {
   BEFORE_WORK: '업무 전',
@@ -49,7 +50,7 @@ export default function TimeTracker({ initialState }: { initialState?: WorkState
     isAutoBreakRef.current = false
     startTransition(async () => {
       await recordAttendance({
-        type: 'CHECK_IN',
+        type: 'BREAK_END',
         location: null,
         latitude: null,
         longitude: null,
@@ -65,7 +66,7 @@ export default function TimeTracker({ initialState }: { initialState?: WorkState
     if (stateRef.current !== 'WORKING' && stateRef.current !== 'FIELD') return
     startTransition(async () => {
       const result = await recordAttendance({
-        type: 'CHECK_IN',
+        type: 'BREAK_START',
         location: null,
         latitude: null,
         longitude: null,
@@ -110,7 +111,6 @@ export default function TimeTracker({ initialState }: { initialState?: WorkState
   }, [state, isAutoBreak, handleActivity, triggerAutoBreak])
 
   function requestTransition(next: WorkState) {
-    // Only FIELD (외근) requires GPS confirmation
     if (next === 'FIELD' && !geoData) {
       setPendingNext(next)
       setShowGPS(true)
@@ -129,20 +129,33 @@ export default function TimeTracker({ initialState }: { initialState?: WorkState
   }
 
   function commitTransition(next: WorkState, geo: GeoData | null) {
-    const typeMap: Partial<Record<WorkState, 'CHECK_IN' | 'CHECK_OUT'>> = {
-      WORKING: 'CHECK_IN',
-      DONE: 'CHECK_OUT',
+    const current = stateRef.current
+    let type: AttendanceType
+    let note: string | null = null
+
+    if (next === 'WORKING') {
+      if (current === 'BEFORE_WORK') { type = 'CHECK_IN' }
+      else if (current === 'BREAK') { type = 'BREAK_END'; note = '업무 복귀' }
+      else if (current === 'FIELD') { type = 'FIELD_END'; note = '외근 복귀' }
+      else { type = 'CHECK_IN' }
+    } else if (next === 'BREAK') {
+      type = 'BREAK_START'; note = '휴식'
+    } else if (next === 'FIELD') {
+      type = 'FIELD_START'; note = '외근'
+    } else if (next === 'DONE') {
+      type = 'CHECK_OUT'
+    } else {
+      type = 'CHECK_IN'
     }
-    const type = typeMap[next]
 
     startTransition(async () => {
       const result = await recordAttendance({
-        type: type ?? 'CHECK_IN',
+        type,
         location: geo?.location ?? null,
         latitude: geo?.latitude ?? null,
         longitude: geo?.longitude ?? null,
         isField: next === 'FIELD',
-        note: next === 'BREAK' ? '휴식' : next === 'FIELD' ? '외근' : null,
+        note,
       })
       if (result?.error) {
         toast.error(result.error)
