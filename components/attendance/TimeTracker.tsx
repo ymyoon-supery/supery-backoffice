@@ -239,12 +239,6 @@ export default function TimeTracker({ initialState }: { initialState?: WorkState
           {state === 'WORKING' && (
             <>
               <ActionButton
-                icon={<Coffee size={15} />}
-                label="휴식 시작"
-                onClick={() => requestTransition('BREAK')}
-                disabled={isPending}
-              />
-              <ActionButton
                 icon={<MapPin size={15} />}
                 label="외근 시작"
                 onClick={() => requestTransition('FIELD')}
