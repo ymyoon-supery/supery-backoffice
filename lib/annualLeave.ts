@@ -17,10 +17,11 @@ export function calcAnnualLeave(hiredAt: Date, forYear: number = new Date().getF
     return Math.min(Math.max(monthsWorked, 0), 11)
   }
 
-  // 회계년도 1/1 기준 근속 개월수
+  // 회계년도 1/1 기준 근속 개월수 (= forYear 시작 전까지 완성된 근속월)
   const serviceMonths = (forYear - hiredYear) * 12 - hiredMonthIdx
 
-  if (serviceMonths < 12) return Math.min(Math.max(serviceMonths, 0), 11)
+  // 1년 미만: forYear에 1년 만근일까지 남은 완성 월수 (12 - 기근속월)
+  if (serviceMonths < 12) return Math.min(Math.max(12 - serviceMonths, 0), 11)
 
   const fullYears = Math.floor(serviceMonths / 12)
   if (fullYears < 3) return 15
