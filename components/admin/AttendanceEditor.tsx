@@ -25,10 +25,14 @@ const TYPE_COLOR: Record<string, string> = {
 }
 
 // Always format in KST regardless of server/client timezone
+// Uses UTC getters after +9h shift to avoid local timezone double-application
 function formatKST(dateStr: string) {
-  const d = new Date(dateStr)
-  const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000)
-  return format(kst, 'MM/dd HH:mm')
+  const kst = new Date(new Date(dateStr).getTime() + 9 * 60 * 60 * 1000)
+  const mm = String(kst.getUTCMonth() + 1).padStart(2, '0')
+  const dd = String(kst.getUTCDate()).padStart(2, '0')
+  const hh = String(kst.getUTCHours()).padStart(2, '0')
+  const mi = String(kst.getUTCMinutes()).padStart(2, '0')
+  return `${mm}/${dd} ${hh}:${mi}`
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

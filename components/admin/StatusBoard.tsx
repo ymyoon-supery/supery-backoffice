@@ -89,7 +89,7 @@ export default function StatusBoard({ initial }: { initial: EmployeeStatus[] }) 
               </span>
               {s.lastRecord && (
                 <span className="text-xs text-gray-400">
-                  {format(new Date(new Date(s.lastRecord.recorded_at).getTime() + 9 * 60 * 60 * 1000), 'HH:mm')}
+                  {(() => { const k = new Date(new Date(s.lastRecord.recorded_at).getTime() + 9 * 60 * 60 * 1000); return `${String(k.getUTCHours()).padStart(2,'0')}:${String(k.getUTCMinutes()).padStart(2,'0')}` })()}
                 </span>
               )}
             </div>
