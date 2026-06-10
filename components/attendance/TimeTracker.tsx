@@ -58,6 +58,14 @@ export default function TimeTracker({ initialState }: { initialState?: WorkState
   }, [triggerAutoBreak])
 
   useEffect(() => {
+    if (state !== 'WORKING' && state !== 'FIELD') return
+    const send = () => fetch('/api/attendance/heartbeat', { method: 'POST' })
+    send()
+    const id = setInterval(send, 5 * 60 * 1000)
+    return () => clearInterval(id)
+  }, [state])
+
+  useEffect(() => {
     if (state !== 'WORKING' && state !== 'FIELD') {
       if (timerRef.current) clearTimeout(timerRef.current)
       return

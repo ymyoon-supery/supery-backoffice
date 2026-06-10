@@ -4,6 +4,23 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidateTag } from 'next/cache'
 import { CACHE_TAGS } from '@/lib/cache/tags'
 
+export async function resolveAnomaly(recordId: string, checkoutTime: string, note: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: '인증이 필요합니다.' }
+
+  const { error } = await supabase
+    .from('attendance_records')
+    .update({ recorded_at: new Date(checkoutTime).toISOString(), note, is_anomaly: false })
+    .eq('id', recordId)
+
+  if (error) return { error: error.message }
+
+  revalidateTag(CACHE_TAGS.attendance)
+  revalidateTag(CACHE_TAGS.adminReport)
+  return { error: null }
+}
+
 export async function correctAttendance(recordId: string, note: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

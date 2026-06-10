@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/cron/auto-checkout",
+      "schedule": "0 17 * * *"
+    },
+    {
       "path": "/api/google/directory-sync",
       "schedule": "0 17 * * *"
     },

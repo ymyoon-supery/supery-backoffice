@@ -13,10 +13,11 @@ export default async function AdminAttendancePage() {
   const { data: records } = await supabase
     .from('attendance_records')
     .select(`
-      id, type, recorded_at, location, is_field, note,
+      id, type, recorded_at, location, is_field, note, is_anomaly,
       employees ( id, name, email )
     `)
     .gte('recorded_at', `${since}T00:00:00+09:00`)
+    .order('is_anomaly', { ascending: false })
     .order('recorded_at', { ascending: false })
     .limit(200)
 
