@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
   for (const r of records ?? []) {
     const emp = r.employees as unknown as { name: string; email: string; departments: { name: string } | null } | null
     if (!emp) continue
-    const kstDate = format(new Date(r.recorded_at), 'yyyy-MM-dd')
+    const kstDate = format(new Date(new Date(r.recorded_at).getTime() + 9 * 60 * 60 * 1000), 'yyyy-MM-dd')
     const key = `${r.employee_id}:${kstDate}`
     const existing = byDay.get(key) ?? {
       name: emp.name,

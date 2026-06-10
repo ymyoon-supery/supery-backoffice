@@ -8,7 +8,7 @@ export default async function AdminEmployeesPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const today = format(new Date(), 'yyyy-MM-dd')
+  const today = format(new Date(new Date().getTime() + 9 * 60 * 60 * 1000), 'yyyy-MM-dd')
 
   const { data: employees } = await supabase
     .from('employees')

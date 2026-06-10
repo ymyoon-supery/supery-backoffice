@@ -89,7 +89,7 @@ export default function StatusBoard({ initial }: { initial: EmployeeStatus[] }) 
               </span>
               {s.lastRecord && (
                 <span className="text-xs text-gray-400">
-                  {format(new Date(s.lastRecord.recorded_at), 'HH:mm')}
+                  {format(new Date(new Date(s.lastRecord.recorded_at).getTime() + 9 * 60 * 60 * 1000), 'HH:mm')}
                 </span>
               )}
             </div>
