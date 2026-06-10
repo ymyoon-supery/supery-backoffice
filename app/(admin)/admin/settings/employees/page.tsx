@@ -7,7 +7,7 @@ export default async function EmployeesSettingsPage() {
   const [{ data: employees }, { data: groups }, { data: teams }] = await Promise.all([
     supabase
       .from('employees')
-      .select('id, name, email, role, rank, position, department_id, is_active, auth_user_id')
+      .select('id, name, email, role, rank, position, department_id, is_active, auth_user_id, hired_at, annual_leave_days, remaining_leaves')
       .order('name'),
     supabase.from('groups').select('id, name').order('name'),
     supabase.from('departments').select('id, name, group_id').order('name'),

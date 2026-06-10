@@ -10,6 +10,7 @@ import {
   Users,
   ClipboardList,
   Home,
+  Bell,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -25,6 +26,7 @@ const adminNav = [
   { href: '/admin/attendance', label: '근태 관리', icon: Clock },
   { href: '/admin/reports', label: '리포트', icon: BarChart2 },
   { href: '/admin/employees', label: '직원 관리', icon: Users },
+  { href: '/admin/leave-promotion', label: '연차사용촉진', icon: Bell },
   { href: '/admin/settings', label: '설정', icon: Settings },
 ]
 

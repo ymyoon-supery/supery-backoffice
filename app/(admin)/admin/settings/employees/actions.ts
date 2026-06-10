@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
+import { calcAnnualLeave } from '@/lib/annualLeave'
 
 async function requireAdmin() {
   const supabase = await createClient()
@@ -27,6 +28,7 @@ export type CreateEmployeeInput = {
   rank: string | null
   position: string | null
   role: 'ADMIN' | 'MANAGER' | 'EMPLOYEE'
+  hiredAt: string | null
 }
 
 export async function createEmployee(input: CreateEmployeeInput) {
@@ -37,6 +39,9 @@ export async function createEmployee(input: CreateEmployeeInput) {
     return { error: '이메일은 @supery.co.kr 도메인이어야 합니다.' }
   }
 
+  const hiredDate = input.hiredAt ? new Date(input.hiredAt) : null
+  const annualLeaveDays = hiredDate ? calcAnnualLeave(hiredDate) : 15
+
   const client = adminClient()
   const { error } = await client.from('employees').insert({
     name: input.name.trim(),
@@ -45,6 +50,9 @@ export async function createEmployee(input: CreateEmployeeInput) {
     rank: input.rank || null,
     position: input.position || null,
     role: input.role,
+    hired_at: input.hiredAt || null,
+    annual_leave_days: annualLeaveDays,
+    remaining_leaves: annualLeaveDays,
   })
 
   if (error) {
@@ -63,20 +71,30 @@ export type UpdateEmployeeInput = {
   rank: string | null
   position: string | null
   role: 'ADMIN' | 'MANAGER' | 'EMPLOYEE'
+  hiredAt: string | null
 }
 
 export async function updateEmployee(input: UpdateEmployeeInput) {
   const { error: authError } = await requireAdmin()
   if (authError) return { error: authError }
 
-  const client = adminClient()
-  const { error } = await client.from('employees').update({
+  const hiredDate = input.hiredAt ? new Date(input.hiredAt) : null
+  const annualLeaveDays = hiredDate ? calcAnnualLeave(hiredDate) : undefined
+
+  const updateData: Record<string, unknown> = {
     name: input.name.trim(),
     department_id: input.departmentId || null,
     rank: input.rank || null,
     position: input.position || null,
     role: input.role,
-  }).eq('id', input.id)
+    hired_at: input.hiredAt || null,
+  }
+  if (annualLeaveDays !== undefined) {
+    updateData.annual_leave_days = annualLeaveDays
+  }
+
+  const client = adminClient()
+  const { error } = await client.from('employees').update(updateData).eq('id', input.id)
 
   if (error) return { error: error.message }
   revalidatePath('/admin/settings/employees')

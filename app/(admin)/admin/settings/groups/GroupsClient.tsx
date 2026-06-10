@@ -34,7 +34,7 @@ export default function GroupsClient({ groups: init, teams: initTeams }: { group
       const result = await createGroup(name)
       if (result.error) { toast.error(result.error); return }
       toast.success(`그룹 "${name}" 등록됨`)
-      setGroups(prev => [...prev, { id: crypto.randomUUID(), name }])
+      setGroups(prev => [...prev, { id: result.id!, name }])
       setAddingGroup(false); setGroupInput(''); setGroupPreset('')
     })
   }
@@ -56,7 +56,7 @@ export default function GroupsClient({ groups: init, teams: initTeams }: { group
       const result = await createTeam(groupId, name)
       if (result.error) { toast.error(result.error); return }
       toast.success(`팀 "${name}" 등록됨`)
-      setTeams(prev => [...prev, { id: crypto.randomUUID(), name, group_id: groupId }])
+      setTeams(prev => [...prev, { id: result.id!, name, group_id: groupId }])
       setAddingTeamFor(null); setTeamInput(''); setTeamPreset('')
     })
   }
