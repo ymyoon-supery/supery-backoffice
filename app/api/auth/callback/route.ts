@@ -37,30 +37,43 @@ export async function GET(request: NextRequest) {
 
   const user = data.user
 
-  // Use service role to bypass RLS — new users have no employee record yet
   const adminClient = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   )
 
-  const { error: upsertError } = await adminClient
+  // If admin pre-registered this email (auth_user_id = null), link the auth account
+  const { data: preRegistered } = await adminClient
     .from('employees')
-    .upsert(
-      {
+    .select('id')
+    .eq('email', user.email!)
+    .is('auth_user_id', null)
+    .maybeSingle()
+
+  if (preRegistered) {
+    const { error: linkError } = await adminClient
+      .from('employees')
+      .update({
         auth_user_id: user.id,
-        email: user.email!,
-        name: user.user_metadata.full_name ?? user.email!.split('@')[0],
         avatar_url: user.user_metadata.avatar_url ?? null,
         google_user_id: user.user_metadata.sub ?? null,
-      },
-      {
-        onConflict: 'auth_user_id',
-        ignoreDuplicates: false,
-      },
-    )
-
-  if (upsertError) {
-    console.error('[auth/callback] employee upsert failed:', upsertError.message)
+      })
+      .eq('id', preRegistered.id)
+    if (linkError) console.error('[auth/callback] pre-registered link failed:', linkError.message)
+  } else {
+    const { error: upsertError } = await adminClient
+      .from('employees')
+      .upsert(
+        {
+          auth_user_id: user.id,
+          email: user.email!,
+          name: user.user_metadata.full_name ?? user.email!.split('@')[0],
+          avatar_url: user.user_metadata.avatar_url ?? null,
+          google_user_id: user.user_metadata.sub ?? null,
+        },
+        { onConflict: 'auth_user_id', ignoreDuplicates: false },
+      )
+    if (upsertError) console.error('[auth/callback] employee upsert failed:', upsertError.message)
   }
 
   return NextResponse.redirect(`${origin}${next}`)
