@@ -279,6 +279,19 @@ export default function LeaveManualClient({ employees, leaveRecords: init }: {
             ))}
           </select>
         </div>
+        {filterEmpId && (() => {
+          const emp = employees.find(e => e.id === filterEmpId)
+          if (!emp) return null
+          const used = Math.round((emp.annual_leave_days - emp.remaining_leaves) * 10) / 10
+          return (
+            <div className="px-4 py-2.5 bg-blue-50 border-b border-blue-100 flex items-center gap-5 text-xs">
+              <span className="font-medium text-blue-800">{emp.name}</span>
+              <span className="text-blue-600">보유연차 <strong className="text-blue-800">{emp.annual_leave_days}일</strong></span>
+              <span className="text-blue-600">사용연차 <strong className="text-blue-800">{used}일</strong></span>
+              <span className="text-blue-600">잔여연차 <strong className="text-blue-800">{emp.remaining_leaves}일</strong></span>
+            </div>
+          )
+        })()}
         {filtered.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-8">내역이 없습니다.</p>
         ) : (

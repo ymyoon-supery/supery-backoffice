@@ -104,31 +104,40 @@ export async function GET(request: Request) {
 
   // ── Sheet 1: 연차 사용 내역 (UI 조회 화면과 동일한 순서) ──────
   const s1 = wb.addWorksheet('연차 사용 내역')
-  s1.columns = [
-    { header: '직원',    key: 'name',      width: 14 },
-    { header: '부서',    key: 'dept',      width: 14 },
-    { header: '유형',    key: 'type',      width: 12 },
-    { header: '시작일',  key: 'startDate', width: 13 },
-    { header: '종료일',  key: 'endDate',   width: 13 },
-    { header: '사용일수', key: 'days',     width: 10 },
-    { header: '사유',    key: 'reason',    width: 30 },
-    { header: '구분',    key: 'source',    width: 8  },
-  ]
-  s1.getRow(1).font = { bold: true }
-  s1.getRow(1).fill = headerFill
+  const s1ColWidths = [14, 14, 12, 13, 13, 10, 30, 8]
+  s1ColWidths.forEach((w, i) => { s1.getColumn(i + 1).width = w })
+
+  // 직원 개인 조회 시 상단에 연차 현황 요약 표시
+  if (employeeIdFilter && employees.length > 0) {
+    const emp = employees[0]
+    const usedDays = Math.round((emp.entitlement - emp.remaining) * 10) / 10
+    const infoRow = s1.addRow([
+      `${emp.name}`,
+      `보유연차: ${emp.entitlement}일`,
+      `사용연차: ${usedDays}일`,
+      `잔여연차: ${emp.remaining}일`,
+    ])
+    infoRow.font = { bold: true, size: 11 }
+    infoRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD0E4FF' } }
+    s1.addRow([]) // spacer
+  }
+
+  const s1Header = s1.addRow(['직원', '부서', '유형', '시작일', '종료일', '사용일수', '사유', '구분'])
+  s1Header.font = { bold: true }
+  s1Header.fill = headerFill
 
   for (const r of leaveRecords ?? []) {
     const emp = empMap.get(r.employee_id)
-    s1.addRow({
-      name:      emp?.name     ?? '—',
-      dept:      emp?.deptName ?? '—',
-      type:      LEAVE_LABELS[r.leave_type] ?? r.leave_type,
-      startDate: r.start_date,
-      endDate:   r.end_date,
-      days:      DEDUCTS.has(r.leave_type) ? Number(r.days_used) : 0,
-      reason:    r.reason ?? '',
-      source:    r.is_manual ? '수동' : '결재',
-    })
+    s1.addRow([
+      emp?.name     ?? '—',
+      emp?.deptName ?? '—',
+      LEAVE_LABELS[r.leave_type] ?? r.leave_type,
+      r.start_date,
+      r.end_date,
+      DEDUCTS.has(r.leave_type) ? Number(r.days_used) : 0,
+      r.reason ?? '',
+      r.is_manual ? '수동' : '결재',
+    ])
   }
 
   // ── Sheet 2: 연차 현황 (직원별 요약) ──────────────────────────

@@ -3,6 +3,27 @@ import { MapPin, ExternalLink } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
+async function fetchKoreanAddress(lat: number, lng: number): Promise<string> {
+  const apiKey = process.env.KAKAO_REST_API_KEY
+  if (!apiKey) return ''
+  try {
+    const res = await fetch(
+      `https://dapi.kakao.com/v2/local/geo/coord2address.json?x=${lng}&y=${lat}`,
+      {
+        headers: { Authorization: `KakaoAK ${apiKey}` },
+        next: { revalidate: 3600 },
+      },
+    )
+    const data = await res.json()
+    const addr = data.documents?.[0]?.address
+    if (!addr) return ''
+    return [addr.region_1depth_name, addr.region_2depth_name, addr.region_3depth_name]
+      .filter(Boolean).join(' ')
+  } catch {
+    return ''
+  }
+}
+
 export default async function HomeLocationsPage() {
   const admin = createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,12 +47,18 @@ export default async function HomeLocationsPage() {
   const registered = (employees ?? []).filter(e => e.home_lat != null && e.home_lng != null)
   const unregistered = (employees ?? []).filter(e => e.home_lat == null || e.home_lng == null)
 
+  // 등록된 직원의 GPS 좌표를 한국 주소로 변환 (병렬 요청)
+  const addressResults = await Promise.all(
+    registered.map(e => fetchKoreanAddress(Number(e.home_lat), Number(e.home_lng)))
+  )
+  const addressMap = new Map(registered.map((e, i) => [e.id, addressResults[i]]))
+
   function mapsUrl(lat: number, lng: number) {
     return `https://www.google.com/maps?q=${lat},${lng}`
   }
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="max-w-5xl space-y-6">
       <div className="flex items-center gap-3">
         <h2 className="text-sm font-semibold text-gray-800">재택근무지 현황</h2>
         <span className="text-xs text-gray-400">
@@ -49,10 +76,11 @@ export default async function HomeLocationsPage() {
         <table className="w-full text-sm table-fixed">
           <thead>
             <tr className="border-b border-gray-100 text-xs text-gray-400 font-medium text-left bg-gray-50/50">
-              <th className="px-4 py-3 w-[140px]">직원</th>
-              <th className="px-4 py-3 w-[120px]">부서</th>
-              <th className="px-4 py-3">GPS 좌표</th>
-              <th className="px-4 py-3 w-[90px] text-center">지도</th>
+              <th className="px-4 py-3 w-[130px]">직원</th>
+              <th className="px-4 py-3 w-[110px]">부서</th>
+              <th className="px-4 py-3 w-[170px]">GPS 좌표</th>
+              <th className="px-4 py-3">주소 (시구군동)</th>
+              <th className="px-4 py-3 w-[80px] text-center">지도</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -70,6 +98,9 @@ export default async function HomeLocationsPage() {
                         {lat.toFixed(5)}, {lng.toFixed(5)}
                       </span>
                     </div>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-gray-600">
+                    {addressMap.get(e.id) || '—'}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <a
@@ -90,13 +121,14 @@ export default async function HomeLocationsPage() {
                 <td className="px-4 py-3 font-medium text-gray-900">{e.name}</td>
                 <td className="px-4 py-3 text-xs text-gray-400">{deptMap.get(e.department_id) ?? '—'}</td>
                 <td className="px-4 py-3 text-xs text-gray-400">미등록</td>
+                <td className="px-4 py-3 text-xs text-gray-300">—</td>
                 <td className="px-4 py-3 text-center text-xs text-gray-300">—</td>
               </tr>
             ))}
 
             {(employees ?? []).length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-10 text-center text-sm text-gray-400">
+                <td colSpan={5} className="px-4 py-10 text-center text-sm text-gray-400">
                   직원 정보가 없습니다.
                 </td>
               </tr>
