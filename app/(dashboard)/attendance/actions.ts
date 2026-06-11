@@ -25,6 +25,13 @@ export async function registerHomeLocation(lat: number, lng: number) {
   if (error) return { error: error.message }
   if (!data || data.length === 0) return { error: '직원 정보를 찾을 수 없습니다.' }
 
+  const empId = data[0].id
+  await admin
+    .from('home_location_requests')
+    .update({ status: 'REJECTED', comment: '재택근무지 직접 등록으로 대체됨' })
+    .eq('employee_id', empId)
+    .eq('status', 'PENDING')
+
   revalidateTag(CACHE_TAGS.attendance)
   revalidatePath('/admin/settings/home-locations')
   return { ok: true }

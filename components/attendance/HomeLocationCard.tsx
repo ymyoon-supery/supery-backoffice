@@ -59,6 +59,7 @@ export default function HomeLocationCard({
         const res = await registerHomeLocation(lat, lng)
         if (res.error) { toast.error(res.error); return }
         setLocation({ lat, lng })
+        setPendingReq(null)
         toast.success('재택근무지가 등록되었습니다.')
       }
     })
@@ -74,7 +75,7 @@ export default function HomeLocationCard({
         <button
           type="button"
           onClick={handleAction}
-          disabled={isPending || !!pendingReq}
+          disabled={isPending || (!!pendingReq && !!location)}
           className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
         >
           <RefreshCw size={12} className={isPending ? 'animate-spin' : ''} />

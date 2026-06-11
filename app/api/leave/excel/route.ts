@@ -12,7 +12,7 @@ const LEAVE_LABELS: Record<string, string> = {
   SICK: '병가(무급)', GROUP: '공동연차', COMP: '보상휴가', OTHER: '기타',
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -32,23 +32,39 @@ export async function GET() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   )
 
+  const { searchParams } = new URL(request.url)
+  const employeeIdFilter = searchParams.get('employeeId') ?? undefined
+
   const today = new Date()
   const kstNow = new Date(today.getTime() + 9 * 60 * 60 * 1000)
   const dateStr = kstNow.toISOString().slice(0, 10).replace(/-/g, '')
 
+  let empQuery = admin.from('employees')
+    .select('id, name, email, hired_at, annual_leave_days, department_id, departments(name)')
+    .eq('is_active', true)
+    .order('name')
+  if (employeeIdFilter) {
+    empQuery = empQuery.eq('id', employeeIdFilter) as typeof empQuery
+  }
+
+  let recordsQuery = admin.from('leave_requests')
+    .select('id, employee_id, leave_type, start_date, end_date, days_used, reason, is_manual, created_at')
+    .eq('status', 'APPROVED')
+    .order('start_date', { ascending: false })
+  if (employeeIdFilter) {
+    recordsQuery = recordsQuery.eq('employee_id', employeeIdFilter) as typeof recordsQuery
+  }
+
+  let usedQuery = admin.from('leave_requests')
+    .select('employee_id, leave_type, days_used')
+    .eq('status', 'APPROVED')
+    .in('leave_type', [...DEDUCTS])
+  if (employeeIdFilter) {
+    usedQuery = usedQuery.eq('employee_id', employeeIdFilter) as typeof usedQuery
+  }
+
   const [{ data: rawEmployees }, { data: leaveRecords }, { data: usedTotals }] = await Promise.all([
-    admin.from('employees')
-      .select('id, name, email, hired_at, annual_leave_days, department_id, departments(name)')
-      .eq('is_active', true)
-      .order('name'),
-    admin.from('leave_requests')
-      .select('id, employee_id, leave_type, start_date, end_date, days_used, reason, is_manual, created_at')
-      .eq('status', 'APPROVED')
-      .order('start_date', { ascending: false }),
-    admin.from('leave_requests')
-      .select('employee_id, leave_type, days_used')
-      .eq('status', 'APPROVED')
-      .in('leave_type', [...DEDUCTS]),
+    empQuery, recordsQuery, usedQuery,
   ])
 
   const usedByEmp: Record<string, number> = {}
@@ -65,6 +81,10 @@ export async function GET() {
     const dept = e.departments as unknown as { name: string } | null
     return { ...e, entitlement, used, remaining, deptName: dept?.name ?? '' }
   })
+
+  const filterLabel = employeeIdFilter
+    ? (employees[0]?.name ?? '직원')
+    : '전체'
 
   const empMap = new Map(employees.map(e => [e.id, e]))
 
@@ -133,7 +153,7 @@ export async function GET() {
   }
 
   const buffer = await wb.xlsx.writeBuffer()
-  const filename = encodeURIComponent(`연차사용내역_${dateStr}.xlsx`)
+  const filename = encodeURIComponent(`연차사용내역_${filterLabel}_${dateStr}.xlsx`)
 
   return new NextResponse(buffer, {
     headers: {

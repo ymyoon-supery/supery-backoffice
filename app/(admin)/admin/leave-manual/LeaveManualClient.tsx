@@ -4,7 +4,7 @@ import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { differenceInCalendarDays } from 'date-fns'
-import { Pencil, Trash2, X } from 'lucide-react'
+import { Pencil, Trash2, X, Download } from 'lucide-react'
 import { adminAddLeaveRecord, adminUpdateLeaveRecord, adminDeleteLeaveRecord } from './actions'
 
 type Employee = { id: string; name: string; email: string; annual_leave_days: number; remaining_leaves: number }
@@ -252,6 +252,17 @@ export default function LeaveManualClient({ employees, leaveRecords: init }: {
           className="w-full py-2.5 bg-primary text-white text-sm font-medium rounded-lg disabled:opacity-40 hover:bg-primary/90 transition-colors">
           {isPending ? '등록 중...' : '연차 내역 등록'}
         </button>
+
+        <a
+          href={filterEmpId ? `/api/leave/excel?employeeId=${filterEmpId}` : '/api/leave/excel'}
+          className="flex items-center justify-center gap-2 w-full py-2.5 border border-gray-200 text-sm text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
+        >
+          <Download size={14} />
+          Excel 다운로드
+          <span className="text-xs text-gray-400">
+            ({filterEmpId ? (employees.find(e => e.id === filterEmpId)?.name ?? '직원') : '전체'})
+          </span>
+        </a>
       </div>
 
       {/* 전체 연차 내역 목록 */}
