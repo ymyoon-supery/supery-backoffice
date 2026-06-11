@@ -9,16 +9,17 @@ async function fetchKoreanAddress(lat: number, lng: number): Promise<string> {
   try {
     const res = await fetch(
       `https://dapi.kakao.com/v2/local/geo/coord2address.json?x=${lng}&y=${lat}`,
-      {
-        headers: { Authorization: `KakaoAK ${apiKey}` },
-        next: { revalidate: 3600 },
-      },
+      { headers: { Authorization: `KakaoAK ${apiKey}` }, cache: 'no-store' },
     )
+    if (!res.ok) return ''
     const data = await res.json()
-    const addr = data.documents?.[0]?.address
-    if (!addr) return ''
-    return [addr.region_1depth_name, addr.region_2depth_name, addr.region_3depth_name]
-      .filter(Boolean).join(' ')
+    const doc = data.documents?.[0]
+    if (!doc) return ''
+    // address(지번) 우선, 없으면 road_address(도로명)로 fallback
+    const r1 = doc.address?.region_1depth_name ?? doc.road_address?.region_1depth_name ?? ''
+    const r2 = doc.address?.region_2depth_name ?? doc.road_address?.region_2depth_name ?? ''
+    const r3 = doc.address?.region_3depth_name ?? ''
+    return [r1, r2, r3].filter(Boolean).join(' ')
   } catch {
     return ''
   }
