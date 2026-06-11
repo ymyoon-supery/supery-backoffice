@@ -11,7 +11,7 @@ type Employee = { id: string; name: string; email: string; annual_leave_days: nu
 type LeaveRecord = {
   id: string; employee_id: string; leave_type: string
   start_date: string; end_date: string; days_used: number; reason: string | null
-  is_manual: boolean; employees?: { name: string }[] | { name: string } | null
+  is_manual: boolean
 }
 type LeaveType = 'ANNUAL' | 'HALF_DAY' | 'SICK' | 'GROUP' | 'COMP' | 'OTHER'
 
@@ -191,10 +191,8 @@ export default function LeaveManualClient({ employees, leaveRecords: init }: {
     })
   }
 
-  const empName = (r: LeaveRecord) => {
-    const joined = Array.isArray(r.employees) ? r.employees[0]?.name : r.employees?.name
-    return joined ?? employees.find(e => e.id === r.employee_id)?.name ?? r.employee_id.slice(0, 8)
-  }
+  const empName = (r: LeaveRecord) =>
+    employees.find(e => e.id === r.employee_id)?.name ?? r.employee_id.slice(0, 8)
 
   const filtered = filterEmpId ? records.filter(r => r.employee_id === filterEmpId) : records
 
