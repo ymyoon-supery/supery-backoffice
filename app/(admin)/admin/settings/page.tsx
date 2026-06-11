@@ -1,4 +1,5 @@
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { headers } from 'next/headers'
 import GeneralSettingsClient from './GeneralSettingsClient'
 
 export default async function AdminSettingsPage() {
@@ -6,8 +7,22 @@ export default async function AdminSettingsPage() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   )
-  const { data } = await admin.from('company_settings').select('inactivity_minutes').single()
-  const inactivityMinutes = data?.inactivity_minutes ?? 15
+  const { data } = await admin
+    .from('company_settings')
+    .select('inactivity_minutes, office_ips')
+    .single()
 
-  return <GeneralSettingsClient inactivityMinutes={inactivityMinutes} />
+  const hdrs = await headers()
+  const currentIp =
+    hdrs.get('x-forwarded-for')?.split(',')[0].trim() ??
+    hdrs.get('x-real-ip') ??
+    ''
+
+  return (
+    <GeneralSettingsClient
+      inactivityMinutes={data?.inactivity_minutes ?? 15}
+      officeIps={data?.office_ips ?? []}
+      currentIp={currentIp}
+    />
+  )
 }
