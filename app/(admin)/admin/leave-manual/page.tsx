@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import { calcAnnualLeave } from '@/lib/annualLeave'
 import LeaveManualClient from './LeaveManualClient'
@@ -8,9 +9,15 @@ export default async function LeaveManualPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  // service role로 RLS 우회 — 어드민 전용 페이지
+  const admin = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+
   const [{ data: rawEmployees }, { data: leaveRecords }] = await Promise.all([
-    supabase.from('employees').select('id, name, email, hired_at, annual_leave_days, remaining_leaves').eq('is_active', true).order('name'),
-    supabase.from('leave_requests')
+    admin.from('employees').select('id, name, email, hired_at, annual_leave_days, remaining_leaves').eq('is_active', true).order('name'),
+    admin.from('leave_requests')
       .select('id, employee_id, leave_type, start_date, end_date, days_used, reason, is_manual')
       .eq('status', 'APPROVED')
       .order('start_date', { ascending: false })
