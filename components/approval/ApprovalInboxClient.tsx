@@ -8,7 +8,7 @@ import { approveExpense } from '@/app/(dashboard)/approval/expense/actions'
 import { useRouter } from 'next/navigation'
 
 const LEAVE_LABELS: Record<string, string> = {
-  ANNUAL: '연차', SICK: '병가', HALF_DAY: '반차', OTHER: '기타',
+  ANNUAL: '연차', HALF_DAY: '반차', SICK: '병가(무급)', GROUP: '공동연차', COMP: '보상휴가', OTHER: '기타',
 }
 const EXPENSE_LABELS: Record<string, string> = {
   TRANSPORT: '교통비', MEAL: '식대', ACCOMMODATION: '숙박비', SUPPLIES: '소모품', OTHER: '기타',
