@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Trash2, Plus, Wifi } from 'lucide-react'
-import { updateInactivityMinutes, addOfficeIp, removeOfficeIp } from './actions'
+import { updateInactivityMinutes, updateAutoBreakMode, addOfficeIp, removeOfficeIp } from './actions'
 
 const INACTIVITY_OPTIONS = [
   { value: 10, label: '10분' },
@@ -16,12 +16,15 @@ export default function GeneralSettingsClient({
   inactivityMinutes,
   officeIps,
   currentIp,
+  autoBreakMode,
 }: {
   inactivityMinutes: number
   officeIps: string[]
   currentIp: string
+  autoBreakMode: 'frontend' | 'server'
 }) {
   const [minutes, setMinutes] = useState(inactivityMinutes)
+  const [breakMode, setBreakMode] = useState<'frontend' | 'server'>(autoBreakMode)
   const [ips, setIps] = useState<string[]>(officeIps)
   const [newIp, setNewIp] = useState('')
   const [isPending, startTransition] = useTransition()
@@ -29,6 +32,15 @@ export default function GeneralSettingsClient({
   function handleSaveInactivity() {
     startTransition(async () => {
       const res = await updateInactivityMinutes(minutes)
+      if (res.error) { toast.error(res.error); return }
+      toast.success('저장되었습니다.')
+    })
+  }
+
+  function handleBreakModeChange(mode: 'frontend' | 'server') {
+    setBreakMode(mode)
+    startTransition(async () => {
+      const res = await updateAutoBreakMode(mode)
       if (res.error) { toast.error(res.error); return }
       toast.success('저장되었습니다.')
     })
@@ -92,6 +104,38 @@ export default function GeneralSettingsClient({
         >
           {isPending ? '저장 중...' : '저장'}
         </button>
+
+        <div className="border-t border-gray-100 pt-4 space-y-2">
+          <label className="text-sm text-gray-600">자동 휴식 감지 방식</label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => handleBreakModeChange('frontend')}
+              disabled={isPending}
+              className={`flex-1 px-4 py-3 text-sm rounded-lg border transition-colors text-left space-y-0.5 ${
+                breakMode === 'frontend'
+                  ? 'bg-primary/5 border-primary text-primary'
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <div className="font-medium">프론트엔드</div>
+              <div className="text-xs opacity-70">직원 화면에 휴식 알림 표시</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleBreakModeChange('server')}
+              disabled={isPending}
+              className={`flex-1 px-4 py-3 text-sm rounded-lg border transition-colors text-left space-y-0.5 ${
+                breakMode === 'server'
+                  ? 'bg-primary/5 border-primary text-primary'
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <div className="font-medium">서버 사이드</div>
+              <div className="text-xs opacity-70">직원 모르게 자동 기록</div>
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* 사무실 IP 관리 */}

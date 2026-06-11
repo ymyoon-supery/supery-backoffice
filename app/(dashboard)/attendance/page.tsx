@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import { unstable_cache } from 'next/cache'
 import { CACHE_TAGS } from '@/lib/cache/tags'
@@ -18,6 +19,16 @@ export default async function AttendancePage() {
     .single()
 
   if (!employee) redirect('/login')
+
+  const admin = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+  const { data: settings } = await admin
+    .from('company_settings')
+    .select('auto_break_mode')
+    .single()
+  const autoBreakMode = (settings?.auto_break_mode ?? 'frontend') as 'frontend' | 'server'
 
   const today = new Date()
   // KST 기준 날짜 (UTC+9 고정 오프셋)
@@ -60,7 +71,7 @@ export default async function AttendancePage() {
     <div className="space-y-6 max-w-2xl">
       <h1 className="text-xl font-semibold text-gray-900">근태 기록</h1>
 
-      <TimeTracker initialState={initialState as never} />
+      <TimeTracker initialState={initialState as never} autoBreakMode={autoBreakMode} />
 
       <div className="bg-white rounded-xl border border-gray-100">
         <div className="px-5 py-4 border-b border-gray-50">

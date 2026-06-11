@@ -9,7 +9,7 @@ export default async function AdminSettingsPage() {
   )
   const { data } = await admin
     .from('company_settings')
-    .select('inactivity_minutes, office_ips')
+    .select('inactivity_minutes, office_ips, auto_break_mode')
     .single()
 
   const hdrs = await headers()
@@ -23,6 +23,7 @@ export default async function AdminSettingsPage() {
       inactivityMinutes={data?.inactivity_minutes ?? 15}
       officeIps={data?.office_ips ?? []}
       currentIp={currentIp}
+      autoBreakMode={(data?.auto_break_mode ?? 'frontend') as 'frontend' | 'server'}
     />
   )
 }

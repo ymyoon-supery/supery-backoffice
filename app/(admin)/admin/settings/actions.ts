@@ -37,6 +37,20 @@ export async function updateInactivityMinutes(minutes: number) {
   return { ok: true }
 }
 
+export async function updateAutoBreakMode(mode: 'frontend' | 'server') {
+  const admin = await getAdminClient()
+  if (!admin) return { error: 'Unauthorized' }
+
+  const { error } = await admin
+    .from('company_settings')
+    .update({ auto_break_mode: mode, updated_at: new Date().toISOString() })
+    .not('id', 'is', null)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/settings')
+  return { ok: true }
+}
+
 export async function addOfficeIp(ip: string) {
   const trimmed = ip.trim()
   if (!IP_RE.test(trimmed)) return { error: '올바른 IP 형식이 아닙니다. (예: 123.456.789.0)' }

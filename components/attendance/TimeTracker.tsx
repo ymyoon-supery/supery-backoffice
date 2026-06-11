@@ -22,7 +22,13 @@ const ALL_EVENTS = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'] as 
 // click/touchstart excluded for FIELD: prevents conflict with manual 업무복귀 button
 const FIELD_EVENTS = ['mousemove', 'keydown', 'scroll'] as const
 
-export default function TimeTracker({ initialState }: { initialState?: WorkState }) {
+export default function TimeTracker({
+  initialState,
+  autoBreakMode = 'frontend',
+}: {
+  initialState?: WorkState
+  autoBreakMode?: 'frontend' | 'server'
+}) {
   const [state, setState] = useState<WorkState>(initialState ?? 'BEFORE_WORK')
   const [showCheckInOptions, setShowCheckInOptions] = useState(false)
   const [showFieldForm, setShowFieldForm] = useState(false)
@@ -109,6 +115,7 @@ export default function TimeTracker({ initialState }: { initialState?: WorkState
 
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current)
+    if (autoBreakMode === 'server') return
 
     if (isAutoBreak) {
       ALL_EVENTS.forEach(e => document.addEventListener(e, handleActivity, { passive: true }))
@@ -263,7 +270,7 @@ export default function TimeTracker({ initialState }: { initialState?: WorkState
         </div>
       )}
 
-      {isAutoBreak && (
+      {isAutoBreak && autoBreakMode === 'frontend' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl p-8 shadow-2xl max-w-sm w-full mx-4 text-center space-y-4">
             <div className="w-14 h-14 rounded-full bg-yellow-100 flex items-center justify-center mx-auto">
