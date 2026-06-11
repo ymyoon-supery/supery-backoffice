@@ -31,6 +31,40 @@ export type ManualLeaveInput = {
 
 const DEDUCTS_LEAVE = ['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF', 'GROUP']
 
+async function checkOverlap(
+  client: ReturnType<typeof adminClient>,
+  employeeId: string,
+  startDate: string,
+  endDate: string,
+  leaveType: string,
+  excludeId?: string,
+): Promise<string | null> {
+  let query = client
+    .from('leave_requests')
+    .select('id, leave_type, start_date, end_date')
+    .eq('employee_id', employeeId)
+    .eq('status', 'APPROVED')
+    .lte('start_date', endDate)
+    .gte('end_date', startDate)
+
+  if (excludeId) query = query.neq('id', excludeId)
+
+  const { data } = await query
+  if (!data || data.length === 0) return null
+
+  for (const r of data) {
+    const sameDay = startDate === endDate && r.start_date === r.end_date && startDate === r.start_date
+    const halfDayCombo = sameDay &&
+      ((leaveType === 'AM_HALF' && r.leave_type === 'PM_HALF') ||
+       (leaveType === 'PM_HALF' && r.leave_type === 'AM_HALF'))
+    if (!halfDayCombo) {
+      const dateStr = r.start_date === r.end_date ? r.start_date : `${r.start_date}~${r.end_date}`
+      return `${dateStr}에 이미 등록된 휴가가 있습니다.`
+    }
+  }
+  return null
+}
+
 async function adjustLeaves(client: ReturnType<typeof adminClient>, employeeId: string, delta: number) {
   const { data: emp } = await client.from('employees').select('remaining_leaves').eq('id', employeeId).single()
   if (!emp) return
@@ -44,6 +78,10 @@ export async function adminAddLeaveRecord(input: ManualLeaveInput) {
   if (authError) return { error: authError }
 
   const client = adminClient()
+
+  const overlapMsg = await checkOverlap(client, input.employeeId, input.startDate, input.endDate, input.leaveType)
+  if (overlapMsg) return { error: overlapMsg }
+
   const { error: insertError } = await client.from('leave_requests').insert({
     employee_id: input.employeeId,
     leave_type: input.leaveType,
@@ -77,6 +115,9 @@ export async function adminUpdateLeaveRecord(id: string, input: ManualLeaveInput
     .single()
 
   if (fetchError || !current) return { error: '수정할 내역을 찾을 수 없습니다.' }
+
+  const overlapMsg = await checkOverlap(client, current.employee_id, input.startDate, input.endDate, input.leaveType, id)
+  if (overlapMsg) return { error: overlapMsg }
 
   const oldDeduction = DEDUCTS_LEAVE.includes(current.leave_type) ? Number(current.days_used) : 0
   const newDeduction = DEDUCTS_LEAVE.includes(input.leaveType) ? input.daysUsed : 0

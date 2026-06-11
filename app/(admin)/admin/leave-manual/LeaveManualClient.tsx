@@ -24,6 +24,19 @@ const DEDUCTS = new Set<LeaveType>(['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF', 
 
 function isHalfDay(t: LeaveType) { return t === 'AM_HALF' || t === 'PM_HALF' || t === 'HALF_DAY' }
 
+function hasOverlap(records: LeaveRecord[], empId: string, start: string, end: string, leaveType: LeaveType, excludeId?: string) {
+  return records
+    .filter(r => r.employee_id === empId && r.id !== excludeId)
+    .some(r => {
+      if (r.start_date > end || r.end_date < start) return false
+      const sameDay = start === end && r.start_date === r.end_date && start === r.start_date
+      if (sameDay &&
+        ((leaveType === 'AM_HALF' && r.leave_type === 'PM_HALF') ||
+         (leaveType === 'PM_HALF' && r.leave_type === 'AM_HALF'))) return false
+      return true
+    })
+}
+
 function calcAuto(leaveType: LeaveType, startDate: string, endDate: string) {
   if (isHalfDay(leaveType)) return 0.5
   if (!startDate || !endDate) return 0
@@ -141,10 +154,14 @@ export default function LeaveManualClient({ employees, leaveRecords: init }: {
   const days = daysOv !== '' ? (parseFloat(daysOv) || 0) : calcAuto(type, start, end)
   const eDays = eDaysOv !== '' ? (parseFloat(eDaysOv) || 0) : calcAuto(eType, eStart, eEnd)
 
+  const addEnd = isHalfDay(type) ? start : end
+  const editEnd = isHalfDay(eType) ? eStart : eEnd
   const canAdd = !!empId && !!start && (isHalfDay(type) || !!end) && days > 0
     && (type !== 'OTHER' || reason.trim().length > 0)
+    && !hasOverlap(records, empId, start, addEnd, type)
   const canEdit = !!eStart && (isHalfDay(eType) || !!eEnd) && eDays > 0
     && (eType !== 'OTHER' || eReason.trim().length > 0)
+    && !hasOverlap(records, editing?.employee_id ?? '', eStart, editEnd, eType, editing?.id)
 
   function openEdit(r: LeaveRecord) {
     setEditing(r)
