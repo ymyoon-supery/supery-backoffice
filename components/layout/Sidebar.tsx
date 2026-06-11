@@ -26,7 +26,7 @@ const employeeNavBase = [
 const inboxNav = { href: '/approval/inbox', label: '결재함', icon: ClipboardList }
 
 const adminNav = [
-  { href: '/approval/inbox', label: '결재함', icon: ClipboardList },
+  { href: '/admin/approval', label: '결재함', icon: ClipboardList },
   { href: '/admin/employees', label: '출퇴근 현황', icon: Users },
   { href: '/admin/attendance', label: '근태 현황', icon: Clock },
   { href: '/admin/reports', label: '52시간 리포트', icon: BarChart2 },
