@@ -36,6 +36,33 @@ export async function getHomeLocation() {
   return { lat: Number(data.home_lat), lng: Number(data.home_lng) }
 }
 
+export async function createHomeLocationRequest(lat: number, lng: number, locationName?: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: '인증이 필요합니다.' }
+
+  const { data: employee } = await supabase
+    .from('employees')
+    .select('id')
+    .eq('auth_user_id', user.id)
+    .single()
+
+  if (!employee) return { error: '직원 정보를 찾을 수 없습니다.' }
+
+  await supabase
+    .from('home_location_requests')
+    .update({ status: 'REJECTED', comment: '새 신청으로 대체됨' })
+    .eq('employee_id', employee.id)
+    .eq('status', 'PENDING')
+
+  const { error } = await supabase
+    .from('home_location_requests')
+    .insert({ employee_id: employee.id, new_lat: lat, new_lng: lng, location_name: locationName ?? null })
+
+  if (error) return { error: error.message }
+  return { ok: true }
+}
+
 export async function checkOfficeIp() {
   const hdrs = await headers()
   const currentIp =

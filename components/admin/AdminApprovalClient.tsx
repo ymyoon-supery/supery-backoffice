@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { AlertCircle, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react'
 import { approveLeave } from '@/app/(dashboard)/approval/leave/actions'
 import { approveExpense } from '@/app/(dashboard)/approval/expense/actions'
+import { approveHomeLocationRequest } from '@/app/(admin)/admin/approval/actions'
 import type { ApprovalItem } from '@/app/(admin)/admin/approval/page'
 
 const STATUS_CFG = {
@@ -51,7 +52,9 @@ export default function AdminApprovalClient({
     startTransition(async () => {
       const res = item.kind === 'leave'
         ? await approveLeave(item.requestId, true)
-        : await approveExpense(item.requestId, true)
+        : item.kind === 'expense'
+        ? await approveExpense(item.requestId, true)
+        : await approveHomeLocationRequest(item.requestId, true)
       if (res.error) { toast.error(res.error); return }
       toast.success('승인되었습니다.')
       router.refresh()
@@ -62,7 +65,9 @@ export default function AdminApprovalClient({
     startTransition(async () => {
       const res = item.kind === 'leave'
         ? await approveLeave(item.requestId, false, rejectReason || undefined)
-        : await approveExpense(item.requestId, false, rejectReason || undefined)
+        : item.kind === 'expense'
+        ? await approveExpense(item.requestId, false, rejectReason || undefined)
+        : await approveHomeLocationRequest(item.requestId, false, rejectReason || undefined)
       if (res.error) { toast.error(res.error); return }
       toast.success('반려되었습니다.')
       setRejectingId(null)
@@ -100,7 +105,7 @@ export default function AdminApprovalClient({
       <div className="flex flex-wrap items-center gap-2">
         {/* Type */}
         <div className="flex border border-gray-200 rounded-lg overflow-hidden text-xs">
-          {[['all', '전체'], ['leave', '연차'], ['expense', '지결서']].map(([k, l]) => (
+          {[['all', '전체'], ['leave', '연차'], ['expense', '지결서'], ['home_location', '재택변경']].map(([k, l]) => (
             <button key={k} onClick={() => nav({ type: k, page: '1' })}
               className={`px-3 py-1.5 transition-colors ${type === k ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
               {l}
@@ -164,9 +169,15 @@ export default function AdminApprovalClient({
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                         item.kind === 'leave'
                           ? 'bg-blue-50 text-blue-600'
-                          : 'bg-violet-50 text-violet-600'
+                          : item.kind === 'expense'
+                          ? 'bg-violet-50 text-violet-600'
+                          : 'bg-emerald-50 text-emerald-600'
                       }`}>
-                        {item.kind === 'leave' ? `연차 · ${item.typeLabel}` : `지결서 · ${item.typeLabel}`}
+                        {item.kind === 'leave'
+                          ? `연차 · ${item.typeLabel}`
+                          : item.kind === 'expense'
+                          ? `지결서 · ${item.typeLabel}`
+                          : item.typeLabel}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-600 truncate">

@@ -73,6 +73,25 @@ export default async function AttendancePage() {
     ? { lat: Number(employee.home_lat), lng: Number(employee.home_lng) }
     : null
 
+  const { data: pendingReqData } = await supabase
+    .from('home_location_requests')
+    .select('id, new_lat, new_lng, location_name, created_at')
+    .eq('employee_id', employee.id)
+    .eq('status', 'PENDING')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const pendingRequest = pendingReqData
+    ? {
+        id: pendingReqData.id as string,
+        lat: Number(pendingReqData.new_lat),
+        lng: Number(pendingReqData.new_lng),
+        locationName: pendingReqData.location_name as string | null,
+        createdAt: pendingReqData.created_at as string,
+      }
+    : null
+
   return (
     <div className="space-y-6 max-w-2xl">
       <h1 className="text-xl font-semibold text-gray-900">근태 기록</h1>
@@ -84,7 +103,7 @@ export default async function AttendancePage() {
         remoteRadiusM={remoteRadiusM}
       />
 
-      <HomeLocationCard initialLocation={homeLocation} />
+      <HomeLocationCard initialLocation={homeLocation} initialPendingRequest={pendingRequest} />
 
       <div className="bg-white rounded-xl border border-gray-100">
         <div className="px-5 py-4 border-b border-gray-50">

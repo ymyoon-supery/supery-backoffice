@@ -15,7 +15,7 @@ const EXPENSE_LABELS: Record<string, string> = {
 
 export type ApprovalItem = {
   stepId: string
-  kind: 'leave' | 'expense'
+  kind: 'leave' | 'expense' | 'home_location'
   requestId: string
   employeeName: string
   typeLabel: string
@@ -44,7 +44,7 @@ export default async function AdminApprovalPage({
 
   const params = await searchParams
   const tab    = params.tab    === 'done'    ? 'done'    : 'pending'
-  const type   = ['leave', 'expense'].includes(params.type   ?? '') ? params.type!   : 'all'
+  const type   = ['leave', 'expense', 'home_location'].includes(params.type ?? '') ? params.type! : 'all'
   const period = ['day',   'week',  'month' ].includes(params.period ?? '') ? params.period! : 'all'
   const sort   = params.sort  === 'asc'  ? 'asc'  : 'desc'
   const page   = Math.max(1, parseInt(params.page ?? '1') || 1)
@@ -74,7 +74,7 @@ export default async function AdminApprovalPage({
 
   // ── Leave steps ──────────────────────────────────────────────
   let leaveItems: ApprovalItem[] = []
-  if (type !== 'expense') {
+  if (type !== 'expense' && type !== 'home_location') {
     let q = admin
       .from('leave_approval_steps')
       .select(`
@@ -108,7 +108,7 @@ export default async function AdminApprovalPage({
 
   // ── Expense steps ─────────────────────────────────────────────
   let expenseItems: ApprovalItem[] = []
-  if (type !== 'leave') {
+  if (type !== 'leave' && type !== 'home_location') {
     let q = admin
       .from('expense_approval_steps')
       .select(`
@@ -139,8 +139,33 @@ export default async function AdminApprovalPage({
     })
   }
 
+  // ── Home location requests ────────────────────────────────────
+  let homeLocationItems: ApprovalItem[] = []
+  if (type === 'all' || type === 'home_location') {
+    let q = admin
+      .from('home_location_requests')
+      .select(`id, status, comment, new_lat, new_lng, location_name, created_at, employees ( name )`)
+      .in('status', statusFilter)
+    if (fromDate) q = q.gte('created_at', fromDate)
+
+    const { data } = await q
+    homeLocationItems = (data ?? []).map((r: any) => ({
+      stepId:       r.id,
+      kind:         'home_location' as const,
+      requestId:    r.id,
+      employeeName: r.employees?.name ?? '—',
+      typeLabel:    '재택변경',
+      detail:       r.location_name
+        ? `${r.location_name} · ${Number(r.new_lat).toFixed(5)}, ${Number(r.new_lng).toFixed(5)}`
+        : `${Number(r.new_lat).toFixed(5)}, ${Number(r.new_lng).toFixed(5)}`,
+      requestDate:  r.created_at,
+      status:       r.status,
+      comment:      r.comment,
+    }))
+  }
+
   // ── Merge, sort, paginate ─────────────────────────────────────
-  const all = [...leaveItems, ...expenseItems].sort((a, b) => {
+  const all = [...leaveItems, ...expenseItems, ...homeLocationItems].sort((a, b) => {
     const diff = new Date(a.requestDate).getTime() - new Date(b.requestDate).getTime()
     return sort === 'asc' ? diff : -diff
   })

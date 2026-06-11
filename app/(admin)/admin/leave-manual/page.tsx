@@ -3,6 +3,8 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import { calcAnnualLeave } from '@/lib/annualLeave'
 import LeaveManualClient from './LeaveManualClient'
+import Link from 'next/link'
+import { Download } from 'lucide-react'
 
 const DEDUCTS = ['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF', 'GROUP']
 
@@ -51,7 +53,15 @@ export default async function LeaveManualPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-xl font-semibold text-gray-900 mb-1">연차 관리</h1>
+      <div className="flex items-center justify-between mb-1">
+        <h1 className="text-xl font-semibold text-gray-900">연차 관리</h1>
+        <Link
+          href="/api/leave/excel"
+          className="flex items-center gap-2 text-sm px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-600"
+        >
+          <Download size={15} /> Excel 다운로드
+        </Link>
+      </div>
       <p className="text-sm text-gray-500 mb-6">수동 등록 및 결재 승인된 연차를 조회·수정·삭제합니다.</p>
       {leaveError && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600 font-mono">

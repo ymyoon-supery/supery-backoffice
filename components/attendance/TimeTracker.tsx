@@ -4,7 +4,7 @@ import { useState, useTransition, useEffect, useRef, useCallback } from 'react'
 import { toast } from 'sonner'
 import { Clock, MapPin, LogOut, Building2, Home, Car } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { recordAttendance, checkOfficeIp, registerHomeLocation } from '@/app/(dashboard)/attendance/actions'
+import { recordAttendance, checkOfficeIp, createHomeLocationRequest } from '@/app/(dashboard)/attendance/actions'
 
 type WorkState = 'BEFORE_WORK' | 'WORKING' | 'BREAK' | 'FIELD' | 'DONE'
 type AttendanceType = 'CHECK_IN' | 'CHECK_OUT' | 'BREAK_START' | 'BREAK_END' | 'FIELD_START' | 'FIELD_END'
@@ -185,7 +185,7 @@ export default function TimeTracker({
     setNewLocationName('')
     startTransition(async () => {
       if (opts) {
-        await registerHomeLocation(opts.coords.lat, opts.coords.lng)
+        await createHomeLocationRequest(opts.coords.lat, opts.coords.lng, opts.locationName)
       }
       const result = await recordAttendance({
         type: 'CHECK_IN',
@@ -194,12 +194,12 @@ export default function TimeTracker({
         longitude: opts?.coords.lng ?? null,
         isField: false,
         note: opts
-          ? `재택 변경 (이전 위치에서 ${opts.distanceM}m)`
+          ? `재택 변경 신청 (이전 위치에서 ${opts.distanceM}m)`
           : '재택',
       })
       if (result?.error) { toast.error(result.error); return }
       setState('WORKING')
-      toast.success('출근 기록 완료')
+      toast.success(opts ? '출근 기록 완료. 재택근무지 변경 신청이 접수되었습니다.' : '출근 기록 완료')
     })
   }
 

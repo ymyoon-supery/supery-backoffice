@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { Home, MapPin, RefreshCw } from 'lucide-react'
-import { registerHomeLocation } from '@/app/(dashboard)/attendance/actions'
+import { Home, MapPin, RefreshCw, Clock } from 'lucide-react'
+import { registerHomeLocation, createHomeLocationRequest } from '@/app/(dashboard)/attendance/actions'
 
 function getCurrentPosition(): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) =>
@@ -14,15 +14,26 @@ function getCurrentPosition(): Promise<GeolocationPosition> {
   )
 }
 
+type PendingRequest = {
+  id: string
+  lat: number
+  lng: number
+  locationName: string | null
+  createdAt: string
+}
+
 export default function HomeLocationCard({
   initialLocation,
+  initialPendingRequest = null,
 }: {
   initialLocation: { lat: number; lng: number } | null
+  initialPendingRequest?: PendingRequest | null
 }) {
   const [location, setLocation] = useState(initialLocation)
+  const [pendingReq, setPendingReq] = useState<PendingRequest | null>(initialPendingRequest)
   const [isPending, startTransition] = useTransition()
 
-  function handleRegister() {
+  function handleAction() {
     if (!navigator.geolocation) {
       toast.error('이 브라우저는 위치 서비스를 지원하지 않습니다.')
       return
@@ -38,11 +49,18 @@ export default function HomeLocationCard({
 
       const lat = position.coords.latitude
       const lng = position.coords.longitude
-      const res = await registerHomeLocation(lat, lng)
-      if (res.error) { toast.error(res.error); return }
 
-      setLocation({ lat, lng })
-      toast.success('재택근무지가 등록되었습니다.')
+      if (location) {
+        const res = await createHomeLocationRequest(lat, lng)
+        if (res.error) { toast.error(res.error); return }
+        setPendingReq({ id: '', lat, lng, locationName: null, createdAt: new Date().toISOString() })
+        toast.success('재택근무지 변경 신청이 접수되었습니다. 관리자 승인 후 반영됩니다.')
+      } else {
+        const res = await registerHomeLocation(lat, lng)
+        if (res.error) { toast.error(res.error); return }
+        setLocation({ lat, lng })
+        toast.success('재택근무지가 등록되었습니다.')
+      }
     })
   }
 
@@ -55,16 +73,27 @@ export default function HomeLocationCard({
         </div>
         <button
           type="button"
-          onClick={handleRegister}
-          disabled={isPending}
+          onClick={handleAction}
+          disabled={isPending || !!pendingReq}
           className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
         >
           <RefreshCw size={12} className={isPending ? 'animate-spin' : ''} />
-          {location ? '위치 재등록' : '현재 위치로 등록'}
+          {location ? '변경 신청' : '현재 위치로 등록'}
         </button>
       </div>
 
-      {location ? (
+      {pendingReq ? (
+        <div className="flex items-center gap-2 bg-amber-50 rounded-lg px-3 py-2 border border-amber-100">
+          <Clock size={13} className="text-amber-500 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-amber-700">변경 신청 검토 중</p>
+            {pendingReq.locationName && (
+              <p className="text-xs text-amber-600 truncate">{pendingReq.locationName}</p>
+            )}
+          </div>
+          <span className="text-xs text-amber-500 shrink-0">관리자 승인 대기</span>
+        </div>
+      ) : location ? (
         <div className="flex items-center gap-2 bg-green-50 rounded-lg px-3 py-2">
           <MapPin size={13} className="text-green-500 shrink-0" />
           <span className="text-xs text-green-700 font-mono">
