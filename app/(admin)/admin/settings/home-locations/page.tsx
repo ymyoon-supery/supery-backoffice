@@ -9,14 +9,22 @@ export default async function HomeLocationsPage() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   )
 
-  const { data: employees } = await admin
-    .from('employees')
-    .select('id, name, home_lat, home_lng, department_id, departments(name)')
-    .eq('is_active', true)
-    .order('name')
+  const [{ data: employees, error }, { data: depts }] = await Promise.all([
+    admin.from('employees')
+      .select('id, name, home_lat, home_lng, department_id')
+      .eq('is_active', true)
+      .order('name'),
+    admin.from('departments').select('id, name'),
+  ])
 
-  const registered = (employees ?? []).filter(e => e.home_lat && e.home_lng)
-  const unregistered = (employees ?? []).filter(e => !e.home_lat || !e.home_lng)
+  if (error) {
+    console.error('[home-locations] query error:', error)
+  }
+
+  const deptMap = new Map((depts ?? []).map(d => [d.id, d.name as string]))
+
+  const registered = (employees ?? []).filter(e => e.home_lat != null && e.home_lng != null)
+  const unregistered = (employees ?? []).filter(e => e.home_lat == null || e.home_lng == null)
 
   function mapsUrl(lat: number, lng: number) {
     return `https://www.google.com/maps?q=${lat},${lng}`
@@ -31,6 +39,12 @@ export default async function HomeLocationsPage() {
         </span>
       </div>
 
+      {error && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600 font-mono">
+          쿼리 오류: {error.message}
+        </div>
+      )}
+
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
         <table className="w-full text-sm table-fixed">
           <thead>
@@ -43,13 +57,12 @@ export default async function HomeLocationsPage() {
           </thead>
           <tbody className="divide-y divide-gray-50">
             {registered.map(e => {
-              const dept = e.departments as unknown as { name: string } | null
               const lat = Number(e.home_lat)
               const lng = Number(e.home_lng)
               return (
                 <tr key={e.id} className="hover:bg-gray-50/50">
                   <td className="px-4 py-3 font-medium text-gray-900">{e.name}</td>
-                  <td className="px-4 py-3 text-xs text-gray-400">{dept?.name ?? '—'}</td>
+                  <td className="px-4 py-3 text-xs text-gray-400">{deptMap.get(e.department_id) ?? '—'}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
                       <MapPin size={12} className="text-green-500 shrink-0" />
@@ -72,17 +85,14 @@ export default async function HomeLocationsPage() {
               )
             })}
 
-            {unregistered.map(e => {
-              const dept = e.departments as unknown as { name: string } | null
-              return (
-                <tr key={e.id} className="hover:bg-gray-50/50 opacity-50">
-                  <td className="px-4 py-3 font-medium text-gray-900">{e.name}</td>
-                  <td className="px-4 py-3 text-xs text-gray-400">{dept?.name ?? '—'}</td>
-                  <td className="px-4 py-3 text-xs text-gray-400">미등록</td>
-                  <td className="px-4 py-3 text-center text-xs text-gray-300">—</td>
-                </tr>
-              )
-            })}
+            {unregistered.map(e => (
+              <tr key={e.id} className="hover:bg-gray-50/50 opacity-50">
+                <td className="px-4 py-3 font-medium text-gray-900">{e.name}</td>
+                <td className="px-4 py-3 text-xs text-gray-400">{deptMap.get(e.department_id) ?? '—'}</td>
+                <td className="px-4 py-3 text-xs text-gray-400">미등록</td>
+                <td className="px-4 py-3 text-center text-xs text-gray-300">—</td>
+              </tr>
+            ))}
 
             {(employees ?? []).length === 0 && (
               <tr>

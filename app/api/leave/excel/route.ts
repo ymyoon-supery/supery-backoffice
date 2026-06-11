@@ -39,33 +39,39 @@ export async function GET(request: Request) {
   const kstNow = new Date(today.getTime() + 9 * 60 * 60 * 1000)
   const dateStr = kstNow.toISOString().slice(0, 10).replace(/-/g, '')
 
-  let empQuery = admin.from('employees')
-    .select('id, name, email, hired_at, annual_leave_days, department_id, departments(name)')
+  // departments 를 별도 조회해서 join 모호성 오류 방지
+  let empQ = admin.from('employees')
+    .select('id, name, email, hired_at, annual_leave_days, department_id')
     .eq('is_active', true)
     .order('name')
-  if (employeeIdFilter) {
-    empQuery = empQuery.eq('id', employeeIdFilter) as typeof empQuery
-  }
+  if (employeeIdFilter) empQ = empQ.eq('id', employeeIdFilter) as typeof empQ
 
-  let recordsQuery = admin.from('leave_requests')
-    .select('id, employee_id, leave_type, start_date, end_date, days_used, reason, is_manual, created_at')
+  let recQ = admin.from('leave_requests')
+    .select('id, employee_id, leave_type, start_date, end_date, days_used, reason, is_manual')
     .eq('status', 'APPROVED')
     .order('start_date', { ascending: false })
-  if (employeeIdFilter) {
-    recordsQuery = recordsQuery.eq('employee_id', employeeIdFilter) as typeof recordsQuery
-  }
+  if (employeeIdFilter) recQ = recQ.eq('employee_id', employeeIdFilter) as typeof recQ
 
-  let usedQuery = admin.from('leave_requests')
+  let usedQ = admin.from('leave_requests')
     .select('employee_id, leave_type, days_used')
     .eq('status', 'APPROVED')
     .in('leave_type', [...DEDUCTS])
-  if (employeeIdFilter) {
-    usedQuery = usedQuery.eq('employee_id', employeeIdFilter) as typeof usedQuery
-  }
+  if (employeeIdFilter) usedQ = usedQ.eq('employee_id', employeeIdFilter) as typeof usedQ
 
-  const [{ data: rawEmployees }, { data: leaveRecords }, { data: usedTotals }] = await Promise.all([
-    empQuery, recordsQuery, usedQuery,
+  const [
+    { data: rawEmployees, error: empError },
+    { data: leaveRecords, error: recError },
+    { data: usedTotals },
+    { data: depts },
+  ] = await Promise.all([
+    empQ, recQ, usedQ,
+    admin.from('departments').select('id, name'),
   ])
+
+  if (empError) console.error('[excel] employees error:', empError)
+  if (recError) console.error('[excel] records error:', recError)
+
+  const deptMap = new Map((depts ?? []).map(d => [d.id, d.name as string]))
 
   const usedByEmp: Record<string, number> = {}
   for (const r of usedTotals ?? []) {
@@ -78,8 +84,7 @@ export async function GET(request: Request) {
       : (e.annual_leave_days ?? 15)
     const used = usedByEmp[e.id] ?? 0
     const remaining = Math.max(Math.round((entitlement - used) * 10) / 10, 0)
-    const dept = e.departments as unknown as { name: string } | null
-    return { ...e, entitlement, used, remaining, deptName: dept?.name ?? '' }
+    return { ...e, entitlement, used, remaining, deptName: deptMap.get(e.department_id) ?? '' }
   })
 
   const filterLabel = employeeIdFilter
@@ -97,35 +102,10 @@ export async function GET(request: Request) {
     type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F0FE' },
   }
 
-  // ── Sheet 1: 연차 현황 ──────────────────────────────────────
-  const s1 = wb.addWorksheet('연차 현황')
+  // ── Sheet 1: 연차 사용 내역 (UI 조회 화면과 동일한 순서) ──────
+  const s1 = wb.addWorksheet('연차 사용 내역')
   s1.columns = [
-    { header: '이름',       key: 'name',        width: 14 },
-    { header: '이메일',     key: 'email',       width: 26 },
-    { header: '부서',       key: 'dept',        width: 14 },
-    { header: '보유 연차',  key: 'entitlement', width: 12 },
-    { header: '사용 연차',  key: 'used',        width: 12 },
-    { header: '잔여 연차',  key: 'remaining',   width: 12 },
-  ]
-  s1.getRow(1).font = { bold: true }
-  s1.getRow(1).fill = headerFill
-
-  for (const e of employees) {
-    s1.addRow({
-      name: e.name,
-      email: e.email,
-      dept: e.deptName,
-      entitlement: e.entitlement,
-      used: e.used,
-      remaining: e.remaining,
-    })
-  }
-
-  // ── Sheet 2: 연차 사용 내역 ─────────────────────────────────
-  const s2 = wb.addWorksheet('연차 사용 내역')
-  s2.columns = [
     { header: '직원',    key: 'name',      width: 14 },
-    { header: '이메일',  key: 'email',     width: 26 },
     { header: '부서',    key: 'dept',      width: 14 },
     { header: '유형',    key: 'type',      width: 12 },
     { header: '시작일',  key: 'startDate', width: 13 },
@@ -134,14 +114,13 @@ export async function GET(request: Request) {
     { header: '사유',    key: 'reason',    width: 30 },
     { header: '구분',    key: 'source',    width: 8  },
   ]
-  s2.getRow(1).font = { bold: true }
-  s2.getRow(1).fill = headerFill
+  s1.getRow(1).font = { bold: true }
+  s1.getRow(1).fill = headerFill
 
   for (const r of leaveRecords ?? []) {
     const emp = empMap.get(r.employee_id)
-    s2.addRow({
-      name:      emp?.name   ?? '—',
-      email:     emp?.email  ?? '—',
+    s1.addRow({
+      name:      emp?.name     ?? '—',
       dept:      emp?.deptName ?? '—',
       type:      LEAVE_LABELS[r.leave_type] ?? r.leave_type,
       startDate: r.start_date,
@@ -149,6 +128,30 @@ export async function GET(request: Request) {
       days:      DEDUCTS.has(r.leave_type) ? Number(r.days_used) : 0,
       reason:    r.reason ?? '',
       source:    r.is_manual ? '수동' : '결재',
+    })
+  }
+
+  // ── Sheet 2: 연차 현황 (직원별 요약) ──────────────────────────
+  const s2 = wb.addWorksheet('연차 현황')
+  s2.columns = [
+    { header: '직원',     key: 'name',        width: 14 },
+    { header: '부서',     key: 'dept',        width: 14 },
+    { header: '이메일',   key: 'email',       width: 26 },
+    { header: '보유 연차', key: 'entitlement', width: 12 },
+    { header: '사용 연차', key: 'used',        width: 12 },
+    { header: '잔여 연차', key: 'remaining',   width: 12 },
+  ]
+  s2.getRow(1).font = { bold: true }
+  s2.getRow(1).fill = headerFill
+
+  for (const e of employees) {
+    s2.addRow({
+      name:        e.name,
+      dept:        e.deptName,
+      email:       e.email,
+      entitlement: e.entitlement,
+      used:        e.used,
+      remaining:   e.remaining,
     })
   }
 
