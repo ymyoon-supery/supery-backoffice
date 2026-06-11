@@ -132,7 +132,7 @@ export default function GeneralSettingsClient({
               }`}
             >
               <div className="font-medium">서버 사이드</div>
-              <div className="text-xs opacity-70">직원 모르게 자동 기록</div>
+              <div className="text-xs opacity-70">Hidden 자동 기록</div>
             </button>
           </div>
         </div>
