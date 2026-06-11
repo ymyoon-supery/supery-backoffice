@@ -13,16 +13,19 @@ type LeaveRecord = {
   start_date: string; end_date: string; days_used: number; reason: string | null
   is_manual: boolean
 }
-type LeaveType = 'ANNUAL' | 'HALF_DAY' | 'SICK' | 'GROUP' | 'COMP' | 'OTHER'
+type LeaveType = 'ANNUAL' | 'HALF_DAY' | 'AM_HALF' | 'PM_HALF' | 'SICK' | 'GROUP' | 'COMP' | 'OTHER'
 
-const LEAVE_TYPES: LeaveType[] = ['ANNUAL', 'HALF_DAY', 'SICK', 'GROUP', 'COMP', 'OTHER']
+const LEAVE_TYPES: LeaveType[] = ['ANNUAL', 'AM_HALF', 'PM_HALF', 'SICK', 'GROUP', 'COMP', 'OTHER']
 const LEAVE_LABELS: Record<LeaveType, string> = {
-  ANNUAL: '연차', HALF_DAY: '반차', SICK: '병가(무급)', GROUP: '공동연차', COMP: '보상휴가', OTHER: '기타',
+  ANNUAL: '연차', HALF_DAY: '반차', AM_HALF: '오전반차', PM_HALF: '오후반차',
+  SICK: '병가(무급)', GROUP: '공동연차', COMP: '보상휴가', OTHER: '기타',
 }
-const DEDUCTS = new Set<LeaveType>(['ANNUAL', 'HALF_DAY', 'GROUP'])
+const DEDUCTS = new Set<LeaveType>(['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF', 'GROUP'])
+
+function isHalfDay(t: LeaveType) { return t === 'AM_HALF' || t === 'PM_HALF' || t === 'HALF_DAY' }
 
 function calcAuto(leaveType: LeaveType, startDate: string, endDate: string) {
-  if (leaveType === 'HALF_DAY') return 0.5
+  if (isHalfDay(leaveType)) return 0.5
   if (!startDate || !endDate) return 0
   return Math.max(differenceInCalendarDays(new Date(endDate), new Date(startDate)) + 1, 0)
 }
@@ -68,7 +71,7 @@ function LeaveFields({
             onChange={e => { setStartDate(e.target.value); setDaysOverride('') }}
             className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30" />
         </div>
-        {leaveType !== 'HALF_DAY' && (
+        {!isHalfDay(leaveType) && (
           <div className="space-y-1">
             <label className="text-sm font-medium text-gray-700">종료일</label>
             <input type="date" value={endDate} min={startDate}
@@ -136,9 +139,9 @@ export default function LeaveManualClient({ employees, leaveRecords: init }: {
   const days = daysOv !== '' ? (parseFloat(daysOv) || 0) : calcAuto(type, start, end)
   const eDays = eDaysOv !== '' ? (parseFloat(eDaysOv) || 0) : calcAuto(eType, eStart, eEnd)
 
-  const canAdd = !!empId && !!start && (type === 'HALF_DAY' || !!end) && days > 0
+  const canAdd = !!empId && !!start && (isHalfDay(type) || !!end) && days > 0
     && (type !== 'OTHER' || reason.trim().length > 0)
-  const canEdit = !!eStart && (eType === 'HALF_DAY' || !!eEnd) && eDays > 0
+  const canEdit = !!eStart && (isHalfDay(eType) || !!eEnd) && eDays > 0
     && (eType !== 'OTHER' || eReason.trim().length > 0)
 
   function openEdit(r: LeaveRecord) {
@@ -152,7 +155,7 @@ export default function LeaveManualClient({ employees, leaveRecords: init }: {
     startTransition(async () => {
       const res = await adminAddLeaveRecord({
         employeeId: empId, leaveType: type,
-        startDate: start, endDate: type === 'HALF_DAY' ? start : end,
+        startDate: start, endDate: isHalfDay(type) ? start : end,
         daysUsed: days, reason: reason || null,
       })
       if (res.error) { toast.error(res.error); return }
@@ -167,12 +170,12 @@ export default function LeaveManualClient({ employees, leaveRecords: init }: {
     startTransition(async () => {
       const res = await adminUpdateLeaveRecord(editing.id, {
         employeeId: editing.employee_id, leaveType: eType,
-        startDate: eStart, endDate: eType === 'HALF_DAY' ? eStart : eEnd,
+        startDate: eStart, endDate: isHalfDay(eType) ? eStart : eEnd,
         daysUsed: eDays, reason: eReason || null,
       })
       if (res.error) { toast.error(res.error); return }
       setRecords(prev => prev.map(r => r.id === editing.id
-        ? { ...r, leave_type: eType, start_date: eStart, end_date: eType === 'HALF_DAY' ? eStart : eEnd, days_used: eDays, reason: eReason || null }
+        ? { ...r, leave_type: eType, start_date: eStart, end_date: isHalfDay(eType) ? eStart : eEnd, days_used: eDays, reason: eReason || null }
         : r))
       toast.success('수정됐습니다.')
       setEditing(null)

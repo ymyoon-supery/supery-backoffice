@@ -6,13 +6,15 @@ import { toast } from 'sonner'
 import { submitLeave } from '@/app/(dashboard)/approval/leave/actions'
 import { differenceInCalendarDays, format } from 'date-fns'
 
-type LeaveType = 'ANNUAL' | 'HALF_DAY' | 'SICK' | 'GROUP' | 'COMP' | 'OTHER'
+type LeaveType = 'ANNUAL' | 'HALF_DAY' | 'AM_HALF' | 'PM_HALF' | 'SICK' | 'GROUP' | 'COMP' | 'OTHER'
 
-const LEAVE_TYPES: LeaveType[] = ['ANNUAL', 'HALF_DAY', 'SICK', 'GROUP', 'COMP', 'OTHER']
+const LEAVE_TYPES: LeaveType[] = ['ANNUAL', 'AM_HALF', 'PM_HALF', 'SICK', 'GROUP', 'COMP', 'OTHER']
 
 const LEAVE_LABELS: Record<LeaveType, string> = {
   ANNUAL: '연차',
   HALF_DAY: '반차',
+  AM_HALF: '오전반차',
+  PM_HALF: '오후반차',
   SICK: '병가(무급)',
   GROUP: '공동연차',
   COMP: '보상휴가',
@@ -20,10 +22,10 @@ const LEAVE_LABELS: Record<LeaveType, string> = {
 }
 
 const FIXED_DAYS: Partial<Record<LeaveType, number>> = {
-  HALF_DAY: 0.5,
+  HALF_DAY: 0.5, AM_HALF: 0.5, PM_HALF: 0.5,
 }
 
-const DEDUCTS_LEAVE = new Set<LeaveType>(['ANNUAL', 'HALF_DAY', 'GROUP'])
+const DEDUCTS_LEAVE = new Set<LeaveType>(['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF', 'GROUP'])
 
 export default function LeaveForm({ remainingLeaves }: { remainingLeaves: number }) {
   const router = useRouter()
@@ -42,9 +44,11 @@ export default function LeaveForm({ remainingLeaves }: { remainingLeaves: number
 
   const exceedsBalance = DEDUCTS_LEAVE.has(leaveType) && computedDays > remainingLeaves
 
+  const isHalfDay = leaveType === 'AM_HALF' || leaveType === 'PM_HALF' || leaveType === 'HALF_DAY'
+
   const canSubmit =
     !!startDate &&
-    (leaveType === 'HALF_DAY' || !!endDate) &&
+    (isHalfDay || !!endDate) &&
     computedDays > 0 &&
     !exceedsBalance &&
     (leaveType !== 'OTHER' || reason.trim().length > 0)
@@ -54,7 +58,7 @@ export default function LeaveForm({ remainingLeaves }: { remainingLeaves: number
       const result = await submitLeave({
         leaveType,
         startDate,
-        endDate: leaveType === 'HALF_DAY' ? startDate : endDate,
+        endDate: isHalfDay ? startDate : endDate,
         daysUsed: computedDays,
         reason: reason || null,
       })
@@ -125,7 +129,7 @@ export default function LeaveForm({ remainingLeaves }: { remainingLeaves: number
             className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </div>
-        {leaveType !== 'HALF_DAY' && (
+        {!isHalfDay && (
           <div className="space-y-1">
             <label className="text-sm font-medium text-gray-700">종료일</label>
             <input

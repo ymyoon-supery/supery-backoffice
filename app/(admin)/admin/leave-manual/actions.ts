@@ -29,7 +29,7 @@ export type ManualLeaveInput = {
   reason: string | null
 }
 
-const DEDUCTS_LEAVE = ['ANNUAL', 'HALF_DAY', 'GROUP']
+const DEDUCTS_LEAVE = ['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF', 'GROUP']
 
 async function adjustLeaves(client: ReturnType<typeof adminClient>, employeeId: string, delta: number) {
   const { data: emp } = await client.from('employees').select('remaining_leaves').eq('id', employeeId).single()

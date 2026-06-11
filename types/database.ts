@@ -1,6 +1,6 @@
 export type EmployeeRole = 'ADMIN' | 'MANAGER' | 'EMPLOYEE'
 export type AttendanceType = 'CHECK_IN' | 'CHECK_OUT'
-export type LeaveType = 'ANNUAL' | 'HALF_DAY' | 'SICK' | 'GROUP' | 'COMP' | 'OTHER'
+export type LeaveType = 'ANNUAL' | 'HALF_DAY' | 'AM_HALF' | 'PM_HALF' | 'SICK' | 'GROUP' | 'COMP' | 'OTHER'
 export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
 export type ExpenseCategory = 'TRANSPORT' | 'MEAL' | 'ACCOMMODATION' | 'SUPPLIES' | 'OTHER'
 export type OutboxEventType = 'CALENDAR_INSERT' | 'CALENDAR_DELETE' | 'DRIVE_UPLOAD' | 'CHAT_NOTIFY'
