@@ -6,36 +6,38 @@ import {
   Clock,
   FileText,
   BarChart2,
-  Settings,
   Users,
   ClipboardList,
   Home,
   Bell,
   FilePlus,
+  CalendarDays,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-const employeeNav = [
+const employeeNavBase = [
   { href: '/', label: '홈', icon: Home },
-  { href: '/attendance', label: '근태 기록', icon: Clock },
-  { href: '/leave', label: '내 연차', icon: FileText },
+  { href: '/attendance', label: '근태등록', icon: Clock },
+  { href: '/leave', label: '연차 사용 내역', icon: CalendarDays },
   { href: '/approval/leave/new', label: '연차 신청', icon: FileText },
   { href: '/approval/expense/new', label: '지출결의', icon: FileText },
-  { href: '/approval/inbox', label: '결재함', icon: ClipboardList },
 ]
 
+const inboxNav = { href: '/approval/inbox', label: '결재함', icon: ClipboardList }
+
 const adminNav = [
-  { href: '/admin/attendance', label: '근태 관리', icon: Clock },
-  { href: '/admin/reports', label: '리포트', icon: BarChart2 },
-  { href: '/admin/employees', label: '직원 상태', icon: Users },
+  { href: '/approval/inbox', label: '결재함', icon: ClipboardList },
+  { href: '/admin/employees', label: '출퇴근 현황', icon: Users },
+  { href: '/admin/attendance', label: '근태 현황', icon: Clock },
+  { href: '/admin/reports', label: '52시간 리포트', icon: BarChart2 },
+  { href: '/admin/leave-manual', label: '연차관리', icon: FilePlus },
   { href: '/admin/leave-promotion', label: '연차사용촉진', icon: Bell },
-  { href: '/admin/leave-manual', label: '연차 관리', icon: FilePlus },
-  { href: '/admin/settings', label: '설정', icon: Settings },
 ]
 
 export default function Sidebar({ role }: { role: string }) {
   const pathname = usePathname()
   const isAdmin = role === 'ADMIN'
+  const employeeNav = isAdmin ? employeeNavBase : [...employeeNavBase, inboxNav]
 
   return (
     <aside className="w-56 bg-white border-r border-gray-100 flex flex-col">

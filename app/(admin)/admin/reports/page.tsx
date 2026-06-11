@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { format, startOfWeek, endOfWeek, differenceInMinutes } from 'date-fns'
+import { format, startOfWeek, endOfWeek, differenceInMinutes, parseISO, addWeeks } from 'date-fns'
 import Link from 'next/link'
 import { Download } from 'lucide-react'
 
@@ -13,7 +13,7 @@ function fmtHM(minutes: number) {
 export default async function AdminReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ team?: string; group?: string }>
+  searchParams: Promise<{ team?: string; group?: string; weekStart?: string }>
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -23,8 +23,13 @@ export default async function AdminReportsPage({
   const selectedTeam = params.team ?? ''
   const selectedGroup = params.group ?? ''
 
-  const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd')
-  const weekEnd = format(endOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd')
+  const weekStartDate = params.weekStart
+    ? parseISO(params.weekStart)
+    : startOfWeek(new Date(), { weekStartsOn: 1 })
+  const weekStart = format(weekStartDate, 'yyyy-MM-dd')
+  const weekEnd = format(endOfWeek(weekStartDate, { weekStartsOn: 1 }), 'yyyy-MM-dd')
+  const prevWeek = format(addWeeks(weekStartDate, -1), 'yyyy-MM-dd')
+  const nextWeek = format(addWeeks(weekStartDate, 1), 'yyyy-MM-dd')
 
   const [{ data: groups }, { data: allTeams }, { data: records }] = await Promise.all([
     supabase.from('groups').select('id, name').order('name'),
@@ -43,15 +48,15 @@ export default async function AdminReportsPage({
 
   type RecordRow = NonNullable<typeof records>[number]
 
-  // Collect employees, filtered by team/group if selected
   const hoursMap = new Map<string, { name: string; email: string; teamId: string | null; workMinutes: number; breakMinutes: number }>()
   for (const r of records ?? []) {
     const emp = r.employees as unknown as { id: string; name: string; email: string; department_id: string | null } | null
     if (!emp) continue
     if (selectedTeam && emp.department_id !== selectedTeam) continue
     if (selectedGroup && !teams.some(t => t.id === emp.department_id)) continue
-    if (hoursMap.has(r.employee_id)) continue
-    hoursMap.set(r.employee_id, { name: emp.name, email: emp.email, teamId: emp.department_id, workMinutes: 0, breakMinutes: 0 })
+    if (!hoursMap.has(r.employee_id)) {
+      hoursMap.set(r.employee_id, { name: emp.name, email: emp.email, teamId: emp.department_id, workMinutes: 0, breakMinutes: 0 })
+    }
   }
 
   const byEmployeeDay = new Map<string, RecordRow[]>()
@@ -86,7 +91,8 @@ export default async function AdminReportsPage({
       }
     }
     const gross = differenceInMinutes(new Date(checkOut.recorded_at), new Date(checkIn.recorded_at))
-    entry.workMinutes += Math.max(0, gross - dayBreak)
+    const lunch = dayBreak < 30 && gross > 240 ? 60 : 0
+    entry.workMinutes += Math.max(0, gross - dayBreak - lunch)
     entry.breakMinutes += dayBreak
   }
 
@@ -96,12 +102,11 @@ export default async function AdminReportsPage({
 
   const overLimit = sorted.filter(([, v]) => v.workMinutes > 52 * 60)
 
-  function buildUrl(team: string, group: string) {
-    const p = new URLSearchParams()
+  function buildUrl(team: string, group: string, ws = weekStart) {
+    const p = new URLSearchParams({ weekStart: ws })
     if (team) p.set('team', team)
     if (group) p.set('group', group)
-    const qs = p.toString()
-    return `/admin/reports${qs ? `?${qs}` : ''}`
+    return `/admin/reports?${p.toString()}`
   }
 
   return (
@@ -116,7 +121,18 @@ export default async function AdminReportsPage({
         </Link>
       </div>
 
-      <p className="text-sm text-gray-500">기간: {weekStart} ~ {weekEnd}</p>
+      {/* Week navigation */}
+      <div className="flex items-center gap-3">
+        <Link href={buildUrl(selectedTeam, selectedGroup, prevWeek)}
+          className="w-7 h-7 flex items-center justify-center border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-500 text-lg leading-none">
+          ‹
+        </Link>
+        <span className="text-sm font-medium text-gray-700">{weekStart} ~ {weekEnd}</span>
+        <Link href={buildUrl(selectedTeam, selectedGroup, nextWeek)}
+          className="w-7 h-7 flex items-center justify-center border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-500 text-lg leading-none">
+          ›
+        </Link>
+      </div>
 
       {/* Group / Team filter */}
       <div className="flex flex-wrap gap-2">
@@ -180,7 +196,7 @@ export default async function AdminReportsPage({
             {sorted.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-10 text-center text-gray-400">
-                  이번 주 근무 기록이 없습니다.
+                  해당 주간 근무 기록이 없습니다.
                 </td>
               </tr>
             )}
