@@ -8,6 +8,7 @@ const tabs = [
   { href: '/admin/settings', label: '기본 설정', exact: true },
   { href: '/admin/settings/groups', label: '그룹/팀 관리' },
   { href: '/admin/settings/employees', label: '직원 관리' },
+  { href: '/admin/settings/home-locations', label: '재택근무지 현황' },
 ]
 
 export default function SettingsTabs() {
