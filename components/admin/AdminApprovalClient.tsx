@@ -132,14 +132,14 @@ export default function AdminApprovalClient({
 
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm table-fixed">
           <thead>
             <tr className="border-b border-gray-100 text-xs text-gray-400 font-medium text-left bg-gray-50/50">
-              <th className="px-4 py-3">직원</th>
-              <th className="px-4 py-3">유형</th>
+              <th className="px-4 py-3 w-[130px]">직원</th>
+              <th className="px-4 py-3 w-[150px]">유형</th>
               <th className="px-4 py-3">내용</th>
-              <th className="px-4 py-3 whitespace-nowrap">신청일시</th>
-              <th className="px-4 py-3 text-right">{tab === 'pending' ? '처리' : '상태'}</th>
+              <th className="px-4 py-3 w-[120px] whitespace-nowrap">신청일시</th>
+              <th className="px-4 py-3 w-[140px] text-right">{tab === 'pending' ? '처리' : '상태'}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -169,7 +169,7 @@ export default function AdminApprovalClient({
                         {item.kind === 'leave' ? `연차 · ${item.typeLabel}` : `지결서 · ${item.typeLabel}`}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-600 max-w-[240px] truncate">
+                    <td className="px-4 py-3 text-xs text-gray-600 truncate">
                       {item.detail}
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-400 tabular-nums whitespace-nowrap">
