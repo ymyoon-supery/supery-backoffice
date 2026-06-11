@@ -20,7 +20,7 @@ const LEAVE_LABELS: Record<LeaveType, string> = {
   ANNUAL: '연차', HALF_DAY: '반차', AM_HALF: '오전반차', PM_HALF: '오후반차',
   SICK: '병가(무급)', GROUP: '공동연차', COMP: '보상휴가', OTHER: '기타',
 }
-const DEDUCTS = new Set<LeaveType>(['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF', 'GROUP'])
+const DEDUCTS = new Set<LeaveType>(['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF'])
 
 function isHalfDay(t: LeaveType) { return t === 'AM_HALF' || t === 'PM_HALF' || t === 'HALF_DAY' }
 

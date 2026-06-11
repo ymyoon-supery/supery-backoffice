@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { calcAnnualLeave } from '@/lib/annualLeave'
 import LeaveManualClient from './LeaveManualClient'
 
-const DEDUCTS = ['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF', 'GROUP']
+const DEDUCTS = ['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF']
 
 export default async function LeaveManualPage() {
   const supabase = await createClient()
