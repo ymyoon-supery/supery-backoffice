@@ -6,6 +6,36 @@ import { headers } from 'next/headers'
 import { revalidateTag } from 'next/cache'
 import { CACHE_TAGS } from '@/lib/cache/tags'
 
+export async function registerHomeLocation(lat: number, lng: number) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: '인증이 필요합니다.' }
+
+  const { error } = await supabase
+    .from('employees')
+    .update({ home_lat: lat, home_lng: lng })
+    .eq('auth_user_id', user.id)
+
+  if (error) return { error: error.message }
+  revalidateTag(CACHE_TAGS.attendance)
+  return { ok: true }
+}
+
+export async function getHomeLocation() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const { data } = await supabase
+    .from('employees')
+    .select('home_lat, home_lng')
+    .eq('auth_user_id', user.id)
+    .single()
+
+  if (!data?.home_lat || !data?.home_lng) return null
+  return { lat: Number(data.home_lat), lng: Number(data.home_lng) }
+}
+
 export async function checkOfficeIp() {
   const hdrs = await headers()
   const currentIp =

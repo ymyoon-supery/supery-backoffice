@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { unstable_cache } from 'next/cache'
 import { CACHE_TAGS } from '@/lib/cache/tags'
 import TimeTracker from '@/components/attendance/TimeTracker'
+import HomeLocationCard from '@/components/attendance/HomeLocationCard'
 import { format, startOfWeek, endOfWeek } from 'date-fns'
 import { ko } from 'date-fns/locale'
 
@@ -14,7 +15,7 @@ export default async function AttendancePage() {
 
   const { data: employee } = await supabase
     .from('employees')
-    .select('id, name')
+    .select('id, name, home_lat, home_lng')
     .eq('auth_user_id', user.id)
     .single()
 
@@ -67,11 +68,21 @@ export default async function AttendancePage() {
     : lastRecord?.type === 'CHECK_IN' || lastRecord?.type === 'BREAK_END' || lastRecord?.type === 'FIELD_END' ? 'WORKING'
     : 'BEFORE_WORK'
 
+  const homeLocation = (employee?.home_lat && employee?.home_lng)
+    ? { lat: Number(employee.home_lat), lng: Number(employee.home_lng) }
+    : null
+
   return (
     <div className="space-y-6 max-w-2xl">
       <h1 className="text-xl font-semibold text-gray-900">근태 기록</h1>
 
-      <TimeTracker initialState={initialState as never} autoBreakMode={autoBreakMode} />
+      <TimeTracker
+        initialState={initialState as never}
+        autoBreakMode={autoBreakMode}
+        homeLocation={homeLocation}
+      />
+
+      <HomeLocationCard initialLocation={homeLocation} />
 
       <div className="bg-white rounded-xl border border-gray-100">
         <div className="px-5 py-4 border-b border-gray-50">

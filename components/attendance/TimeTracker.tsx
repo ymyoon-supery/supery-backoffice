@@ -22,12 +22,31 @@ const ALL_EVENTS = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'] as 
 // click/touchstart excluded for FIELD: prevents conflict with manual 업무복귀 button
 const FIELD_EVENTS = ['mousemove', 'keydown', 'scroll'] as const
 
+function haversineM(lat1: number, lng1: number, lat2: number, lng2: number) {
+  const R = 6371000
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+function getCurrentPosition(): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) =>
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true, timeout: 10000,
+    })
+  )
+}
+
 export default function TimeTracker({
   initialState,
   autoBreakMode = 'frontend',
+  homeLocation = null,
 }: {
   initialState?: WorkState
   autoBreakMode?: 'frontend' | 'server'
+  homeLocation?: { lat: number; lng: number } | null
 }) {
   const [state, setState] = useState<WorkState>(initialState ?? 'BEFORE_WORK')
   const [showCheckInOptions, setShowCheckInOptions] = useState(false)
@@ -36,6 +55,7 @@ export default function TimeTracker({
   const [fieldIsCheckIn, setFieldIsCheckIn] = useState(false)
   const [isAutoBreak, setIsAutoBreak] = useState(false)
   const [officeIpWarning, setOfficeIpWarning] = useState<{ currentIp: string } | null>(null)
+  const [remoteGpsWarning, setRemoteGpsWarning] = useState<{ distanceM: number } | null>(null)
   const [isPending, startTransition] = useTransition()
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const stateRef = useRef(state)
@@ -149,6 +169,20 @@ export default function TimeTracker({
     })
   }
 
+  function doRemoteCheckIn() {
+    setRemoteGpsWarning(null)
+    startTransition(async () => {
+      const result = await recordAttendance({
+        type: 'CHECK_IN',
+        location: null, latitude: null, longitude: null,
+        isField: false, note: '재택',
+      })
+      if (result?.error) { toast.error(result.error); return }
+      setState('WORKING')
+      toast.success('출근 기록 완료')
+    })
+  }
+
   function handleCheckIn(location: 'OFFICE' | 'REMOTE' | 'FIELD') {
     setShowCheckInOptions(false)
     if (location === 'FIELD') {
@@ -168,16 +202,32 @@ export default function TimeTracker({
       })
       return
     }
-    // REMOTE
+    // REMOTE — GPS 검증
+    if (!homeLocation) {
+      toast.error('재택근무지를 먼저 등록해주세요. (아래 재택근무지 카드에서 등록)')
+      return
+    }
     startTransition(async () => {
-      const result = await recordAttendance({
-        type: 'CHECK_IN',
-        location: null, latitude: null, longitude: null,
-        isField: false, note: '재택',
-      })
-      if (result?.error) { toast.error(result.error); return }
-      setState('WORKING')
-      toast.success('출근 기록 완료')
+      if (!navigator.geolocation) {
+        toast.error('이 브라우저는 위치 서비스를 지원하지 않습니다.')
+        return
+      }
+      let position: GeolocationPosition
+      try {
+        position = await getCurrentPosition()
+      } catch {
+        toast.error('위치 정보를 가져올 수 없습니다. 브라우저 위치 권한을 확인해주세요.')
+        return
+      }
+      const distanceM = haversineM(
+        position.coords.latitude, position.coords.longitude,
+        homeLocation.lat, homeLocation.lng,
+      )
+      if (distanceM > 500) {
+        setRemoteGpsWarning({ distanceM: Math.round(distanceM) })
+        return
+      }
+      doRemoteCheckIn()
     })
   }
 
@@ -236,6 +286,38 @@ export default function TimeTracker({
 
   return (
     <>
+      {remoteGpsWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-8 shadow-2xl max-w-sm w-full mx-4 text-center space-y-4">
+            <div className="w-14 h-14 rounded-full bg-orange-100 flex items-center justify-center mx-auto">
+              <Home size={26} className="text-orange-500" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">재택근무지 위치 확인</h3>
+              <p className="text-sm text-gray-500 mt-1.5 leading-relaxed">
+                현재 위치가 등록된 재택근무지와<br />
+                <span className="font-semibold text-orange-500">{remoteGpsWarning.distanceM}m</span> 떨어져 있습니다.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={doRemoteCheckIn}
+                disabled={isPending}
+                className="w-full bg-primary text-white rounded-xl py-3 text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              >
+                그래도 재택 출근
+              </button>
+              <button
+                onClick={() => setRemoteGpsWarning(null)}
+                className="w-full text-sm text-gray-500 hover:text-gray-700 py-2"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {officeIpWarning && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl p-8 shadow-2xl max-w-sm w-full mx-4 text-center space-y-4">
