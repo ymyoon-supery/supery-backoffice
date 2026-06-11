@@ -1,8 +1,30 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { headers } from 'next/headers'
 import { revalidateTag } from 'next/cache'
 import { CACHE_TAGS } from '@/lib/cache/tags'
+
+export async function checkOfficeIp() {
+  const hdrs = await headers()
+  const currentIp =
+    hdrs.get('x-forwarded-for')?.split(',')[0].trim() ??
+    hdrs.get('x-real-ip') ??
+    ''
+
+  const admin = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+  const { data } = await admin.from('company_settings').select('office_ips').single()
+  const officeIps: string[] = data?.office_ips ?? []
+
+  // No IPs registered → no restriction
+  if (officeIps.length === 0) return { match: true, currentIp, officeIps }
+
+  return { match: officeIps.includes(currentIp), currentIp, officeIps }
+}
 
 type RecordAttendanceInput = {
   type: 'CHECK_IN' | 'CHECK_OUT' | 'BREAK_START' | 'BREAK_END' | 'FIELD_START' | 'FIELD_END'

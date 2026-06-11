@@ -4,7 +4,7 @@ import { useState, useTransition, useEffect, useRef, useCallback } from 'react'
 import { toast } from 'sonner'
 import { Clock, MapPin, LogOut, Building2, Home, Car } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { recordAttendance } from '@/app/(dashboard)/attendance/actions'
+import { recordAttendance, checkOfficeIp } from '@/app/(dashboard)/attendance/actions'
 
 type WorkState = 'BEFORE_WORK' | 'WORKING' | 'BREAK' | 'FIELD' | 'DONE'
 type AttendanceType = 'CHECK_IN' | 'CHECK_OUT' | 'BREAK_START' | 'BREAK_END' | 'FIELD_START' | 'FIELD_END'
@@ -29,6 +29,7 @@ export default function TimeTracker({ initialState }: { initialState?: WorkState
   const [fieldNote, setFieldNote] = useState('')
   const [fieldIsCheckIn, setFieldIsCheckIn] = useState(false)
   const [isAutoBreak, setIsAutoBreak] = useState(false)
+  const [officeIpWarning, setOfficeIpWarning] = useState<{ currentIp: string } | null>(null)
   const [isPending, startTransition] = useTransition()
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const stateRef = useRef(state)
@@ -127,6 +128,20 @@ export default function TimeTracker({ initialState }: { initialState?: WorkState
     }
   }, [state, isAutoBreak, handleActivity, triggerAutoBreak])
 
+  function doOfficeCheckIn() {
+    setOfficeIpWarning(null)
+    startTransition(async () => {
+      const result = await recordAttendance({
+        type: 'CHECK_IN',
+        location: null, latitude: null, longitude: null,
+        isField: false, note: null,
+      })
+      if (result?.error) { toast.error(result.error); return }
+      setState('WORKING')
+      toast.success('출근 기록 완료')
+    })
+  }
+
   function handleCheckIn(location: 'OFFICE' | 'REMOTE' | 'FIELD') {
     setShowCheckInOptions(false)
     if (location === 'FIELD') {
@@ -135,12 +150,23 @@ export default function TimeTracker({ initialState }: { initialState?: WorkState
       setShowFieldForm(true)
       return
     }
+    if (location === 'OFFICE') {
+      startTransition(async () => {
+        const { match, currentIp } = await checkOfficeIp()
+        if (!match) {
+          setOfficeIpWarning({ currentIp })
+          return
+        }
+        doOfficeCheckIn()
+      })
+      return
+    }
+    // REMOTE
     startTransition(async () => {
       const result = await recordAttendance({
         type: 'CHECK_IN',
         location: null, latitude: null, longitude: null,
-        isField: false,
-        note: location === 'REMOTE' ? '재택' : null,
+        isField: false, note: '재택',
       })
       if (result?.error) { toast.error(result.error); return }
       setState('WORKING')
@@ -203,6 +229,40 @@ export default function TimeTracker({ initialState }: { initialState?: WorkState
 
   return (
     <>
+      {officeIpWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-8 shadow-2xl max-w-sm w-full mx-4 text-center space-y-4">
+            <div className="w-14 h-14 rounded-full bg-orange-100 flex items-center justify-center mx-auto">
+              <MapPin size={26} className="text-orange-500" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">출근 위치 확인</h3>
+              <p className="text-sm text-gray-500 mt-1.5 leading-relaxed">
+                현재 네트워크가 등록된 사무실 IP와<br />다릅니다.
+              </p>
+              <p className="mt-2 text-xs font-mono bg-gray-50 rounded-lg px-3 py-2 text-gray-600">
+                현재 IP: {officeIpWarning.currentIp || '확인 불가'}
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={doOfficeCheckIn}
+                disabled={isPending}
+                className="w-full bg-primary text-white rounded-xl py-3 text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              >
+                그래도 사무실 출근
+              </button>
+              <button
+                onClick={() => setOfficeIpWarning(null)}
+                className="w-full text-sm text-gray-500 hover:text-gray-700 py-2"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isAutoBreak && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl p-8 shadow-2xl max-w-sm w-full mx-4 text-center space-y-4">
