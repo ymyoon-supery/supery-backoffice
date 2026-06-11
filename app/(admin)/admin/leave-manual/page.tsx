@@ -20,7 +20,7 @@ export default async function LeaveManualPage() {
   const [{ data: rawEmployees }, { data: leaveRecords, error: leaveError }, { data: usedTotals }] = await Promise.all([
     admin.from('employees').select('id, name, email, hired_at, annual_leave_days, remaining_leaves').eq('is_active', true).order('name'),
     admin.from('leave_requests')
-      .select('id, employee_id, leave_type, start_date, end_date, days_used, reason')
+      .select('id, employee_id, leave_type, start_date, end_date, days_used, reason, is_manual')
       .eq('status', 'APPROVED')
       .order('start_date', { ascending: false })
       .limit(500),
@@ -47,7 +47,7 @@ export default async function LeaveManualPage() {
     }
   })
 
-  const records = (leaveRecords ?? []).map(r => ({ ...r, is_manual: false }))
+  const records = (leaveRecords ?? []).map(r => ({ ...r, is_manual: r.is_manual ?? false }))
 
   return (
     <div className="max-w-2xl">
