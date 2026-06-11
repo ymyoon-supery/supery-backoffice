@@ -27,9 +27,10 @@ export default async function AttendancePage() {
   )
   const { data: settings } = await admin
     .from('company_settings')
-    .select('auto_break_mode')
+    .select('auto_break_mode, remote_radius_m')
     .single()
   const autoBreakMode = (settings?.auto_break_mode ?? 'frontend') as 'frontend' | 'server'
+  const remoteRadiusM = settings?.remote_radius_m ?? 500
 
   const today = new Date()
   // KST 기준 날짜 (UTC+9 고정 오프셋)
@@ -80,6 +81,7 @@ export default async function AttendancePage() {
         initialState={initialState as never}
         autoBreakMode={autoBreakMode}
         homeLocation={homeLocation}
+        remoteRadiusM={remoteRadiusM}
       />
 
       <HomeLocationCard initialLocation={homeLocation} />

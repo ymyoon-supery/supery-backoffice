@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Trash2, Plus, Wifi } from 'lucide-react'
-import { updateInactivityMinutes, updateAutoBreakMode, addOfficeIp, removeOfficeIp } from './actions'
+import { updateInactivityMinutes, updateAutoBreakMode, updateRemoteRadius, addOfficeIp, removeOfficeIp } from './actions'
 
 const INACTIVITY_OPTIONS = [
   { value: 10, label: '10분' },
@@ -12,19 +12,32 @@ const INACTIVITY_OPTIONS = [
   { value: 30, label: '30분' },
 ]
 
+const RADIUS_OPTIONS = [
+  { value: 0,    label: '제한 없음' },
+  { value: 100,  label: '100m' },
+  { value: 200,  label: '200m' },
+  { value: 300,  label: '300m' },
+  { value: 500,  label: '500m (기본)' },
+  { value: 1000, label: '1km' },
+  { value: 2000, label: '2km' },
+]
+
 export default function GeneralSettingsClient({
   inactivityMinutes,
   officeIps,
   currentIp,
   autoBreakMode,
+  remoteRadiusM,
 }: {
   inactivityMinutes: number
   officeIps: string[]
   currentIp: string
   autoBreakMode: 'frontend' | 'server'
+  remoteRadiusM: number
 }) {
   const [minutes, setMinutes] = useState(inactivityMinutes)
   const [breakMode, setBreakMode] = useState<'frontend' | 'server'>(autoBreakMode)
+  const [radiusM, setRadiusM] = useState(remoteRadiusM)
   const [ips, setIps] = useState<string[]>(officeIps)
   const [newIp, setNewIp] = useState('')
   const [isPending, startTransition] = useTransition()
@@ -41,6 +54,15 @@ export default function GeneralSettingsClient({
     setBreakMode(mode)
     startTransition(async () => {
       const res = await updateAutoBreakMode(mode)
+      if (res.error) { toast.error(res.error); return }
+      toast.success('저장되었습니다.')
+    })
+  }
+
+  function handleRadiusChange(r: number) {
+    setRadiusM(r)
+    startTransition(async () => {
+      const res = await updateRemoteRadius(r)
       if (res.error) { toast.error(res.error); return }
       toast.success('저장되었습니다.')
     })
@@ -135,6 +157,32 @@ export default function GeneralSettingsClient({
               <div className="text-xs opacity-70">Hidden 자동 기록</div>
             </button>
           </div>
+        </div>
+
+        <div className="border-t border-gray-100 pt-4 space-y-2">
+          <label className="text-sm text-gray-600">재택근무 인정 거리 (반경)</label>
+          <div className="flex gap-2 flex-wrap">
+            {RADIUS_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => handleRadiusChange(opt.value)}
+                disabled={isPending}
+                className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                  radiusM === opt.value
+                    ? 'bg-primary text-white border-primary'
+                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-gray-400">
+            {radiusM === 0
+              ? 'GPS 위치 제한 없이 재택 출근이 허용됩니다.'
+              : `등록된 재택근무지 반경 ${radiusM >= 1000 ? `${radiusM / 1000}km` : `${radiusM}m`} 이내에서만 재택 출근이 인정됩니다.`}
+          </p>
         </div>
       </div>
 

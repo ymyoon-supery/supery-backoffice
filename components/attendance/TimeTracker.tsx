@@ -43,10 +43,12 @@ export default function TimeTracker({
   initialState,
   autoBreakMode = 'frontend',
   homeLocation = null,
+  remoteRadiusM = 500,
 }: {
   initialState?: WorkState
   autoBreakMode?: 'frontend' | 'server'
   homeLocation?: { lat: number; lng: number } | null
+  remoteRadiusM?: number
 }) {
   const [state, setState] = useState<WorkState>(initialState ?? 'BEFORE_WORK')
   const [showCheckInOptions, setShowCheckInOptions] = useState(false)
@@ -241,7 +243,7 @@ export default function TimeTracker({
         position.coords.latitude, position.coords.longitude,
         homeLocation.lat, homeLocation.lng,
       )
-      if (distanceM > 500) {
+      if (remoteRadiusM > 0 && distanceM > remoteRadiusM) {
         setRemoteGpsState({
           step: 'warning',
           distanceM: Math.round(distanceM),
