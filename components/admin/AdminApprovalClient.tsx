@@ -74,7 +74,7 @@ export default function AdminApprovalClient({
   const pageNums = getPageNums(page, totalPages)
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 max-w-5xl">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">결재함</h1>
