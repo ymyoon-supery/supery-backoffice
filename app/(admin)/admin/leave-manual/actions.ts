@@ -52,7 +52,6 @@ export async function adminAddLeaveRecord(input: ManualLeaveInput) {
     days_used: input.daysUsed,
     reason: input.reason,
     status: 'APPROVED',
-    is_manual: true,
   })
   if (insertError) return { error: insertError.message }
 
