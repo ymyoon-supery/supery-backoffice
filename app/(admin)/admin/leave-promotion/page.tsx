@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { calcAnnualLeave } from '@/lib/annualLeave'
 import LeavePromotionClient from './LeavePromotionClient'
 
-const DEDUCTS = ['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF']
+const DEDUCTS = ['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF', 'GROUP']
 
 export default async function LeavePromotionPage({
   searchParams,

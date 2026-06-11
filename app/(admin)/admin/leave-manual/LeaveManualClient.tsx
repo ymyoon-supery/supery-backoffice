@@ -20,7 +20,7 @@ const LEAVE_LABELS: Record<LeaveType, string> = {
   ANNUAL: '연차', HALF_DAY: '반차', AM_HALF: '오전반차', PM_HALF: '오후반차',
   SICK: '병가(무급)', GROUP: '공동연차', COMP: '보상휴가', OTHER: '기타',
 }
-const DEDUCTS = new Set<LeaveType>(['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF'])
+const DEDUCTS = new Set<LeaveType>(['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF', 'GROUP'])
 
 function isHalfDay(t: LeaveType) { return t === 'AM_HALF' || t === 'PM_HALF' || t === 'HALF_DAY' }
 
@@ -38,6 +38,7 @@ function hasOverlap(records: LeaveRecord[], empId: string, start: string, end: s
 }
 
 function calcAuto(leaveType: LeaveType, startDate: string, endDate: string) {
+  if (!DEDUCTS.has(leaveType)) return 0
   if (isHalfDay(leaveType)) return 0.5
   if (!startDate || !endDate) return 0
   return Math.max(differenceInCalendarDays(new Date(endDate), new Date(startDate)) + 1, 0)
@@ -96,8 +97,8 @@ function LeaveFields({
 
       <div className="space-y-1">
         <label className="text-sm font-medium text-gray-700">사용 일수</label>
-        <input type="number" step="0.5" min="0.5"
-          value={daysOverride !== '' ? daysOverride : (auto > 0 ? auto : '')}
+        <input type="number" step="0.5" min="0"
+          value={daysOverride !== '' ? daysOverride : (auto > 0 ? auto : (!DEDUCTS.has(leaveType) ? 0 : ''))}
           onChange={e => setDaysOverride(e.target.value)}
           className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
           placeholder="자동 계산 (직접 수정 가능)" />
@@ -156,10 +157,12 @@ export default function LeaveManualClient({ employees, leaveRecords: init }: {
 
   const addEnd = isHalfDay(type) ? start : end
   const editEnd = isHalfDay(eType) ? eStart : eEnd
-  const canAdd = !!empId && !!start && (isHalfDay(type) || !!end) && days > 0
+  const canAdd = !!empId && !!start && (isHalfDay(type) || !!end)
+    && (days > 0 || !DEDUCTS.has(type))
     && (type !== 'OTHER' || reason.trim().length > 0)
     && !hasOverlap(records, empId, start, addEnd, type)
-  const canEdit = !!eStart && (isHalfDay(eType) || !!eEnd) && eDays > 0
+  const canEdit = !!eStart && (isHalfDay(eType) || !!eEnd)
+    && (eDays > 0 || !DEDUCTS.has(eType))
     && (eType !== 'OTHER' || eReason.trim().length > 0)
     && !hasOverlap(records, editing?.employee_id ?? '', eStart, editEnd, eType, editing?.id)
 

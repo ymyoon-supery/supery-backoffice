@@ -25,7 +25,7 @@ const FIXED_DAYS: Partial<Record<LeaveType, number>> = {
   HALF_DAY: 0.5, AM_HALF: 0.5, PM_HALF: 0.5,
 }
 
-const DEDUCTS_LEAVE = new Set<LeaveType>(['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF'])
+const DEDUCTS_LEAVE = new Set<LeaveType>(['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF', 'GROUP'])
 
 export default function LeaveForm({ remainingLeaves }: { remainingLeaves: number }) {
   const router = useRouter()

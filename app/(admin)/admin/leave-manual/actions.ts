@@ -29,7 +29,7 @@ export type ManualLeaveInput = {
   reason: string | null
 }
 
-const DEDUCTS_LEAVE = ['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF']
+const DEDUCTS_LEAVE = ['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF', 'GROUP']
 
 async function checkOverlap(
   client: ReturnType<typeof adminClient>,
