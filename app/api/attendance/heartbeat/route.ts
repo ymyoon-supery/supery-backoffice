@@ -2,8 +2,6 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 
-const INACTIVITY_MS = 15 * 60 * 1000
-
 // Types where employee is actively working (not on break/field/done)
 const WORKING_TYPES = new Set(['CHECK_IN', 'BREAK_END', 'FIELD_END'])
 
@@ -16,6 +14,12 @@ export async function POST(_request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   )
+
+  const { data: settings } = await admin
+    .from('company_settings')
+    .select('inactivity_minutes')
+    .single()
+  const INACTIVITY_MS = (settings?.inactivity_minutes ?? 15) * 60 * 1000
 
   const { data: employee } = await supabase
     .from('employees')
