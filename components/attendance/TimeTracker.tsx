@@ -4,7 +4,7 @@ import { useState, useTransition, useEffect, useRef, useCallback } from 'react'
 import { toast } from 'sonner'
 import { Clock, MapPin, LogOut, Building2, Home, Car } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { recordAttendance, checkOfficeIp } from '@/app/(dashboard)/attendance/actions'
+import { recordAttendance, checkOfficeIp, registerHomeLocation } from '@/app/(dashboard)/attendance/actions'
 
 type WorkState = 'BEFORE_WORK' | 'WORKING' | 'BREAK' | 'FIELD' | 'DONE'
 type AttendanceType = 'CHECK_IN' | 'CHECK_OUT' | 'BREAK_START' | 'BREAK_END' | 'FIELD_START' | 'FIELD_END'
@@ -55,7 +55,12 @@ export default function TimeTracker({
   const [fieldIsCheckIn, setFieldIsCheckIn] = useState(false)
   const [isAutoBreak, setIsAutoBreak] = useState(false)
   const [officeIpWarning, setOfficeIpWarning] = useState<{ currentIp: string } | null>(null)
-  const [remoteGpsWarning, setRemoteGpsWarning] = useState<{ distanceM: number } | null>(null)
+  const [remoteGpsState, setRemoteGpsState] = useState<{
+    step: 'warning' | 'input'
+    distanceM: number
+    coords: { lat: number; lng: number }
+  } | null>(null)
+  const [newLocationName, setNewLocationName] = useState('')
   const [isPending, startTransition] = useTransition()
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const stateRef = useRef(state)
@@ -169,13 +174,26 @@ export default function TimeTracker({
     })
   }
 
-  function doRemoteCheckIn() {
-    setRemoteGpsWarning(null)
+  function doRemoteCheckIn(opts?: {
+    locationName: string
+    distanceM: number
+    coords: { lat: number; lng: number }
+  }) {
+    setRemoteGpsState(null)
+    setNewLocationName('')
     startTransition(async () => {
+      if (opts) {
+        await registerHomeLocation(opts.coords.lat, opts.coords.lng)
+      }
       const result = await recordAttendance({
         type: 'CHECK_IN',
-        location: null, latitude: null, longitude: null,
-        isField: false, note: '재택',
+        location: opts?.locationName ?? null,
+        latitude: opts?.coords.lat ?? null,
+        longitude: opts?.coords.lng ?? null,
+        isField: false,
+        note: opts
+          ? `재택 변경 (이전 위치에서 ${opts.distanceM}m)`
+          : '재택',
       })
       if (result?.error) { toast.error(result.error); return }
       setState('WORKING')
@@ -224,7 +242,11 @@ export default function TimeTracker({
         homeLocation.lat, homeLocation.lng,
       )
       if (distanceM > 500) {
-        setRemoteGpsWarning({ distanceM: Math.round(distanceM) })
+        setRemoteGpsState({
+          step: 'warning',
+          distanceM: Math.round(distanceM),
+          coords: { lat: position.coords.latitude, lng: position.coords.longitude },
+        })
         return
       }
       doRemoteCheckIn()
@@ -286,34 +308,86 @@ export default function TimeTracker({
 
   return (
     <>
-      {remoteGpsWarning && (
+      {remoteGpsState && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl p-8 shadow-2xl max-w-sm w-full mx-4 text-center space-y-4">
             <div className="w-14 h-14 rounded-full bg-orange-100 flex items-center justify-center mx-auto">
               <Home size={26} className="text-orange-500" />
             </div>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900">재택근무지 위치 확인</h3>
-              <p className="text-sm text-gray-500 mt-1.5 leading-relaxed">
-                현재 위치가 등록된 재택근무지와<br />
-                <span className="font-semibold text-orange-500">{remoteGpsWarning.distanceM}m</span> 떨어져 있습니다.
-              </p>
-            </div>
-            <div className="flex flex-col gap-2">
-              <button
-                onClick={doRemoteCheckIn}
-                disabled={isPending}
-                className="w-full bg-primary text-white rounded-xl py-3 text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 transition-colors"
-              >
-                그래도 재택 출근
-              </button>
-              <button
-                onClick={() => setRemoteGpsWarning(null)}
-                className="w-full text-sm text-gray-500 hover:text-gray-700 py-2"
-              >
-                취소
-              </button>
-            </div>
+
+            {remoteGpsState.step === 'warning' ? (
+              <>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">등록된 재택근무지가 아닙니다</h3>
+                  <p className="text-sm text-gray-500 mt-1.5 leading-relaxed">
+                    현재 위치가 등록된 재택근무지와<br />
+                    <span className="font-semibold text-orange-500">{remoteGpsState.distanceM}m</span> 떨어져 있습니다.<br />
+                    재택근무지를 변경 등록하시겠습니까?
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => setRemoteGpsState(s => s && { ...s, step: 'input' })}
+                    disabled={isPending}
+                    className="w-full bg-primary text-white rounded-xl py-3 text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                  >
+                    변경 등록
+                  </button>
+                  <button
+                    onClick={() => setRemoteGpsState(null)}
+                    className="w-full text-sm text-gray-500 hover:text-gray-700 py-2"
+                  >
+                    취소
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">새 재택근무지 등록</h3>
+                  <p className="text-sm text-gray-500 mt-1">현재 위치의 장소명을 입력해주세요.</p>
+                </div>
+                <input
+                  type="text"
+                  value={newLocationName}
+                  onChange={e => setNewLocationName(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && newLocationName.trim()) {
+                      doRemoteCheckIn({
+                        locationName: newLocationName.trim(),
+                        distanceM: remoteGpsState.distanceM,
+                        coords: remoteGpsState.coords,
+                      })
+                    }
+                  }}
+                  placeholder="예: 스타벅스 강남점, 부모님 댁"
+                  autoFocus
+                  className="w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 text-center"
+                />
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => {
+                      if (!newLocationName.trim()) { toast.error('장소명을 입력해주세요.'); return }
+                      doRemoteCheckIn({
+                        locationName: newLocationName.trim(),
+                        distanceM: remoteGpsState.distanceM,
+                        coords: remoteGpsState.coords,
+                      })
+                    }}
+                    disabled={isPending || !newLocationName.trim()}
+                    className="w-full bg-primary text-white rounded-xl py-3 text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                  >
+                    {isPending ? '저장 중...' : '확인 및 저장'}
+                  </button>
+                  <button
+                    onClick={() => setRemoteGpsState(s => s && { ...s, step: 'warning' })}
+                    className="w-full text-sm text-gray-500 hover:text-gray-700 py-2"
+                  >
+                    뒤로
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
