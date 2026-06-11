@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
-import { calcAnnualLeave } from '@/lib/annualLeave'
 import LeaveManualClient from './LeaveManualClient'
 
 export default async function LeaveManualPage() {
@@ -16,7 +15,7 @@ export default async function LeaveManualPage() {
   )
 
   const [{ data: rawEmployees }, { data: leaveRecords, error: leaveError }] = await Promise.all([
-    admin.from('employees').select('id, name, email, hired_at, annual_leave_days, remaining_leaves').eq('is_active', true).order('name'),
+    admin.from('employees').select('id, name, email, annual_leave_days, remaining_leaves').eq('is_active', true).order('name'),
     admin.from('leave_requests')
       .select('id, employee_id, leave_type, start_date, end_date, days_used, reason')
       .eq('status', 'APPROVED')
@@ -24,14 +23,7 @@ export default async function LeaveManualPage() {
       .limit(500),
   ])
 
-  const today = new Date()
-  const employees = (rawEmployees ?? []).map(e => ({
-    ...e,
-    annual_leave_days: e.hired_at
-      ? calcAnnualLeave(new Date(e.hired_at), today)
-      : (e.annual_leave_days ?? 15),
-  }))
-
+  const employees = rawEmployees ?? []
   const records = (leaveRecords ?? []).map(r => ({ ...r, is_manual: false }))
 
   return (
