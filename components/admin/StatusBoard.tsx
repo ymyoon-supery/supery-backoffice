@@ -12,7 +12,15 @@ type EmployeeStatus = {
   lastRecord: { type: string; recorded_at: string; is_field: boolean } | null
 }
 
-export default function StatusBoard({ initial }: { initial: EmployeeStatus[] }) {
+const LEAVE_LABELS: Record<string, string> = {
+  ANNUAL: '연차', HALF_DAY: '반차', AM_HALF: '오전반차', PM_HALF: '오후반차',
+  SICK: '병가', GROUP: '공동연차', COMP: '보상휴가', OTHER: '휴가',
+}
+
+export default function StatusBoard({ initial, onLeaveMap }: {
+  initial: EmployeeStatus[]
+  onLeaveMap: Record<string, string>
+}) {
   const [statuses, setStatuses] = useState<EmployeeStatus[]>(initial)
 
   useEffect(() => {
@@ -58,7 +66,11 @@ export default function StatusBoard({ initial }: { initial: EmployeeStatus[] }) 
   }, [])
 
   function getStatusLabel(s: EmployeeStatus) {
-    if (!s.lastRecord) return { label: '미출근', className: 'bg-gray-100 text-gray-500' }
+    if (!s.lastRecord) {
+      const leaveType = onLeaveMap[s.id]
+      if (leaveType) return { label: LEAVE_LABELS[leaveType] ?? '휴가', className: 'bg-amber-50 text-amber-700' }
+      return { label: '미출근', className: 'bg-gray-100 text-gray-500' }
+    }
     if (s.lastRecord.type === 'CHECK_OUT') return { label: '퇴근', className: 'bg-gray-100 text-gray-500' }
     if (s.lastRecord.is_field) return { label: '외근', className: 'bg-blue-50 text-blue-700' }
     return { label: '근무중', className: 'bg-green-50 text-green-700' }

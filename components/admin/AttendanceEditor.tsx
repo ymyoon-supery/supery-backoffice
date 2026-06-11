@@ -24,6 +24,11 @@ const TYPE_COLOR: Record<string, string> = {
   FIELD_END: 'bg-blue-50 text-blue-600',
 }
 
+const LEAVE_LABELS: Record<string, string> = {
+  ANNUAL: '연차', HALF_DAY: '반차', AM_HALF: '오전반차', PM_HALF: '오후반차',
+  SICK: '병가(무급)', GROUP: '공동연차', COMP: '보상휴가', OTHER: '기타',
+}
+
 // Always format in KST regardless of server/client timezone
 // Uses UTC getters after +9h shift to avoid local timezone double-application
 function formatKST(dateStr: string) {
@@ -36,7 +41,17 @@ function formatKST(dateStr: string) {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export default function AttendanceEditor({ records, employees }: { records: any[]; employees: any[] }) {
+export default function AttendanceEditor({ records, employees, leaveRecords }: { records: any[]; employees: any[]; leaveRecords: any[] }) {
+  const empNameMap = Object.fromEntries(employees.map((e: any) => [e.id, e.name]))
+
+  const merged = [
+    ...records.map((r: any) => ({ ...r, _kind: 'attendance' as const, _sortKey: r.recorded_at })),
+    ...leaveRecords.map((r: any) => ({ ...r, _kind: 'leave' as const, _sortKey: `${r.start_date}T09:00:00+09:00` })),
+  ].sort((a, b) => {
+    if (a.is_anomaly && !b.is_anomaly) return -1
+    if (!a.is_anomaly && b.is_anomaly) return 1
+    return b._sortKey.localeCompare(a._sortKey)
+  })
   const [editing, setEditing] = useState<string | null>(null)
   const [note, setNote] = useState('')
   const [resolvingId, setResolvingId] = useState<string | null>(null)
@@ -95,100 +110,122 @@ export default function AttendanceEditor({ records, employees }: { records: any[
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {records.map((r) => (
-              <>
-                <tr
-                  key={r.id}
-                  className={r.is_anomaly ? 'bg-red-50/60 hover:bg-red-50' : 'hover:bg-gray-50/50'}
-                >
-                  <td className="px-4 py-3 text-gray-900">{r.employees?.name}</td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${TYPE_COLOR[r.type] ?? 'bg-gray-100 text-gray-600'}`}>
-                      {TYPE_LABEL[r.type] ?? r.type}
-                    </span>
-                    {r.is_anomaly && (
-                      <span className="ml-1.5 inline-flex items-center gap-0.5 text-xs text-red-600 font-medium">
-                        <AlertTriangle size={11} />이상
+            {merged.map((r) => {
+              if (r._kind === 'leave') {
+                const dateStr = r.start_date === r.end_date
+                  ? r.start_date.slice(5).replace('-', '/')
+                  : `${r.start_date.slice(5).replace('-', '/')}~${r.end_date.slice(5).replace('-', '/')}`
+                return (
+                  <tr key={`leave-${r.id}`} className="bg-amber-50/40 hover:bg-amber-50/60">
+                    <td className="px-4 py-3 text-gray-900">{empNameMap[r.employee_id] ?? '—'}</td>
+                    <td className="px-4 py-3">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                        {LEAVE_LABELS[r.leave_type] ?? r.leave_type}
                       </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-gray-700 tabular-nums">
-                    {formatKST(r.recorded_at)}
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 max-w-[200px] truncate">{r.location ?? '—'}</td>
-                  <td className="px-4 py-3">
-                    {editing === r.id ? (
-                      <div className="flex gap-2 items-center">
-                        <input
-                          type="text"
-                          value={note}
-                          onChange={(e) => setNote(e.target.value)}
-                          className="text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary/30 w-40"
-                        />
-                        <button onClick={() => handleSave(r.id)} disabled={isPending}
-                          className="text-xs text-primary font-medium disabled:opacity-50">저장</button>
-                        <button onClick={() => setEditing(null)} className="text-xs text-gray-400">취소</button>
-                      </div>
-                    ) : (
-                      <span className={r.is_anomaly ? 'text-red-500' : 'text-gray-500'}>{r.note ?? '—'}</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    {r.is_anomaly ? (
-                      resolvingId !== r.id && (
-                        <button
-                          onClick={() => startResolve(r.id, r.recorded_at)}
-                          className="text-xs text-red-600 font-medium hover:text-red-800 border border-red-200 rounded px-2 py-0.5"
-                        >
-                          처리
-                        </button>
-                      )
-                    ) : (
-                      editing !== r.id && (
-                        <button onClick={() => startEdit(r.id, r.note)} className="text-gray-400 hover:text-gray-600">
-                          <Pencil size={14} />
-                        </button>
-                      )
-                    )}
-                  </td>
-                </tr>
-                {resolvingId === r.id && (
-                  <tr key={`${r.id}-resolve`} className="bg-red-50/40">
-                    <td colSpan={6} className="px-4 py-3">
-                      <div className="flex flex-wrap gap-3 items-end">
-                        <div className="flex flex-col gap-1">
-                          <label className="text-xs text-gray-500">실제 퇴근 시간 (KST)</label>
-                          <input
-                            type="datetime-local"
-                            value={resolveTime}
-                            onChange={(e) => setResolveTime(e.target.value)}
-                            className="text-sm border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary/30"
-                          />
-                        </div>
-                        <div className="flex flex-col gap-1 flex-1 min-w-[180px]">
-                          <label className="text-xs text-gray-500">메모</label>
+                    </td>
+                    <td className="px-4 py-3 text-gray-700 tabular-nums">{dateStr}</td>
+                    <td className="px-4 py-3 text-gray-400">—</td>
+                    <td className="px-4 py-3 text-gray-500">{r.reason ?? '—'}</td>
+                    <td className="px-4 py-3"></td>
+                  </tr>
+                )
+              }
+
+              return (
+                <>
+                  <tr
+                    key={r.id}
+                    className={r.is_anomaly ? 'bg-red-50/60 hover:bg-red-50' : 'hover:bg-gray-50/50'}
+                  >
+                    <td className="px-4 py-3 text-gray-900">{r.employees?.name}</td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${TYPE_COLOR[r.type] ?? 'bg-gray-100 text-gray-600'}`}>
+                        {TYPE_LABEL[r.type] ?? r.type}
+                      </span>
+                      {r.is_anomaly && (
+                        <span className="ml-1.5 inline-flex items-center gap-0.5 text-xs text-red-600 font-medium">
+                          <AlertTriangle size={11} />이상
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-700 tabular-nums">
+                      {formatKST(r.recorded_at)}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500 max-w-[200px] truncate">{r.location ?? '—'}</td>
+                    <td className="px-4 py-3">
+                      {editing === r.id ? (
+                        <div className="flex gap-2 items-center">
                           <input
                             type="text"
-                            value={resolveNote}
-                            onChange={(e) => setResolveNote(e.target.value)}
-                            placeholder="사유 또는 메모 (선택)"
-                            className="text-sm border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary/30"
+                            value={note}
+                            onChange={(e) => setNote(e.target.value)}
+                            className="text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary/30 w-40"
                           />
+                          <button onClick={() => handleSave(r.id)} disabled={isPending}
+                            className="text-xs text-primary font-medium disabled:opacity-50">저장</button>
+                          <button onClick={() => setEditing(null)} className="text-xs text-gray-400">취소</button>
                         </div>
-                        <div className="flex gap-2">
-                          <button onClick={() => handleResolve(r.id)} disabled={isPending}
-                            className="text-xs bg-red-600 text-white rounded px-3 py-1.5 font-medium hover:bg-red-700 disabled:opacity-50">
-                            확인 완료
+                      ) : (
+                        <span className={r.is_anomaly ? 'text-red-500' : 'text-gray-500'}>{r.note ?? '—'}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {r.is_anomaly ? (
+                        resolvingId !== r.id && (
+                          <button
+                            onClick={() => startResolve(r.id, r.recorded_at)}
+                            className="text-xs text-red-600 font-medium hover:text-red-800 border border-red-200 rounded px-2 py-0.5"
+                          >
+                            처리
                           </button>
-                          <button onClick={() => setResolvingId(null)} className="text-xs text-gray-500 hover:text-gray-700">취소</button>
-                        </div>
-                      </div>
+                        )
+                      ) : (
+                        editing !== r.id && (
+                          <button onClick={() => startEdit(r.id, r.note)} className="text-gray-400 hover:text-gray-600">
+                            <Pencil size={14} />
+                          </button>
+                        )
+                      )}
                     </td>
                   </tr>
-                )}
-              </>
-            ))}
-            {records.length === 0 && (
+                  {resolvingId === r.id && (
+                    <tr key={`${r.id}-resolve`} className="bg-red-50/40">
+                      <td colSpan={6} className="px-4 py-3">
+                        <div className="flex flex-wrap gap-3 items-end">
+                          <div className="flex flex-col gap-1">
+                            <label className="text-xs text-gray-500">실제 퇴근 시간 (KST)</label>
+                            <input
+                              type="datetime-local"
+                              value={resolveTime}
+                              onChange={(e) => setResolveTime(e.target.value)}
+                              className="text-sm border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary/30"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1 flex-1 min-w-[180px]">
+                            <label className="text-xs text-gray-500">메모</label>
+                            <input
+                              type="text"
+                              value={resolveNote}
+                              onChange={(e) => setResolveNote(e.target.value)}
+                              placeholder="사유 또는 메모 (선택)"
+                              className="text-sm border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary/30"
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <button onClick={() => handleResolve(r.id)} disabled={isPending}
+                              className="text-xs bg-red-600 text-white rounded px-3 py-1.5 font-medium hover:bg-red-700 disabled:opacity-50">
+                              확인 완료
+                            </button>
+                            <button onClick={() => setResolvingId(null)} className="text-xs text-gray-500 hover:text-gray-700">취소</button>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
+              )
+            })}
+            {merged.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-10 text-center text-gray-400">기록이 없습니다.</td>
               </tr>
