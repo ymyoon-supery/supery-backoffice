@@ -54,7 +54,7 @@ export default async function LeavePromotionPage({
     return {
       ...e,
       annual_leave_days: entitlement,
-      remaining_leaves: Math.max(entitlement - (usedByEmp[e.id] ?? 0), 0),
+      remaining_leaves: Math.max(Math.round((entitlement - (usedByEmp[e.id] ?? 0)) * 10) / 10, 0),
     }
   })
 
