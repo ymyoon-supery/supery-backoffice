@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { headers } from 'next/headers'
-import { revalidateTag } from 'next/cache'
+import { revalidateTag, revalidatePath } from 'next/cache'
 import { CACHE_TAGS } from '@/lib/cache/tags'
 
 export async function registerHomeLocation(lat: number, lng: number) {
@@ -11,13 +11,22 @@ export async function registerHomeLocation(lat: number, lng: number) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: '인증이 필요합니다.' }
 
-  const { error } = await supabase
+  const admin = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+
+  const { data, error } = await admin
     .from('employees')
     .update({ home_lat: lat, home_lng: lng })
     .eq('auth_user_id', user.id)
+    .select('id')
 
   if (error) return { error: error.message }
+  if (!data || data.length === 0) return { error: '직원 정보를 찾을 수 없습니다.' }
+
   revalidateTag(CACHE_TAGS.attendance)
+  revalidatePath('/admin/settings/home-locations')
   return { ok: true }
 }
 
