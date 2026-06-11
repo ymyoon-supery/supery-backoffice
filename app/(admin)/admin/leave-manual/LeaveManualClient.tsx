@@ -272,7 +272,9 @@ export default function LeaveManualClient({ employees, leaveRecords: init }: {
                   <td className="px-4 py-2.5 text-gray-500 text-xs">
                     {r.start_date}{r.start_date !== r.end_date ? ` ~ ${r.end_date}` : ''}
                   </td>
-                  <td className="px-4 py-2.5 text-right tabular-nums">{r.days_used}일</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">
+                    {DEDUCTS.has(r.leave_type as LeaveType) ? r.days_used : 0}일
+                  </td>
                   <td className="px-4 py-2.5 text-center">
                     <span className={`text-xs px-1.5 py-0.5 rounded-full ${
                       r.is_manual
