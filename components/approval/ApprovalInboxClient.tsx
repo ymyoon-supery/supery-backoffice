@@ -25,17 +25,21 @@ export default function ApprovalInboxClient({ leaveSteps, expenseSteps, myLeave,
   const router = useRouter()
   const [tab, setTab] = useState<'pending' | 'mine'>('pending')
   const [isPending, startTransition] = useTransition()
+  const [rejectingId, setRejectingId] = useState<string | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
 
-  function handleLeave(stepId: string, requestId: string, approved: boolean) {
+  function handleLeave(requestId: string, approved: boolean, comment?: string) {
     startTransition(async () => {
-      const result = await approveLeave(requestId, approved)
+      const result = await approveLeave(requestId, approved, comment)
       if (result.error) { toast.error(result.error); return }
       toast.success(approved ? '승인되었습니다.' : '반려되었습니다.')
+      setRejectingId(null)
+      setRejectReason('')
       router.refresh()
     })
   }
 
-  function handleExpense(stepId: string, reportId: string, approved: boolean) {
+  function handleExpense(reportId: string, approved: boolean) {
     startTransition(async () => {
       const result = await approveExpense(reportId, approved)
       if (result.error) { toast.error(result.error); return }
@@ -84,22 +88,51 @@ export default function ApprovalInboxClient({ leaveSteps, expenseSteps, myLeave,
                   </div>
                   <span className="text-xs text-gray-400">{format(new Date(req.created_at), 'MM/dd')}</span>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleLeave(step.id, req.id, true)}
-                    disabled={isPending}
-                    className="flex-1 py-2 text-sm font-medium bg-primary text-white rounded-lg disabled:opacity-50 hover:bg-primary/90"
-                  >
-                    승인
-                  </button>
-                  <button
-                    onClick={() => handleLeave(step.id, req.id, false)}
-                    disabled={isPending}
-                    className="flex-1 py-2 text-sm font-medium border border-red-200 text-red-600 rounded-lg disabled:opacity-50 hover:bg-red-50"
-                  >
-                    반려
-                  </button>
-                </div>
+
+                {rejectingId === step.id ? (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                      placeholder="반려 사유 (선택)"
+                      className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-200"
+                      autoFocus
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleLeave(req.id, false, rejectReason || undefined)}
+                        disabled={isPending}
+                        className="flex-1 py-2 text-sm font-medium bg-red-600 text-white rounded-lg disabled:opacity-50 hover:bg-red-700"
+                      >
+                        반려 확인
+                      </button>
+                      <button
+                        onClick={() => { setRejectingId(null); setRejectReason('') }}
+                        className="flex-1 py-2 text-sm font-medium border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50"
+                      >
+                        취소
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleLeave(req.id, true)}
+                      disabled={isPending}
+                      className="flex-1 py-2 text-sm font-medium bg-primary text-white rounded-lg disabled:opacity-50 hover:bg-primary/90"
+                    >
+                      승인
+                    </button>
+                    <button
+                      onClick={() => setRejectingId(step.id)}
+                      disabled={isPending}
+                      className="flex-1 py-2 text-sm font-medium border border-red-200 text-red-600 rounded-lg disabled:opacity-50 hover:bg-red-50"
+                    >
+                      반려
+                    </button>
+                  </div>
+                )}
               </div>
             )
           })}
@@ -121,14 +154,14 @@ export default function ApprovalInboxClient({ leaveSteps, expenseSteps, myLeave,
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => handleExpense(step.id, rep.id, true)}
+                    onClick={() => handleExpense(rep.id, true)}
                     disabled={isPending}
                     className="flex-1 py-2 text-sm font-medium bg-primary text-white rounded-lg disabled:opacity-50 hover:bg-primary/90"
                   >
                     승인
                   </button>
                   <button
-                    onClick={() => handleExpense(step.id, rep.id, false)}
+                    onClick={() => handleExpense(rep.id, false)}
                     disabled={isPending}
                     className="flex-1 py-2 text-sm font-medium border border-red-200 text-red-600 rounded-lg disabled:opacity-50 hover:bg-red-50"
                   >
@@ -151,19 +184,27 @@ export default function ApprovalInboxClient({ leaveSteps, expenseSteps, myLeave,
             .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
             .map((item: any) => {
               const status = STATUS_LABELS[item.status] ?? STATUS_LABELS.PENDING
+              const rejectionReason = item.kind === 'leave' && item.status === 'REJECTED'
+                ? (item.leave_approval_steps as any[])?.find((s: any) => s.status === 'REJECTED')?.comment
+                : null
               return (
-                <div key={item.id} className="bg-white rounded-xl border border-gray-100 px-5 py-4 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {item.kind === 'leave'
-                        ? `${LEAVE_LABELS[item.leave_type]} ${item.days_used}일`
-                        : `${item.title} — ${item.amount?.toLocaleString()}원`}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-0.5">{format(new Date(item.created_at), 'yyyy.MM.dd')}</p>
+                <div key={item.id} className="bg-white rounded-xl border border-gray-100 px-5 py-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        {item.kind === 'leave'
+                          ? `${LEAVE_LABELS[item.leave_type]} ${item.days_used}일`
+                          : `${item.title} — ${item.amount?.toLocaleString()}원`}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">{format(new Date(item.created_at), 'yyyy.MM.dd')}</p>
+                    </div>
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${status.className}`}>
+                      {status.label}
+                    </span>
                   </div>
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${status.className}`}>
-                    {status.label}
-                  </span>
+                  {rejectionReason && (
+                    <p className="text-xs text-red-500 mt-2 pl-0.5">반려 사유: {rejectionReason}</p>
+                  )}
                 </div>
               )
             })}

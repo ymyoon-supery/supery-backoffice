@@ -45,11 +45,11 @@ export default async function ApprovalInboxPage() {
   // My own pending requests
   const { data: myLeave } = await supabase
     .from('leave_requests')
-    .select('id, leave_type, start_date, end_date, days_used, status, created_at')
+    .select('id, leave_type, start_date, end_date, days_used, status, created_at, leave_approval_steps(comment, status)')
     .eq('employee_id', employee.id)
     .in('status', ['PENDING', 'APPROVED', 'REJECTED'])
     .order('created_at', { ascending: false })
-    .limit(10)
+    .limit(20)
 
   const { data: myExpense } = await supabase
     .from('expense_reports')

@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils'
 const employeeNav = [
   { href: '/', label: '홈', icon: Home },
   { href: '/attendance', label: '근태 기록', icon: Clock },
+  { href: '/leave', label: '내 연차', icon: FileText },
   { href: '/approval/leave/new', label: '연차 신청', icon: FileText },
   { href: '/approval/expense/new', label: '지출결의', icon: FileText },
   { href: '/approval/inbox', label: '결재함', icon: ClipboardList },
