@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { differenceInCalendarDays } from 'date-fns'
@@ -117,6 +117,8 @@ export default function LeaveManualClient({ employees, leaveRecords: init }: {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [records, setRecords] = useState<LeaveRecord[]>(init)
+
+  useEffect(() => { setRecords(init) }, [init])
 
   // 등록 폼
   const [empId, setEmpId] = useState('')
