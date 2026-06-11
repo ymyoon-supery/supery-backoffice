@@ -1,6 +1,8 @@
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { MapPin, ExternalLink } from 'lucide-react'
 
+export const dynamic = 'force-dynamic'
+
 export default async function HomeLocationsPage() {
   const admin = createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
