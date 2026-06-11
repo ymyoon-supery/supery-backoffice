@@ -12,6 +12,7 @@ import {
   Bell,
   FilePlus,
   CalendarDays,
+  Settings,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -32,6 +33,7 @@ const adminNav = [
   { href: '/admin/reports', label: '52시간 리포트', icon: BarChart2 },
   { href: '/admin/leave-manual', label: '연차관리', icon: FilePlus },
   { href: '/admin/leave-promotion', label: '연차사용촉진', icon: Bell },
+  { href: '/admin/settings', label: '설정', icon: Settings },
 ]
 
 export default function Sidebar({ role }: { role: string }) {
