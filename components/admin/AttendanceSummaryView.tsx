@@ -7,13 +7,8 @@ import {
   startOfWeek, endOfWeek, getDay,
 } from 'date-fns'
 import AttendanceEditor from './AttendanceEditor'
+import type { DaySummary } from '@/lib/attendance/calc'
 
-type DaySummary = {
-  checkIn: string | null
-  checkOut: string | null
-  breakMin: number
-  workMin: number
-}
 type EmpSummary = {
   id: string
   name: string
@@ -89,7 +84,6 @@ export default function AttendanceSummaryView({
     )
   }
 
-  // Month: group dates into Mon–Sun weeks
   const weekGroups: string[][] = []
   if (view === 'month') {
     let current: string[] = []
@@ -174,8 +168,26 @@ export default function AttendanceSummaryView({
                         </>
                       ) : (
                         <>
-                          <td className="px-4 py-3 tabular-nums text-gray-700">{ds?.checkIn ?? <span className="text-gray-300">—</span>}</td>
-                          <td className="px-4 py-3 tabular-nums text-gray-700">{ds?.checkOut ?? <span className="text-gray-300">—</span>}</td>
+                          <td className="px-4 py-3 tabular-nums text-gray-700">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span>{ds?.checkIn ?? <span className="text-gray-300">—</span>}</span>
+                              {ds && ds.lateMin > 0 && (
+                                <span className="text-xs px-1.5 py-0.5 rounded bg-red-50 text-red-500 whitespace-nowrap">
+                                  지각 +{ds.lateMin}분
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 tabular-nums text-gray-700">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span>{ds?.checkOut ?? <span className="text-gray-300">—</span>}</span>
+                              {ds && ds.earlyLeaveMin > 0 && (
+                                <span className="text-xs px-1.5 py-0.5 rounded bg-orange-50 text-orange-500 whitespace-nowrap">
+                                  조퇴 -{ds.earlyLeaveMin}분
+                                </span>
+                              )}
+                            </div>
+                          </td>
                           <td className="px-4 py-3 text-right tabular-nums text-gray-400 text-xs">{ds?.breakMin ? fmtWork(ds.breakMin) : '—'}</td>
                           <td className={`px-4 py-3 text-right tabular-nums ${ds ? workColor(ds.workMin) : 'text-gray-300'}`}>
                             {ds ? fmtWork(ds.workMin) : '—'}
@@ -222,7 +234,15 @@ export default function AttendanceSummaryView({
                         return (
                           <td key={d} className="px-2 py-3 text-center">
                             {ds ? (
-                              <span className={`text-xs tabular-nums ${workColor(ds.workMin)}`}>{fmtWork(ds.workMin)}</span>
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span className={`text-xs tabular-nums ${workColor(ds.workMin)}`}>{fmtWork(ds.workMin)}</span>
+                                {(ds.lateMin > 0 || ds.earlyLeaveMin > 0) && (
+                                  <div className="flex gap-0.5">
+                                    {ds.lateMin > 0 && <span className="w-1.5 h-1.5 rounded-full bg-red-400" title={`지각 ${ds.lateMin}분`} />}
+                                    {ds.earlyLeaveMin > 0 && <span className="w-1.5 h-1.5 rounded-full bg-orange-400" title={`조퇴 ${ds.earlyLeaveMin}분`} />}
+                                  </div>
+                                )}
+                              </div>
                             ) : leave ? (
                               <span className="text-xs px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 whitespace-nowrap">
                                 {LEAVE_ABBR[leave.leave_type] ?? '휴가'}
@@ -266,9 +286,21 @@ export default function AttendanceSummaryView({
                       <td className="px-4 py-3 font-medium text-gray-900">{emp.name}</td>
                       {weekGroups.map(wg => {
                         const weekMin = wg.reduce((s, d) => s + (emp.days[d]?.workMin ?? 0), 0)
+                        const hasLate = wg.some(d => (emp.days[d]?.lateMin ?? 0) > 0)
+                        const hasEarly = wg.some(d => (emp.days[d]?.earlyLeaveMin ?? 0) > 0)
                         return (
-                          <td key={wg[0]} className={`px-3 py-3 text-center tabular-nums text-xs ${weekMin >= 52 * 60 ? 'text-red-600 font-semibold' : weekMin > 0 ? 'text-gray-700' : 'text-gray-200'}`}>
-                            {weekMin > 0 ? fmtWork(weekMin) : '—'}
+                          <td key={wg[0]} className="px-3 py-3 text-center">
+                            <div className="flex flex-col items-center gap-0.5">
+                              <span className={`tabular-nums text-xs ${weekMin >= 52 * 60 ? 'text-red-600 font-semibold' : weekMin > 0 ? 'text-gray-700' : 'text-gray-200'}`}>
+                                {weekMin > 0 ? fmtWork(weekMin) : '—'}
+                              </span>
+                              {(hasLate || hasEarly) && (
+                                <div className="flex gap-0.5">
+                                  {hasLate && <span className="w-1.5 h-1.5 rounded-full bg-red-400" title="지각 있음" />}
+                                  {hasEarly && <span className="w-1.5 h-1.5 rounded-full bg-orange-400" title="조퇴 있음" />}
+                                </div>
+                              )}
+                            </div>
                           </td>
                         )
                       })}
