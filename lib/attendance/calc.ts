@@ -18,7 +18,8 @@ export type DaySummary = {
 }
 
 export function timeToMin(t: string): number {
-  const [h, m] = t.split(':').map(Number)
+  const [h, m] = t.slice(0, 5).split(':').map(Number)
+  if (Number.isNaN(h) || Number.isNaN(m)) throw new Error(`Invalid time: "${t}"`)
   return h * 60 + m
 }
 
@@ -44,19 +45,24 @@ export function calcDaySummary(
     return { checkIn: null, checkOut: null, breakMin: 0, workMin: 0, lateMin: 0, earlyLeaveMin: 0 }
   }
 
+  const checkInKST = toKSTTime(checkIn.recorded_at)
+  if (!checkOut) {
+    return { checkIn: checkInKST, checkOut: null, breakMin: 0, workMin: 0, lateMin: 0, earlyLeaveMin: 0 }
+  }
+
+  const shiftRecs = sorted.filter(r =>
+    new Date(r.recorded_at) >= new Date(checkIn.recorded_at) &&
+    new Date(r.recorded_at) <= new Date(checkOut.recorded_at)
+  )
+
   let breakMin = 0
   let breakStart: Date | null = null
-  for (const r of sorted) {
+  for (const r of shiftRecs) {
     if (r.type === 'BREAK_START') breakStart = new Date(r.recorded_at)
     else if (r.type === 'BREAK_END' && breakStart) {
       breakMin += differenceInMinutes(new Date(r.recorded_at), breakStart)
       breakStart = null
     }
-  }
-
-  const checkInKST = toKSTTime(checkIn.recorded_at)
-  if (!checkOut) {
-    return { checkIn: checkInKST, checkOut: null, breakMin, workMin: 0, lateMin: 0, earlyLeaveMin: 0 }
   }
 
   const checkOutKST = toKSTTime(checkOut.recorded_at)
@@ -75,6 +81,7 @@ export function calcDaySummary(
   const lunchDeduct = spansLunch && breakMin < lunchDurationMin ? lunchDurationMin - breakMin : 0
   const workMin = Math.max(0, gross - breakMin - lunchDeduct)
 
+  // Note: minute-of-day comparison assumes same-day shifts (no midnight crossing)
   const lateMin = Math.max(0, checkInMin - startMin)
   const earlyLeaveMin = Math.max(0, endMin - checkOutMin)
 
