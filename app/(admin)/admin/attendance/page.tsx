@@ -2,57 +2,10 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import {
   format, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
-  parseISO, differenceInMinutes, eachDayOfInterval,
+  parseISO, eachDayOfInterval,
 } from 'date-fns'
 import AttendanceSummaryView from '@/components/admin/AttendanceSummaryView'
-
-type DaySummary = {
-  checkIn: string | null
-  checkOut: string | null
-  breakMin: number
-  workMin: number
-}
-
-function toKSTTime(utcStr: string): string {
-  const d = new Date(new Date(utcStr).getTime() + 9 * 60 * 60 * 1000)
-  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
-}
-
-function toKSTDate(utcStr: string): string {
-  return new Date(new Date(utcStr).getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
-}
-
-function calcDaySummary(recs: { type: string; recorded_at: string }[]): DaySummary {
-  const sorted = [...recs].sort((a, b) =>
-    new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
-  )
-  const checkIn = sorted.find(r => r.type === 'CHECK_IN')
-  const checkOut = [...sorted].reverse().find(r => r.type === 'CHECK_OUT')
-  if (!checkIn) return { checkIn: null, checkOut: null, breakMin: 0, workMin: 0 }
-
-  let breakMin = 0
-  let breakStart: Date | null = null
-  for (const r of sorted) {
-    if (r.type === 'BREAK_START') breakStart = new Date(r.recorded_at)
-    else if (r.type === 'BREAK_END' && breakStart) {
-      breakMin += differenceInMinutes(new Date(r.recorded_at), breakStart)
-      breakStart = null
-    }
-  }
-
-  if (!checkOut) return { checkIn: toKSTTime(checkIn.recorded_at), checkOut: null, breakMin, workMin: 0 }
-
-  const gross = differenceInMinutes(new Date(checkOut.recorded_at), new Date(checkIn.recorded_at))
-  const lunch = breakMin < 30 && gross > 240 ? 60 : 0
-  const workMin = Math.max(0, gross - breakMin - lunch)
-
-  return {
-    checkIn: toKSTTime(checkIn.recorded_at),
-    checkOut: toKSTTime(checkOut.recorded_at),
-    breakMin,
-    workMin,
-  }
-}
+import { calcDaySummary, toKSTDate, WorkSchedule } from '@/lib/attendance/calc'
 
 export default async function AdminAttendancePage({
   searchParams,
@@ -82,7 +35,7 @@ export default async function AdminAttendancePage({
   const fromStr = format(rangeStart, 'yyyy-MM-dd')
   const toStr = format(rangeEnd, 'yyyy-MM-dd')
 
-  const [{ data: records }, { data: employees }, { data: leaveRecords }] = await Promise.all([
+  const [{ data: records }, { data: employees }, { data: leaveRecords }, { data: settingsData }] = await Promise.all([
     supabase
       .from('attendance_records')
       .select('id, type, recorded_at, location, is_field, note, is_anomaly, employee_id, employees(id, name, email, department_id)')
@@ -100,11 +53,21 @@ export default async function AdminAttendancePage({
       .eq('status', 'APPROVED')
       .gte('end_date', fromStr)
       .lte('start_date', toStr),
+    supabase
+      .from('company_settings')
+      .select('work_start_time, work_end_time, lunch_start_time, lunch_end_time')
+      .single(),
   ])
+
+  const schedule: WorkSchedule = {
+    workStartTime: settingsData?.work_start_time ?? '09:00',
+    workEndTime: settingsData?.work_end_time ?? '18:00',
+    lunchStartTime: settingsData?.lunch_start_time ?? '12:00',
+    lunchEndTime: settingsData?.lunch_end_time ?? '13:00',
+  }
 
   const dates = eachDayOfInterval({ start: rangeStart, end: rangeEnd }).map(d => format(d, 'yyyy-MM-dd'))
 
-  // Group records by employee+KST-date
   const byEmpDate = new Map<string, { type: string; recorded_at: string }[]>()
   for (const r of records ?? []) {
     const key = `${r.employee_id}:${toKSTDate(r.recorded_at)}`
@@ -113,15 +76,14 @@ export default async function AdminAttendancePage({
     byEmpDate.set(key, list)
   }
 
-  // Build summaries for all active employees
-  const empSummaries = new Map<string, { id: string; name: string; days: Record<string, DaySummary> }>()
+  const empSummaries = new Map<string, { id: string; name: string; days: Record<string, ReturnType<typeof calcDaySummary>> }>()
   for (const emp of employees ?? []) {
     empSummaries.set(emp.id, { id: emp.id, name: emp.name, days: {} })
   }
   for (const [key, recs] of byEmpDate) {
     const [empId, date] = key.split(':')
     const entry = empSummaries.get(empId)
-    if (entry) entry.days[date] = calcDaySummary(recs)
+    if (entry) entry.days[date] = calcDaySummary(recs, schedule)
   }
 
   const allSummaries = Array.from(empSummaries.values())
