@@ -38,7 +38,7 @@ export default function ExpenseForm({ employeeId, employeeName, employeePosition
   const [title, setTitle] = useState('')
   const [amountRaw, setAmountRaw] = useState('')
   const [payee, setPayee] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH')
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('TRANSFER')
   const [bankName, setBankName] = useState('')
   const [accountNumber, setAccountNumber] = useState('')
   const [accountHolder, setAccountHolder] = useState('')
