@@ -23,6 +23,7 @@ export type ApprovalItem = {
   requestDate: string
   status: 'PENDING' | 'APPROVED' | 'REJECTED'
   comment?: string | null
+  paymentStatus?: 'PENDING_PAYMENT' | 'PAID' | 'SETTLED' | null
 }
 
 export default async function AdminApprovalPage({
@@ -114,7 +115,7 @@ export default async function AdminApprovalPage({
       .select(`
         id, status,
         expense_reports (
-          id, title, amount, category, created_at,
+          id, title, amount, category, created_at, payment_status,
           employees ( name )
         )
       `)
@@ -127,14 +128,15 @@ export default async function AdminApprovalPage({
       const rep = s.expense_reports
       if (!rep) return []
       return [{
-        stepId:       s.id,
-        kind:         'expense' as const,
-        requestId:    rep.id,
-        employeeName: rep.employees?.name ?? '—',
-        typeLabel:    EXPENSE_LABELS[rep.category] ?? rep.category,
-        detail:       `${rep.title} · ${Number(rep.amount).toLocaleString()}원`,
-        requestDate:  rep.created_at,
-        status:       s.status,
+        stepId:        s.id,
+        kind:          'expense' as const,
+        requestId:     rep.id,
+        employeeName:  rep.employees?.name ?? '—',
+        typeLabel:     EXPENSE_LABELS[rep.category] ?? rep.category,
+        detail:        `${rep.title} · ${Number(rep.amount).toLocaleString()}원`,
+        requestDate:   rep.created_at,
+        status:        s.status,
+        paymentStatus: rep.payment_status ?? null,
       }]
     })
   }

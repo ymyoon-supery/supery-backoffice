@@ -5,6 +5,38 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { revalidateTag } from 'next/cache'
 import { CACHE_TAGS } from '@/lib/cache/tags'
 
+export async function updateExpensePaymentStatus(
+  reportId: string,
+  paymentStatus: 'PENDING_PAYMENT' | 'PAID' | 'SETTLED',
+) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: '인증이 필요합니다.' }
+
+  const { data: adminEmployee } = await supabase
+    .from('employees')
+    .select('role')
+    .eq('auth_user_id', user.id)
+    .single()
+
+  if (!adminEmployee || adminEmployee.role !== 'ADMIN') return { error: '권한이 없습니다.' }
+
+  const admin = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+
+  const { error } = await admin
+    .from('expense_reports')
+    .update({ payment_status: paymentStatus })
+    .eq('id', reportId)
+
+  if (error) return { error: error.message }
+
+  revalidateTag(CACHE_TAGS.approvalInbox)
+  return { error: null }
+}
+
 export async function approveHomeLocationRequest(
   requestId: string,
   approved: boolean,

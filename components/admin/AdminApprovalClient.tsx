@@ -4,16 +4,28 @@ import { Fragment, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
-import { AlertCircle, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react'
+import { AlertCircle, ChevronLeft, ChevronRight, ArrowUpDown, ChevronDown } from 'lucide-react'
 import { approveLeave } from '@/app/(dashboard)/approval/leave/actions'
 import { approveExpense } from '@/app/(dashboard)/approval/expense/actions'
-import { approveHomeLocationRequest } from '@/app/(admin)/admin/approval/actions'
+import { approveHomeLocationRequest, updateExpensePaymentStatus } from '@/app/(admin)/admin/approval/actions'
 import type { ApprovalItem } from '@/app/(admin)/admin/approval/page'
 
 const STATUS_CFG = {
   PENDING:  { label: '미결재', cls: 'bg-amber-100 text-amber-700' },
   APPROVED: { label: '승인',   cls: 'bg-green-100 text-green-700' },
   REJECTED: { label: '반려',   cls: 'bg-red-100 text-red-600' },
+}
+
+const PAYMENT_STATUS_CFG = {
+  PENDING_PAYMENT: { label: '지급대기', cls: 'bg-amber-100 text-amber-700' },
+  PAID:            { label: '지급완료', cls: 'bg-blue-100 text-blue-700' },
+  SETTLED:         { label: '정산완료', cls: 'bg-green-100 text-green-700' },
+}
+
+const PAYMENT_STATUS_NEXT: Record<string, Array<{ value: 'PENDING_PAYMENT' | 'PAID' | 'SETTLED'; label: string }>> = {
+  PENDING_PAYMENT: [{ value: 'PAID',    label: '지급완료로 변경' }, { value: 'SETTLED', label: '정산완료로 변경' }],
+  PAID:            [{ value: 'SETTLED', label: '정산완료로 변경' }, { value: 'PENDING_PAYMENT', label: '지급대기로 변경' }],
+  SETTLED:         [{ value: 'PAID',    label: '지급완료로 변경' }, { value: 'PENDING_PAYMENT', label: '지급대기로 변경' }],
 }
 
 function getPageNums(cur: number, total: number): number[] {
@@ -41,6 +53,7 @@ export default function AdminApprovalClient({
   const [isPending, startTransition] = useTransition()
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
+  const [paymentDropdownId, setPaymentDropdownId] = useState<string | null>(null)
 
   function buildUrl(overrides: Record<string, string>) {
     const p = new URLSearchParams({ tab, type, period, sort, page: String(page), ...overrides })
@@ -57,6 +70,16 @@ export default function AdminApprovalClient({
         : await approveHomeLocationRequest(item.requestId, true)
       if (res.error) { toast.error(res.error); return }
       toast.success('승인되었습니다.')
+      router.refresh()
+    })
+  }
+
+  function handlePaymentStatus(item: ApprovalItem, status: 'PENDING_PAYMENT' | 'PAID' | 'SETTLED') {
+    setPaymentDropdownId(null)
+    startTransition(async () => {
+      const res = await updateExpensePaymentStatus(item.requestId, status)
+      if (res.error) { toast.error(res.error); return }
+      toast.success(`${PAYMENT_STATUS_CFG[status].label}로 변경되었습니다.`)
       router.refresh()
     })
   }
@@ -204,12 +227,39 @@ export default function AdminApprovalClient({
                           </div>
                         )
                       ) : (
-                        <div className="flex flex-col items-end gap-0.5">
+                        <div className="flex flex-col items-end gap-1">
                           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cfg.cls}`}>
                             {cfg.label}
                           </span>
                           {item.status === 'REJECTED' && item.comment && (
                             <span className="text-xs text-gray-400 max-w-[160px] truncate">{item.comment}</span>
+                          )}
+                          {item.status === 'APPROVED' && item.kind === 'expense' && item.paymentStatus && (
+                            <div className="relative">
+                              <button
+                                onClick={() => setPaymentDropdownId(
+                                  paymentDropdownId === item.stepId ? null : item.stepId
+                                )}
+                                disabled={isPending}
+                                className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium transition-colors ${PAYMENT_STATUS_CFG[item.paymentStatus].cls} hover:opacity-80`}
+                              >
+                                {PAYMENT_STATUS_CFG[item.paymentStatus].label}
+                                <ChevronDown size={10} />
+                              </button>
+                              {paymentDropdownId === item.stepId && (
+                                <div className="absolute right-0 top-full mt-1 z-10 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[140px]">
+                                  {PAYMENT_STATUS_NEXT[item.paymentStatus].map(opt => (
+                                    <button
+                                      key={opt.value}
+                                      onClick={() => handlePaymentStatus(item, opt.value)}
+                                      className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                                    >
+                                      {opt.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           )}
                         </div>
                       )}
