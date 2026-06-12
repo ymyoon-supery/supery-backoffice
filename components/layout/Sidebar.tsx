@@ -13,6 +13,7 @@ import {
   FilePlus,
   CalendarDays,
   Settings,
+  Megaphone,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -22,6 +23,7 @@ const employeeNavBase = [
   { href: '/leave', label: '연차 사용 내역', icon: CalendarDays },
   { href: '/approval/leave/new', label: '연차 신청', icon: FileText },
   { href: '/approval/expense/new', label: '지출결의', icon: FileText },
+  { href: '/notices', label: '공지사항', icon: Megaphone },
 ]
 
 const inboxNav = { href: '/approval/inbox', label: '결재함', icon: ClipboardList }
@@ -33,6 +35,7 @@ const adminNav = [
   { href: '/admin/reports', label: '52시간 리포트', icon: BarChart2 },
   { href: '/admin/leave-manual', label: '연차관리', icon: FilePlus },
   { href: '/admin/leave-promotion', label: '연차사용촉진', icon: Bell },
+  { href: '/admin/notices', label: '공지사항 관리', icon: Megaphone },
   { href: '/admin/settings', label: '설정', icon: Settings },
 ]
 
