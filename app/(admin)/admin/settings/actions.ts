@@ -106,3 +106,33 @@ export async function removeOfficeIp(ip: string) {
   revalidatePath('/admin/settings')
   return { ok: true }
 }
+
+export async function updateWorkSchedule(
+  workStartTime: string,
+  workEndTime: string,
+  lunchStartTime: string,
+  lunchEndTime: string,
+) {
+  const timeRe = /^([01]\d|2[0-3]):[0-5]\d$/
+  if (![workStartTime, workEndTime, lunchStartTime, lunchEndTime].every(t => timeRe.test(t))) {
+    return { error: '올바른 시간 형식이 아닙니다. (예: 09:00)' }
+  }
+
+  const admin = await getAdminClient()
+  if (!admin) return { error: 'Unauthorized' }
+
+  const { error } = await admin
+    .from('company_settings')
+    .update({
+      work_start_time: workStartTime,
+      work_end_time: workEndTime,
+      lunch_start_time: lunchStartTime,
+      lunch_end_time: lunchEndTime,
+      updated_at: new Date().toISOString(),
+    })
+    .not('id', 'is', null)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/settings')
+  return { ok: true }
+}

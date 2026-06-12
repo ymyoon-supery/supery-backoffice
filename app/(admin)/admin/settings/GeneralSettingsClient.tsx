@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Trash2, Plus, Wifi } from 'lucide-react'
-import { updateInactivityMinutes, updateAutoBreakMode, updateRemoteRadius, addOfficeIp, removeOfficeIp } from './actions'
+import { updateInactivityMinutes, updateAutoBreakMode, updateRemoteRadius, addOfficeIp, removeOfficeIp, updateWorkSchedule } from './actions'
 
 const INACTIVITY_OPTIONS = [
   { value: 10, label: '10분' },
@@ -28,18 +28,30 @@ export default function GeneralSettingsClient({
   currentIp,
   autoBreakMode,
   remoteRadiusM,
+  workStartTime,
+  workEndTime,
+  lunchStartTime,
+  lunchEndTime,
 }: {
   inactivityMinutes: number
   officeIps: string[]
   currentIp: string
   autoBreakMode: 'frontend' | 'server'
   remoteRadiusM: number
+  workStartTime: string
+  workEndTime: string
+  lunchStartTime: string
+  lunchEndTime: string
 }) {
   const [minutes, setMinutes] = useState(inactivityMinutes)
   const [breakMode, setBreakMode] = useState<'frontend' | 'server'>(autoBreakMode)
   const [radiusM, setRadiusM] = useState(remoteRadiusM)
   const [ips, setIps] = useState<string[]>(officeIps)
   const [newIp, setNewIp] = useState('')
+  const [startTime, setStartTime] = useState(workStartTime)
+  const [endTime, setEndTime] = useState(workEndTime)
+  const [lunchStart, setLunchStart] = useState(lunchStartTime)
+  const [lunchEnd, setLunchEnd] = useState(lunchEndTime)
   const [isPending, startTransition] = useTransition()
 
   function handleSaveInactivity() {
@@ -88,10 +100,72 @@ export default function GeneralSettingsClient({
     })
   }
 
+  function handleSaveSchedule() {
+    startTransition(async () => {
+      const res = await updateWorkSchedule(startTime, endTime, lunchStart, lunchEnd)
+      if (res.error) { toast.error(res.error); return }
+      toast.success('근무시간이 저장되었습니다.')
+    })
+  }
+
   const currentIpAlreadyAdded = currentIp && ips.includes(currentIp)
 
   return (
     <div className="max-w-lg space-y-6">
+
+      {/* 근무시간 설정 */}
+      <div className="bg-white rounded-xl border border-gray-100 p-6 space-y-4">
+        <h2 className="text-sm font-semibold text-gray-800">근무시간 설정</h2>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <label className="text-sm text-gray-600">출근시간</label>
+            <input
+              type="time"
+              value={startTime}
+              onChange={e => setStartTime(e.target.value)}
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm text-gray-600">퇴근시간</label>
+            <input
+              type="time"
+              value={endTime}
+              onChange={e => setEndTime(e.target.value)}
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm text-gray-600">점심 시작</label>
+            <input
+              type="time"
+              value={lunchStart}
+              onChange={e => setLunchStart(e.target.value)}
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm text-gray-600">점심 종료</label>
+            <input
+              type="time"
+              value={lunchEnd}
+              onChange={e => setLunchEnd(e.target.value)}
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
+        </div>
+        <p className="text-xs text-gray-400">
+          점심시간은 해당 시간대에 휴식 기록이 없을 경우 자동으로 차감됩니다.
+        </p>
+        <button
+          type="button"
+          onClick={handleSaveSchedule}
+          disabled={isPending}
+          className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+        >
+          {isPending ? '저장 중...' : '저장'}
+        </button>
+      </div>
 
       {/* 근태 설정 */}
       <div className="bg-white rounded-xl border border-gray-100 p-6 space-y-4">
@@ -193,7 +267,6 @@ export default function GeneralSettingsClient({
           등록된 IP에서 출근 시 사무실 근무로 인정됩니다. 여러 IP를 등록할 수 있습니다.
         </p>
 
-        {/* 현재 내 IP 빠른 등록 */}
         {currentIp && (
           <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2.5">
             <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -216,7 +289,6 @@ export default function GeneralSettingsClient({
           </div>
         )}
 
-        {/* 등록된 IP 목록 */}
         {ips.length > 0 ? (
           <ul className="space-y-1.5">
             {ips.map(ip => (
@@ -237,7 +309,6 @@ export default function GeneralSettingsClient({
           <p className="text-sm text-gray-400 text-center py-3">등록된 사무실 IP가 없습니다.</p>
         )}
 
-        {/* 직접 입력 */}
         <div className="flex gap-2">
           <input
             type="text"
