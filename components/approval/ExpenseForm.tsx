@@ -18,9 +18,9 @@ interface Props {
 }
 
 const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
-  { value: 'CASH', label: '현금' },
-  { value: 'CARD', label: '회사카드' },
   { value: 'TRANSFER', label: '계좌송금' },
+  { value: 'CARD', label: '회사카드' },
+  { value: 'CASH', label: '현금' },
 ]
 
 const today = format(new Date(), 'yyyy-MM-dd')
