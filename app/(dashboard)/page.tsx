@@ -23,7 +23,7 @@ export default async function DashboardPage() {
   const dateStr = format(kstNow, 'yyyy년 M월 d일 EEEE', { locale: ko })
 
   const [{ data: employee }, { data: notices }] = await Promise.all([
-    supabase.from('employees').select('name, role, remaining_leaves').eq('auth_user_id', user.id).single(),
+    supabase.from('employees').select('name, role').eq('auth_user_id', user.id).single(),
     admin.from('notices')
       .select('id, title, is_pinned, created_at, employees(name)')
       .order('is_pinned', { ascending: false })
@@ -61,14 +61,6 @@ export default async function DashboardPage() {
             <p className="mt-1 text-sm text-gray-500">오늘도 좋은 하루 되세요.</p>
           </div>
 
-          {/* Remaining leaves pill */}
-          {employee?.remaining_leaves != null && (
-            <div className="inline-flex items-baseline gap-1.5 rounded-xl border border-gray-100 bg-white px-4 py-2 shadow-sm">
-              <span className="text-xs text-gray-400">잔여 연차</span>
-              <span className="text-xl font-extrabold text-primary">{employee.remaining_leaves}</span>
-              <span className="text-xs text-gray-400">일</span>
-            </div>
-          )}
         </div>
       </div>
 
