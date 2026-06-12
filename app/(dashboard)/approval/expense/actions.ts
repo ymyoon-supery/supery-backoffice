@@ -4,13 +4,24 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidateTag } from 'next/cache'
 import { CACHE_TAGS } from '@/lib/cache/tags'
 
+export type LineItem = {
+  item: string
+  date: string
+  count: number
+}
+
 type SubmitExpenseInput = {
   title: string
   amount: number
-  category: string
-  expenseDate: string
-  receiptUrl: string | null
-  description: string | null
+  payee: string
+  paymentMethod: 'CASH' | 'CARD' | 'TRANSFER'
+  bankName: string | null
+  accountNumber: string | null
+  accountHolder: string | null
+  paymentRequestDate: string
+  settlementDate: string | null
+  lineItems: LineItem[]
+  attachmentUrls: string[]
 }
 
 export async function submitExpense(input: SubmitExpenseInput) {
@@ -21,10 +32,19 @@ export async function submitExpense(input: SubmitExpenseInput) {
   const { data, error } = await supabase.rpc('submit_expense_report', {
     p_title: input.title,
     p_amount: input.amount,
-    p_category: input.category,
-    p_expense_date: input.expenseDate,
-    p_receipt_url: input.receiptUrl,
-    p_description: input.description,
+    p_category: 'OTHER',
+    p_expense_date: input.paymentRequestDate,
+    p_receipt_url: null,
+    p_description: null,
+    p_payee: input.payee,
+    p_payment_method: input.paymentMethod,
+    p_bank_name: input.bankName,
+    p_account_number: input.accountNumber,
+    p_account_holder: input.accountHolder,
+    p_payment_request_date: input.paymentRequestDate,
+    p_settlement_date: input.settlementDate,
+    p_line_items: input.lineItems,
+    p_attachment_urls: input.attachmentUrls,
   })
 
   if (error) return { error: error.message }
