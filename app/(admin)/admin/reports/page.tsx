@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { format, startOfWeek, endOfWeek, differenceInMinutes, parseISO, addWeeks } from 'date-fns'
+import { format, startOfWeek, endOfWeek, parseISO, addWeeks } from 'date-fns'
 import Link from 'next/link'
 import { Download } from 'lucide-react'
+import { calcDaySummary, toKSTDate, WorkSchedule } from '@/lib/attendance/calc'
 
 function fmtHM(minutes: number) {
   const h = Math.floor(minutes / 60)
@@ -31,7 +32,7 @@ export default async function AdminReportsPage({
   const prevWeek = format(addWeeks(weekStartDate, -1), 'yyyy-MM-dd')
   const nextWeek = format(addWeeks(weekStartDate, 1), 'yyyy-MM-dd')
 
-  const [{ data: groups }, { data: allTeams }, { data: records }] = await Promise.all([
+  const [{ data: groups }, { data: allTeams }, { data: records }, { data: settingsData }] = await Promise.all([
     supabase.from('groups').select('id, name').order('name'),
     supabase.from('departments').select('id, name, group_id').order('name'),
     supabase
@@ -40,7 +41,18 @@ export default async function AdminReportsPage({
       .gte('recorded_at', `${weekStart}T00:00:00+09:00`)
       .lte('recorded_at', `${weekEnd}T23:59:59+09:00`)
       .order('recorded_at', { ascending: true }),
+    supabase
+      .from('company_settings')
+      .select('work_start_time, work_end_time, lunch_start_time, lunch_end_time')
+      .single(),
   ])
+
+  const schedule: WorkSchedule = {
+    workStartTime: settingsData?.work_start_time ?? '09:00',
+    workEndTime: settingsData?.work_end_time ?? '18:00',
+    lunchStartTime: settingsData?.lunch_start_time ?? '12:00',
+    lunchEndTime: settingsData?.lunch_end_time ?? '13:00',
+  }
 
   const teams = selectedGroup
     ? (allTeams ?? []).filter(t => t.group_id === selectedGroup)
@@ -48,14 +60,23 @@ export default async function AdminReportsPage({
 
   type RecordRow = NonNullable<typeof records>[number]
 
-  const hoursMap = new Map<string, { name: string; email: string; teamId: string | null; workMinutes: number; breakMinutes: number }>()
+  const hoursMap = new Map<string, {
+    name: string
+    email: string
+    teamId: string | null
+    workMinutes: number
+    breakMinutes: number
+    lateCount: number
+    earlyLeaveCount: number
+  }>()
+
   for (const r of records ?? []) {
     const emp = r.employees as unknown as { id: string; name: string; email: string; department_id: string | null } | null
     if (!emp) continue
     if (selectedTeam && emp.department_id !== selectedTeam) continue
     if (selectedGroup && !teams.some(t => t.id === emp.department_id)) continue
     if (!hoursMap.has(r.employee_id)) {
-      hoursMap.set(r.employee_id, { name: emp.name, email: emp.email, teamId: emp.department_id, workMinutes: 0, breakMinutes: 0 })
+      hoursMap.set(r.employee_id, { name: emp.name, email: emp.email, teamId: emp.department_id, workMinutes: 0, breakMinutes: 0, lateCount: 0, earlyLeaveCount: 0 })
     }
   }
 
@@ -65,9 +86,7 @@ export default async function AdminReportsPage({
     if (!emp) continue
     if (selectedTeam && emp.department_id !== selectedTeam) continue
     if (selectedGroup && !teams.some(t => t.id === emp.department_id)) continue
-    const kstDate = new Date(r.recorded_at)
-      .toLocaleString('sv', { timeZone: 'Asia/Seoul' })
-      .split(' ')[0]
+    const kstDate = toKSTDate(r.recorded_at)
     const key = `${r.employee_id}:${kstDate}`
     const list = byEmployeeDay.get(key) ?? []
     list.push(r)
@@ -78,22 +97,11 @@ export default async function AdminReportsPage({
     const empId = key.split(':')[0]
     const entry = hoursMap.get(empId)
     if (!entry) continue
-    const checkIn = recs.find(r => r.type === 'CHECK_IN')
-    const checkOut = recs.find(r => r.type === 'CHECK_OUT')
-    if (!checkIn || !checkOut) continue
-    let dayBreak = 0
-    let breakStart: Date | null = null
-    for (const r of recs) {
-      if (r.type === 'BREAK_START') breakStart = new Date(r.recorded_at)
-      else if (r.type === 'BREAK_END' && breakStart) {
-        dayBreak += differenceInMinutes(new Date(r.recorded_at), breakStart)
-        breakStart = null
-      }
-    }
-    const gross = differenceInMinutes(new Date(checkOut.recorded_at), new Date(checkIn.recorded_at))
-    const lunch = dayBreak < 30 && gross > 240 ? 60 : 0
-    entry.workMinutes += Math.max(0, gross - dayBreak - lunch)
-    entry.breakMinutes += dayBreak
+    const ds = calcDaySummary(recs, schedule)
+    entry.workMinutes += ds.workMin
+    entry.breakMinutes += ds.breakMin
+    if (ds.lateMin > 0) entry.lateCount += 1
+    if (ds.earlyLeaveMin > 0) entry.earlyLeaveCount += 1
   }
 
   const sorted = Array.from(hoursMap.entries())
@@ -168,6 +176,8 @@ export default async function AdminReportsPage({
               <th className="px-4 py-3">팀</th>
               <th className="px-4 py-3 text-right">순 근무시간</th>
               <th className="px-4 py-3 text-right">휴식시간</th>
+              <th className="px-4 py-3 text-right">지각</th>
+              <th className="px-4 py-3 text-right">조퇴</th>
               <th className="px-4 py-3 text-right">초과</th>
             </tr>
           </thead>
@@ -186,6 +196,16 @@ export default async function AdminReportsPage({
                     {v.breakMinutes > 0 ? fmtHM(v.breakMinutes) : '—'}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums text-xs">
+                    {v.lateCount > 0
+                      ? <span className="text-red-500">{v.lateCount}회</span>
+                      : <span className="text-gray-300">—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums text-xs">
+                    {v.earlyLeaveCount > 0
+                      ? <span className="text-orange-500">{v.earlyLeaveCount}회</span>
+                      : <span className="text-gray-300">—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums text-xs">
                     {over > 0
                       ? <span className="text-red-500">+{fmtHM(over)}</span>
                       : <span className="text-gray-300">—</span>}
@@ -195,7 +215,7 @@ export default async function AdminReportsPage({
             })}
             {sorted.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-gray-400">
+                <td colSpan={7} className="px-4 py-10 text-center text-gray-400">
                   해당 주간 근무 기록이 없습니다.
                 </td>
               </tr>
