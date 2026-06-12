@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useState, useTransition } from 'react'
+import { Fragment, useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
@@ -54,6 +54,13 @@ export default function AdminApprovalClient({
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [paymentDropdownId, setPaymentDropdownId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!paymentDropdownId) return
+    function close() { setPaymentDropdownId(null) }
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [paymentDropdownId])
 
   function buildUrl(overrides: Record<string, string>) {
     const p = new URLSearchParams({ tab, type, period, sort, page: String(page), ...overrides })
@@ -237,9 +244,9 @@ export default function AdminApprovalClient({
                           {item.status === 'APPROVED' && item.kind === 'expense' && item.paymentStatus && (
                             <div className="relative">
                               <button
-                                onClick={() => setPaymentDropdownId(
+                                onClick={(e) => { e.stopPropagation(); setPaymentDropdownId(
                                   paymentDropdownId === item.stepId ? null : item.stepId
-                                )}
+                                ) }}
                                 disabled={isPending}
                                 className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium transition-colors ${PAYMENT_STATUS_CFG[item.paymentStatus].cls} hover:opacity-80`}
                               >
