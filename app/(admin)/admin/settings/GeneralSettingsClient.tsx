@@ -53,6 +53,7 @@ export default function GeneralSettingsClient({
   const [lunchStart, setLunchStart] = useState(lunchStartTime)
   const [lunchEnd, setLunchEnd] = useState(lunchEndTime)
   const [isPending, startTransition] = useTransition()
+  const [isSchedulePending, startScheduleTransition] = useTransition()
 
   function handleSaveInactivity() {
     startTransition(async () => {
@@ -101,7 +102,7 @@ export default function GeneralSettingsClient({
   }
 
   function handleSaveSchedule() {
-    startTransition(async () => {
+    startScheduleTransition(async () => {
       const res = await updateWorkSchedule(startTime, endTime, lunchStart, lunchEnd)
       if (res.error) { toast.error(res.error); return }
       toast.success('근무시간이 저장되었습니다.')
@@ -160,10 +161,10 @@ export default function GeneralSettingsClient({
         <button
           type="button"
           onClick={handleSaveSchedule}
-          disabled={isPending}
+          disabled={isSchedulePending}
           className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
         >
-          {isPending ? '저장 중...' : '저장'}
+          {isSchedulePending ? '저장 중...' : '저장'}
         </button>
       </div>
 

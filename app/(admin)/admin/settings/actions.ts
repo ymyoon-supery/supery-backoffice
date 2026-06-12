@@ -118,6 +118,11 @@ export async function updateWorkSchedule(
     return { error: '올바른 시간 형식이 아닙니다. (예: 09:00)' }
   }
 
+  if (workEndTime <= workStartTime)
+    return { error: '퇴근시간은 출근시간보다 늦어야 합니다.' }
+  if (lunchEndTime <= lunchStartTime)
+    return { error: '점심 종료시간은 시작시간보다 늦어야 합니다.' }
+
   const admin = await getAdminClient()
   if (!admin) return { error: 'Unauthorized' }
 
