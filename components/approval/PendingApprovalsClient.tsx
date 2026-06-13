@@ -285,6 +285,7 @@ export default function PendingApprovalsClient({ leaveSteps, expenseSteps, fullA
           </h2>
           {fullApprovedLeaveSteps.map((step: any) => {
             const req = step.leave_requests
+            if (!req) return null
             return (
               <div key={step.id} className="bg-orange-50 rounded-xl border border-orange-200 px-5 py-4 flex items-center justify-between">
                 <div>
@@ -304,6 +305,7 @@ export default function PendingApprovalsClient({ leaveSteps, expenseSteps, fullA
           })}
           {fullApprovedExpenseSteps.map((step: any) => {
             const rep = step.expense_reports
+            if (!rep) return null
             return (
               <div key={step.id} className="bg-orange-50 rounded-xl border border-orange-200 px-5 py-4 flex items-center justify-between">
                 <div>
