@@ -202,27 +202,139 @@ export default function AdminApprovalClient({
             </thead>
             <tbody className="divide-y divide-orange-50">
               {fullApproveItems.map(item => (
-                <tr key={item.stepId} className="hover:bg-orange-50/30">
-                  <td className="px-4 py-3 font-medium text-gray-900">{item.employeeName}</td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      item.kind === 'leave' ? 'bg-blue-50 text-blue-600' : 'bg-violet-50 text-violet-600'
-                    }`}>
-                      {item.kind === 'leave' ? `연차 · ${item.typeLabel}` : `지결서 · ${item.typeLabel}`}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-gray-600 truncate">{item.detail}</td>
-                  <td className="px-4 py-3 text-xs text-gray-500">{item.managerName ?? '—'} 결재 대기중</td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => handleFullApprove(item)}
-                      disabled={isPending}
-                      className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 transition-colors"
-                    >
-                      전결
-                    </button>
-                  </td>
-                </tr>
+                <Fragment key={item.stepId}>
+                  <tr
+                    className="cursor-pointer hover:bg-orange-50/30"
+                    onClick={() => setExpandedId(expandedId === item.stepId ? null : item.stepId)}
+                  >
+                    <td className="px-4 py-3 font-medium text-gray-900">{item.employeeName}</td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        item.kind === 'leave' ? 'bg-blue-50 text-blue-600' : 'bg-violet-50 text-violet-600'
+                      }`}>
+                        {item.kind === 'leave' ? `연차 · ${item.typeLabel}` : `지결서 · ${item.typeLabel}`}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-600 truncate">{item.detail}</td>
+                    <td className="px-4 py-3 text-xs text-gray-500">{item.managerName ?? '—'} 결재 대기중</td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleFullApprove(item) }}
+                        disabled={isPending}
+                        className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 transition-colors"
+                      >
+                        전결
+                      </button>
+                    </td>
+                  </tr>
+                  {expandedId === item.stepId && item.kind !== 'home_location' && (
+                    <tr className="bg-orange-50/40 border-l-[3px] border-l-orange-200">
+                      <td colSpan={5} className="px-6 py-4">
+                        {item.kind === 'leave' && (
+                          <div className="space-y-3 text-sm">
+                            <div className="flex items-center gap-6">
+                              <div>
+                                <span className="text-gray-400 text-xs">부여 연차</span>
+                                <p className="font-semibold text-gray-900 mt-0.5">
+                                  {item.totalLeaves != null ? `${item.totalLeaves}일` : '—'}
+                                </p>
+                              </div>
+                              <div>
+                                <span className="text-gray-400 text-xs">잔여 연차</span>
+                                <p className="font-semibold text-gray-900 mt-0.5">
+                                  {item.remainingLeaves != null ? `${item.remainingLeaves}일` : '—'}
+                                </p>
+                              </div>
+                              <div>
+                                <span className="text-gray-400 text-xs">유형</span>
+                                <p className="font-medium text-gray-900 mt-0.5">{item.typeLabel}</p>
+                              </div>
+                              <div>
+                                <span className="text-gray-400 text-xs">기간</span>
+                                <p className="font-medium text-gray-900 mt-0.5">{item.detail.split(' · ').slice(1).join(' · ')}</p>
+                              </div>
+                              <div>
+                                <span className="text-gray-400 text-xs">사용 일수</span>
+                                <p className="font-medium text-gray-900 mt-0.5">{item.detail.split(' · ')[0]}</p>
+                              </div>
+                            </div>
+                            {item.reason && (
+                              <div>
+                                <span className="text-gray-400 text-xs">사유</span>
+                                <p className="text-gray-700 mt-0.5">{item.reason}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {item.kind === 'expense' && (
+                          <div className="space-y-4 text-sm">
+                            <div className="flex items-center gap-6">
+                              <div>
+                                <span className="text-gray-400 text-xs">수취인</span>
+                                <p className="font-medium text-gray-900 mt-0.5">{item.payee ?? '—'}</p>
+                              </div>
+                              <div>
+                                <span className="text-gray-400 text-xs">결제방식</span>
+                                <p className="font-medium text-gray-900 mt-0.5">
+                                  {item.paymentMethod ? PAYMENT_METHOD_LABELS[item.paymentMethod] ?? item.paymentMethod : '—'}
+                                </p>
+                              </div>
+                              {item.paymentMethod === 'TRANSFER' && (
+                                <div>
+                                  <span className="text-gray-400 text-xs">계좌</span>
+                                  <p className="font-medium text-gray-900 mt-0.5">
+                                    {[item.bankName, item.accountNumber, item.accountHolder].filter(Boolean).join(' · ') || '—'}
+                                  </p>
+                                </div>
+                              )}
+                              <div>
+                                <span className="text-gray-400 text-xs">지급요청일</span>
+                                <p className="font-medium text-gray-900 mt-0.5">{item.paymentRequestDate ?? '—'}</p>
+                              </div>
+                            </div>
+                            {item.lineItems && item.lineItems.length > 0 && (
+                              <div>
+                                <span className="text-gray-400 text-xs block mb-1.5">지출 내역</span>
+                                <table className="w-full max-w-lg text-xs border border-gray-200 rounded-lg overflow-hidden">
+                                  <thead>
+                                    <tr className="bg-gray-100 text-gray-500">
+                                      <th className="px-3 py-2 text-left font-medium">항목</th>
+                                      <th className="px-3 py-2 text-left font-medium">날짜</th>
+                                      <th className="px-3 py-2 text-right font-medium">수량</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-gray-100 bg-white">
+                                    {item.lineItems.map((li, i) => (
+                                      <tr key={i}>
+                                        <td className="px-3 py-2 text-gray-700">{li.item}</td>
+                                        <td className="px-3 py-2 text-gray-500">{li.date}</td>
+                                        <td className="px-3 py-2 text-right text-gray-700">{li.count}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                            {item.attachmentUrls && item.attachmentUrls.length > 0 && (
+                              <div>
+                                <span className="text-gray-400 text-xs block mb-1.5">첨부파일</span>
+                                <div className="flex flex-wrap gap-2">
+                                  {item.attachmentUrls.map((url, i) => (
+                                    <a key={i} href={url} target="_blank" rel="noreferrer"
+                                      className="text-xs px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-primary hover:bg-primary/5 transition-colors"
+                                      onClick={e => e.stopPropagation()}>
+                                      파일 {i + 1}
+                                    </a>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
             </tbody>
           </table>
