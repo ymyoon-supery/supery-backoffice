@@ -130,7 +130,7 @@ export default function ExpenseForm({ employeeId, employeeName, employeePosition
         return
       }
       toast.success('지출결의서가 제출되었습니다.')
-      router.push('/approval/inbox')
+      router.push('/approval/my')
     })
   }
 

@@ -64,7 +64,7 @@ export default function LeaveForm({ remainingLeaves }: { remainingLeaves: number
       })
       if (result.error) { toast.error(result.error); return }
       toast.success('연차 신청이 접수되었습니다.')
-      router.push('/approval/inbox')
+      router.push('/approval/my')
     })
   }
 

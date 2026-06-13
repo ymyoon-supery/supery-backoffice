@@ -41,7 +41,7 @@ export default async function AdminApprovalPage({
     .eq('auth_user_id', user.id)
     .single()
 
-  if (!employee || employee.role !== 'ADMIN') redirect('/approval/inbox')
+  if (!employee || employee.role !== 'ADMIN') redirect('/approval/my')
 
   const params = await searchParams
   const tab    = params.tab    === 'done'    ? 'done'    : 'pending'
