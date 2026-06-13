@@ -201,7 +201,7 @@ export default async function AdminApprovalPage({
     if (type !== 'expense' && type !== 'home_location') {
       const { data: waitingLeave } = await admin
         .from('leave_approval_steps')
-        .select(`id, leave_request_id, leave_requests ( id, leave_type, start_date, end_date, days_used, created_at, employees ( name ) )`)
+        .select(`id, leave_request_id, leave_requests ( id, leave_type, start_date, end_date, days_used, reason, created_at, employees ( name, annual_leave_days, remaining_leaves ) )`)
         .eq('approver_id', employee.id)
         .eq('status', 'WAITING')
         .eq('step_order', 2)
@@ -224,15 +224,18 @@ export default async function AdminApprovalPage({
             const req = s.leave_requests
             if (!req) return []
             return [{
-              stepId:       s.id,
-              kind:         'leave' as const,
-              requestId:    req.id,
-              employeeName: req.employees?.name ?? '—',
-              managerName:  managerByReqId[s.leave_request_id],
-              typeLabel:    LEAVE_LABELS[req.leave_type] ?? req.leave_type,
-              detail:       `${req.days_used}일 · ${req.start_date}${req.start_date !== req.end_date ? ` ~ ${req.end_date}` : ''}`,
-              requestDate:  req.created_at,
-              status:       'PENDING' as const,
+              stepId:          s.id,
+              kind:            'leave' as const,
+              requestId:       req.id,
+              employeeName:    req.employees?.name ?? '—',
+              managerName:     managerByReqId[s.leave_request_id],
+              typeLabel:       LEAVE_LABELS[req.leave_type] ?? req.leave_type,
+              detail:          `${req.days_used}일 · ${req.start_date}${req.start_date !== req.end_date ? ` ~ ${req.end_date}` : ''}`,
+              requestDate:     req.created_at,
+              status:          'PENDING' as const,
+              reason:          req.reason ?? null,
+              totalLeaves:     req.employees?.annual_leave_days ?? null,
+              remainingLeaves: req.employees?.remaining_leaves ?? null,
             }]
           })
       }
@@ -241,7 +244,7 @@ export default async function AdminApprovalPage({
     if (type !== 'leave' && type !== 'home_location') {
       const { data: waitingExpense } = await admin
         .from('expense_approval_steps')
-        .select(`id, expense_report_id, expense_reports ( id, title, amount, category, created_at, payment_status, employees ( name ) )`)
+        .select(`id, expense_report_id, expense_reports ( id, title, amount, category, created_at, payment_status, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, line_items, attachment_urls, employees ( name ) )`)
         .eq('approver_id', employee.id)
         .eq('status', 'WAITING')
         .eq('step_order', 2)
@@ -264,16 +267,24 @@ export default async function AdminApprovalPage({
             const rep = s.expense_reports
             if (!rep) return []
             return [{
-              stepId:        s.id,
-              kind:          'expense' as const,
-              requestId:     rep.id,
-              employeeName:  rep.employees?.name ?? '—',
-              managerName:   managerByRepId[s.expense_report_id],
-              typeLabel:     EXPENSE_LABELS[rep.category] ?? rep.category,
-              detail:        `${rep.title} · ${Number(rep.amount).toLocaleString()}원`,
-              requestDate:   rep.created_at,
-              status:        'PENDING' as const,
-              paymentStatus: rep.payment_status ?? null,
+              stepId:             s.id,
+              kind:               'expense' as const,
+              requestId:          rep.id,
+              employeeName:       rep.employees?.name ?? '—',
+              managerName:        managerByRepId[s.expense_report_id],
+              typeLabel:          EXPENSE_LABELS[rep.category] ?? rep.category,
+              detail:             `${rep.title} · ${Number(rep.amount).toLocaleString()}원`,
+              requestDate:        rep.created_at,
+              status:             'PENDING' as const,
+              paymentStatus:      rep.payment_status ?? null,
+              payee:              rep.payee ?? null,
+              paymentMethod:      rep.payment_method ?? null,
+              bankName:           rep.bank_name ?? null,
+              accountNumber:      rep.account_number ?? null,
+              accountHolder:      rep.account_holder ?? null,
+              paymentRequestDate: rep.payment_request_date ?? null,
+              lineItems:          rep.line_items ?? null,
+              attachmentUrls:     rep.attachment_urls ?? null,
             }]
           })
       }
