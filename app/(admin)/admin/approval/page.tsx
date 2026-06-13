@@ -25,6 +25,18 @@ export type ApprovalItem = {
   comment?: string | null
   paymentStatus?: 'PENDING_PAYMENT' | 'PAID' | 'SETTLED' | null
   managerName?: string
+  // leave detail
+  reason?: string | null
+  remainingLeaves?: number | null
+  // expense detail
+  lineItems?: Array<{ item: string; date: string; count: number }> | null
+  payee?: string | null
+  paymentMethod?: string | null
+  bankName?: string | null
+  accountNumber?: string | null
+  accountHolder?: string | null
+  paymentRequestDate?: string | null
+  attachmentUrls?: string[] | null
 }
 
 export default async function AdminApprovalPage({
@@ -82,8 +94,8 @@ export default async function AdminApprovalPage({
       .select(`
         id, status, comment,
         leave_requests (
-          id, leave_type, start_date, end_date, days_used, created_at,
-          employees ( name )
+          id, leave_type, start_date, end_date, days_used, reason, created_at,
+          employees ( name, remaining_leaves )
         )
       `)
       .eq('approver_id', employee.id)
@@ -95,15 +107,17 @@ export default async function AdminApprovalPage({
       const req = s.leave_requests
       if (!req) return []
       return [{
-        stepId:       s.id,
-        kind:         'leave' as const,
-        requestId:    req.id,
-        employeeName: req.employees?.name ?? '—',
-        typeLabel:    LEAVE_LABELS[req.leave_type] ?? req.leave_type,
-        detail:       `${req.days_used}일 · ${req.start_date}${req.start_date !== req.end_date ? ` ~ ${req.end_date}` : ''}`,
-        requestDate:  req.created_at,
-        status:       s.status,
-        comment:      s.comment,
+        stepId:          s.id,
+        kind:            'leave' as const,
+        requestId:       req.id,
+        employeeName:    req.employees?.name ?? '—',
+        typeLabel:       LEAVE_LABELS[req.leave_type] ?? req.leave_type,
+        detail:          `${req.days_used}일 · ${req.start_date}${req.start_date !== req.end_date ? ` ~ ${req.end_date}` : ''}`,
+        requestDate:     req.created_at,
+        status:          s.status,
+        comment:         s.comment,
+        reason:          req.reason ?? null,
+        remainingLeaves: req.employees?.remaining_leaves ?? null,
       }]
     })
   }
@@ -117,6 +131,8 @@ export default async function AdminApprovalPage({
         id, status,
         expense_reports (
           id, title, amount, category, created_at, payment_status,
+          payee, payment_method, bank_name, account_number, account_holder,
+          payment_request_date, line_items, attachment_urls,
           employees ( name )
         )
       `)
@@ -129,15 +145,23 @@ export default async function AdminApprovalPage({
       const rep = s.expense_reports
       if (!rep) return []
       return [{
-        stepId:        s.id,
-        kind:          'expense' as const,
-        requestId:     rep.id,
-        employeeName:  rep.employees?.name ?? '—',
-        typeLabel:     EXPENSE_LABELS[rep.category] ?? rep.category,
-        detail:        `${rep.title} · ${Number(rep.amount).toLocaleString()}원`,
-        requestDate:   rep.created_at,
-        status:        s.status,
-        paymentStatus: rep.payment_status ?? null,
+        stepId:             s.id,
+        kind:               'expense' as const,
+        requestId:          rep.id,
+        employeeName:       rep.employees?.name ?? '—',
+        typeLabel:          EXPENSE_LABELS[rep.category] ?? rep.category,
+        detail:             `${rep.title} · ${Number(rep.amount).toLocaleString()}원`,
+        requestDate:        rep.created_at,
+        status:             s.status,
+        paymentStatus:      rep.payment_status ?? null,
+        payee:              rep.payee ?? null,
+        paymentMethod:      rep.payment_method ?? null,
+        bankName:           rep.bank_name ?? null,
+        accountNumber:      rep.account_number ?? null,
+        accountHolder:      rep.account_holder ?? null,
+        paymentRequestDate: rep.payment_request_date ?? null,
+        lineItems:          rep.line_items ?? null,
+        attachmentUrls:     rep.attachment_urls ?? null,
       }]
     })
   }

@@ -10,6 +10,10 @@ import { approveExpense } from '@/app/(dashboard)/approval/expense/actions'
 import { approveHomeLocationRequest, updateExpensePaymentStatus, fullApproveLeave, fullApproveExpense } from '@/app/(admin)/admin/approval/actions'
 import type { ApprovalItem } from '@/app/(admin)/admin/approval/page'
 
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  CASH: '현금', CARD: '회사카드', TRANSFER: '계좌송금',
+}
+
 const STATUS_CFG = {
   PENDING:  { label: '미결재', cls: 'bg-amber-100 text-amber-700' },
   APPROVED: { label: '승인',   cls: 'bg-green-100 text-green-700' },
@@ -55,6 +59,7 @@ export default function AdminApprovalClient({
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [paymentDropdownId, setPaymentDropdownId] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!paymentDropdownId) return
@@ -243,11 +248,14 @@ export default function AdminApprovalClient({
 
               return (
                 <Fragment key={item.stepId}>
-                  <tr className={
-                    isPendingRow
-                      ? 'border-l-[3px] border-l-amber-400 bg-amber-50/40 hover:bg-amber-50/70'
-                      : 'hover:bg-gray-50/50'
-                  }>
+                  <tr
+                    className={`cursor-pointer ${
+                      isPendingRow
+                        ? 'border-l-[3px] border-l-amber-400 bg-amber-50/40 hover:bg-amber-50/70'
+                        : 'hover:bg-gray-50/50'
+                    }`}
+                    onClick={() => setExpandedId(expandedId === item.stepId ? null : item.stepId)}
+                  >
                     <td className="px-4 py-3 font-medium text-gray-900">
                       {isPendingRow && (
                         <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 mr-2 mb-px align-middle" />
@@ -281,11 +289,11 @@ export default function AdminApprovalClient({
                       {isPendingRow ? (
                         rejectingId !== item.stepId && (
                           <div className="flex gap-1.5 justify-end">
-                            <button onClick={() => handleApprove(item)} disabled={isPending}
+                            <button onClick={(e) => { e.stopPropagation(); handleApprove(item) }} disabled={isPending}
                               className="px-3 py-1.5 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors">
                               승인
                             </button>
-                            <button onClick={() => { setRejectingId(item.stepId); setRejectReason('') }}
+                            <button onClick={(e) => { e.stopPropagation(); setRejectingId(item.stepId); setRejectReason('') }}
                               disabled={isPending}
                               className="px-3 py-1.5 text-xs font-medium border border-red-200 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors">
                               반려
@@ -331,6 +339,109 @@ export default function AdminApprovalClient({
                       )}
                     </td>
                   </tr>
+
+                  {/* Detail expansion */}
+                  {expandedId === item.stepId && item.kind !== 'home_location' && (
+                    <tr className="bg-gray-50/60 border-l-[3px] border-l-gray-200">
+                      <td colSpan={5} className="px-6 py-4">
+                        {item.kind === 'leave' && (
+                          <div className="space-y-3 text-sm">
+                            <div className="flex items-center gap-6">
+                              <div>
+                                <span className="text-gray-400 text-xs">잔여 연차</span>
+                                <p className="font-semibold text-gray-900 mt-0.5">
+                                  {item.remainingLeaves != null ? `${item.remainingLeaves}일` : '—'}
+                                </p>
+                              </div>
+                              <div>
+                                <span className="text-gray-400 text-xs">유형</span>
+                                <p className="font-medium text-gray-900 mt-0.5">{item.typeLabel}</p>
+                              </div>
+                              <div>
+                                <span className="text-gray-400 text-xs">기간</span>
+                                <p className="font-medium text-gray-900 mt-0.5">{item.detail.split(' · ').slice(1).join(' · ')}</p>
+                              </div>
+                              <div>
+                                <span className="text-gray-400 text-xs">사용 일수</span>
+                                <p className="font-medium text-gray-900 mt-0.5">{item.detail.split(' · ')[0]}</p>
+                              </div>
+                            </div>
+                            {item.reason && (
+                              <div>
+                                <span className="text-gray-400 text-xs">사유</span>
+                                <p className="text-gray-700 mt-0.5">{item.reason}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {item.kind === 'expense' && (
+                          <div className="space-y-4 text-sm">
+                            <div className="flex items-center gap-6">
+                              <div>
+                                <span className="text-gray-400 text-xs">수취인</span>
+                                <p className="font-medium text-gray-900 mt-0.5">{item.payee ?? '—'}</p>
+                              </div>
+                              <div>
+                                <span className="text-gray-400 text-xs">결제방식</span>
+                                <p className="font-medium text-gray-900 mt-0.5">
+                                  {item.paymentMethod ? PAYMENT_METHOD_LABELS[item.paymentMethod] ?? item.paymentMethod : '—'}
+                                </p>
+                              </div>
+                              {item.paymentMethod === 'TRANSFER' && (
+                                <div>
+                                  <span className="text-gray-400 text-xs">계좌</span>
+                                  <p className="font-medium text-gray-900 mt-0.5">
+                                    {[item.bankName, item.accountNumber, item.accountHolder].filter(Boolean).join(' · ') || '—'}
+                                  </p>
+                                </div>
+                              )}
+                              <div>
+                                <span className="text-gray-400 text-xs">지급요청일</span>
+                                <p className="font-medium text-gray-900 mt-0.5">{item.paymentRequestDate ?? '—'}</p>
+                              </div>
+                            </div>
+                            {item.lineItems && item.lineItems.length > 0 && (
+                              <div>
+                                <span className="text-gray-400 text-xs block mb-1.5">지출 내역</span>
+                                <table className="w-full max-w-lg text-xs border border-gray-200 rounded-lg overflow-hidden">
+                                  <thead>
+                                    <tr className="bg-gray-100 text-gray-500">
+                                      <th className="px-3 py-2 text-left font-medium">항목</th>
+                                      <th className="px-3 py-2 text-left font-medium">날짜</th>
+                                      <th className="px-3 py-2 text-right font-medium">수량</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-gray-100 bg-white">
+                                    {item.lineItems.map((li, i) => (
+                                      <tr key={i}>
+                                        <td className="px-3 py-2 text-gray-700">{li.item}</td>
+                                        <td className="px-3 py-2 text-gray-500">{li.date}</td>
+                                        <td className="px-3 py-2 text-right text-gray-700">{li.count}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                            {item.attachmentUrls && item.attachmentUrls.length > 0 && (
+                              <div>
+                                <span className="text-gray-400 text-xs block mb-1.5">첨부파일</span>
+                                <div className="flex flex-wrap gap-2">
+                                  {item.attachmentUrls.map((url, i) => (
+                                    <a key={i} href={url} target="_blank" rel="noreferrer"
+                                      className="text-xs px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-primary hover:bg-primary/5 transition-colors"
+                                      onClick={e => e.stopPropagation()}>
+                                      파일 {i + 1}
+                                    </a>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
 
                   {/* Inline reject form */}
                   {rejectingId === item.stepId && (

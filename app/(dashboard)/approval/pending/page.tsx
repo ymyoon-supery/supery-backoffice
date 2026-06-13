@@ -27,7 +27,7 @@ export default async function PendingApprovalsPage() {
         id, step_order, status,
         leave_requests (
           id, leave_type, start_date, end_date, days_used, reason, status, created_at,
-          employees ( name, email, department_id )
+          employees ( name, email, department_id, remaining_leaves )
         )
       `)
       .eq('approver_id', employee.id)
@@ -39,6 +39,8 @@ export default async function PendingApprovalsPage() {
         id, step_order, status,
         expense_reports (
           id, title, amount, category, expense_date, status, created_at,
+          payee, payment_method, bank_name, account_number, account_holder,
+          payment_request_date, line_items, attachment_urls,
           employees ( name, email )
         )
       `)
