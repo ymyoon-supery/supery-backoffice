@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { AlertCircle, ChevronLeft, ChevronRight, ArrowUpDown, ChevronDown } from 'lucide-react'
 import { approveLeave } from '@/app/(dashboard)/approval/leave/actions'
 import { approveExpense } from '@/app/(dashboard)/approval/expense/actions'
-import { approveHomeLocationRequest, updateExpensePaymentStatus } from '@/app/(admin)/admin/approval/actions'
+import { approveHomeLocationRequest, updateExpensePaymentStatus, fullApproveLeave, fullApproveExpense } from '@/app/(admin)/admin/approval/actions'
 import type { ApprovalItem } from '@/app/(admin)/admin/approval/page'
 
 const STATUS_CFG = {
@@ -38,7 +38,7 @@ function getPageNums(cur: number, total: number): number[] {
 }
 
 export default function AdminApprovalClient({
-  items, total, page, totalPages, tab, type, period, sort,
+  items, total, page, totalPages, tab, type, period, sort, fullApproveItems = [],
 }: {
   items: ApprovalItem[]
   total: number
@@ -48,6 +48,7 @@ export default function AdminApprovalClient({
   type: string
   period: string
   sort: string
+  fullApproveItems?: ApprovalItem[]
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -87,6 +88,17 @@ export default function AdminApprovalClient({
       const res = await updateExpensePaymentStatus(item.requestId, status)
       if (res.error) { toast.error(res.error); return }
       toast.success(`${PAYMENT_STATUS_CFG[status].label}로 변경되었습니다.`)
+      router.refresh()
+    })
+  }
+
+  function handleFullApprove(item: ApprovalItem) {
+    startTransition(async () => {
+      const res = item.kind === 'leave'
+        ? await fullApproveLeave(item.requestId)
+        : await fullApproveExpense(item.requestId)
+      if (res.error) { toast.error(res.error); return }
+      toast.success('전결 처리되었습니다.')
       router.refresh()
     })
   }
@@ -164,6 +176,53 @@ export default function AdminApprovalClient({
           <span className="ml-auto text-xs text-gray-400">전체 {total}건</span>
         )}
       </div>
+
+      {/* 전결 대기 섹션 */}
+      {tab === 'pending' && fullApproveItems.length > 0 && (
+        <div className="bg-white rounded-xl border border-orange-200 overflow-hidden">
+          <div className="px-4 py-2.5 bg-orange-50 border-b border-orange-200 flex items-center gap-2">
+            <span className="text-xs font-semibold text-orange-700">전결 가능</span>
+            <span className="text-xs text-orange-500">팀장 결재 대기 중 — 관리자가 직접 승인할 수 있습니다</span>
+            <span className="ml-auto text-xs font-medium text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full">{fullApproveItems.length}건</span>
+          </div>
+          <table className="w-full text-sm table-fixed">
+            <thead>
+              <tr className="border-b border-orange-100 text-xs text-gray-400 font-medium text-left bg-orange-50/30">
+                <th className="px-4 py-2.5 w-[130px]">신청자</th>
+                <th className="px-4 py-2.5 w-[150px]">유형</th>
+                <th className="px-4 py-2.5">내용</th>
+                <th className="px-4 py-2.5 w-[120px]">팀장</th>
+                <th className="px-4 py-2.5 w-[100px] text-right">전결</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-orange-50">
+              {fullApproveItems.map(item => (
+                <tr key={item.stepId} className="hover:bg-orange-50/30">
+                  <td className="px-4 py-3 font-medium text-gray-900">{item.employeeName}</td>
+                  <td className="px-4 py-3">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                      item.kind === 'leave' ? 'bg-blue-50 text-blue-600' : 'bg-violet-50 text-violet-600'
+                    }`}>
+                      {item.kind === 'leave' ? `연차 · ${item.typeLabel}` : `지결서 · ${item.typeLabel}`}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-gray-600 truncate">{item.detail}</td>
+                  <td className="px-4 py-3 text-xs text-gray-500">{item.managerName ?? '—'} 결재 대기중</td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      onClick={() => handleFullApprove(item)}
+                      disabled={isPending}
+                      className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 transition-colors"
+                    >
+                      전결
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">

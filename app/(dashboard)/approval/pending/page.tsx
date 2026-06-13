@@ -15,7 +15,12 @@ export default async function PendingApprovalsPage() {
   if (!employee) redirect('/login')
   if (employee.position !== '팀장') redirect('/approval/my')
 
-  const [{ data: leaveSteps }, { data: expenseSteps }] = await Promise.all([
+  const [
+    { data: leaveSteps },
+    { data: expenseSteps },
+    { data: fullApprovedLeaveSteps },
+    { data: fullApprovedExpenseSteps },
+  ] = await Promise.all([
     supabase
       .from('leave_approval_steps')
       .select(`
@@ -40,12 +45,42 @@ export default async function PendingApprovalsPage() {
       .eq('approver_id', employee.id)
       .eq('status', 'PENDING')
       .order('created_at', { ascending: false }),
+    supabase
+      .from('leave_approval_steps')
+      .select(`
+        id, acted_at,
+        leave_requests (
+          id, leave_type, start_date, end_date, days_used, created_at,
+          employees ( name )
+        )
+      `)
+      .eq('approver_id', employee.id)
+      .eq('status', 'APPROVED')
+      .eq('comment', '전결')
+      .order('acted_at', { ascending: false })
+      .limit(10),
+    supabase
+      .from('expense_approval_steps')
+      .select(`
+        id, acted_at,
+        expense_reports (
+          id, title, amount, category, created_at,
+          employees ( name )
+        )
+      `)
+      .eq('approver_id', employee.id)
+      .eq('status', 'APPROVED')
+      .eq('comment', '전결')
+      .order('acted_at', { ascending: false })
+      .limit(10),
   ])
 
   return (
     <PendingApprovalsClient
       leaveSteps={leaveSteps ?? []}
       expenseSteps={expenseSteps ?? []}
+      fullApprovedLeaveSteps={fullApprovedLeaveSteps ?? []}
+      fullApprovedExpenseSteps={fullApprovedExpenseSteps ?? []}
     />
   )
 }

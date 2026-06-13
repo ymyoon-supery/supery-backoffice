@@ -16,7 +16,7 @@ const EXPENSE_LABELS: Record<string, string> = {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export default function PendingApprovalsClient({ leaveSteps, expenseSteps }: { leaveSteps: any[]; expenseSteps: any[] }) {
+export default function PendingApprovalsClient({ leaveSteps, expenseSteps, fullApprovedLeaveSteps = [], fullApprovedExpenseSteps = [] }: { leaveSteps: any[]; expenseSteps: any[]; fullApprovedLeaveSteps?: any[]; fullApprovedExpenseSteps?: any[] }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [rejectingId, setRejectingId] = useState<string | null>(null)
@@ -153,6 +153,54 @@ export default function PendingApprovalsClient({ leaveSteps, expenseSteps }: { l
           <div className="py-12 text-center text-sm text-gray-400">결재 대기 항목이 없습니다.</div>
         )}
       </div>
+
+      {/* 전결 처리됨 */}
+      {(fullApprovedLeaveSteps.length > 0 || fullApprovedExpenseSteps.length > 0) && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-medium text-orange-600 flex items-center gap-1.5">
+            <span className="inline-block w-2 h-2 rounded-full bg-orange-400" />
+            관리자 전결 처리됨
+          </h2>
+          {fullApprovedLeaveSteps.map((step: any) => {
+            const req = step.leave_requests
+            return (
+              <div key={step.id} className="bg-orange-50 rounded-xl border border-orange-200 px-5 py-4 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-700">
+                    {req.employees?.name} — {LEAVE_LABELS[req.leave_type]} {req.days_used}일
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {req.start_date} ~ {req.end_date}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">전결</span>
+                  <p className="text-xs text-gray-400 mt-1">{step.acted_at ? format(new Date(step.acted_at), 'MM/dd HH:mm') : ''}</p>
+                </div>
+              </div>
+            )
+          })}
+          {fullApprovedExpenseSteps.map((step: any) => {
+            const rep = step.expense_reports
+            return (
+              <div key={step.id} className="bg-orange-50 rounded-xl border border-orange-200 px-5 py-4 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-700">
+                    {rep.employees?.name} — {rep.title}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {EXPENSE_LABELS[rep.category]} · {Number(rep.amount).toLocaleString()}원
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">전결</span>
+                  <p className="text-xs text-gray-400 mt-1">{step.acted_at ? format(new Date(step.acted_at), 'MM/dd HH:mm') : ''}</p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

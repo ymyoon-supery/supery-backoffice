@@ -5,6 +5,22 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { revalidateTag } from 'next/cache'
 import { CACHE_TAGS } from '@/lib/cache/tags'
 
+export async function fullApproveLeave(requestId: string) {
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('admin_full_approve_leave', { p_request_id: requestId })
+  if (error) return { error: error.message }
+  revalidateTag(CACHE_TAGS.approvalInbox)
+  return { error: null }
+}
+
+export async function fullApproveExpense(reportId: string) {
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('admin_full_approve_expense', { p_report_id: reportId })
+  if (error) return { error: error.message }
+  revalidateTag(CACHE_TAGS.approvalInbox)
+  return { error: null }
+}
+
 export async function updateExpensePaymentStatus(
   reportId: string,
   paymentStatus: 'PENDING_PAYMENT' | 'PAID' | 'SETTLED',

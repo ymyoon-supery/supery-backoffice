@@ -24,6 +24,7 @@ export type ApprovalItem = {
   status: 'PENDING' | 'APPROVED' | 'REJECTED'
   comment?: string | null
   paymentStatus?: 'PENDING_PAYMENT' | 'PAID' | 'SETTLED' | null
+  managerName?: string
 }
 
 export default async function AdminApprovalPage({
@@ -166,6 +167,93 @@ export default async function AdminApprovalPage({
     }))
   }
 
+  // ── 전결 대기: admin WAITING step2 where step1 is still PENDING ──
+  let fullApproveLeaveItems: ApprovalItem[] = []
+  let fullApproveExpenseItems: ApprovalItem[] = []
+
+  if (tab === 'pending') {
+    if (type !== 'expense' && type !== 'home_location') {
+      const { data: waitingLeave } = await admin
+        .from('leave_approval_steps')
+        .select(`id, leave_request_id, leave_requests ( id, leave_type, start_date, end_date, days_used, created_at, employees ( name ) )`)
+        .eq('approver_id', employee.id)
+        .eq('status', 'WAITING')
+        .eq('step_order', 2)
+
+      if (waitingLeave && waitingLeave.length > 0) {
+        const reqIds = waitingLeave.map((s: any) => s.leave_request_id)
+        const { data: step1s } = await admin
+          .from('leave_approval_steps')
+          .select(`leave_request_id, employees ( name )`)
+          .in('leave_request_id', reqIds)
+          .eq('step_order', 1)
+          .eq('status', 'PENDING')
+
+        const managerByReqId = Object.fromEntries(
+          (step1s ?? []).map((s: any) => [s.leave_request_id, s.employees?.name ?? '—'])
+        )
+        fullApproveLeaveItems = waitingLeave
+          .filter((s: any) => managerByReqId[s.leave_request_id])
+          .flatMap((s: any) => {
+            const req = s.leave_requests
+            if (!req) return []
+            return [{
+              stepId:       s.id,
+              kind:         'leave' as const,
+              requestId:    req.id,
+              employeeName: req.employees?.name ?? '—',
+              managerName:  managerByReqId[s.leave_request_id],
+              typeLabel:    LEAVE_LABELS[req.leave_type] ?? req.leave_type,
+              detail:       `${req.days_used}일 · ${req.start_date}${req.start_date !== req.end_date ? ` ~ ${req.end_date}` : ''}`,
+              requestDate:  req.created_at,
+              status:       'PENDING' as const,
+            }]
+          })
+      }
+    }
+
+    if (type !== 'leave' && type !== 'home_location') {
+      const { data: waitingExpense } = await admin
+        .from('expense_approval_steps')
+        .select(`id, expense_report_id, expense_reports ( id, title, amount, category, created_at, payment_status, employees ( name ) )`)
+        .eq('approver_id', employee.id)
+        .eq('status', 'WAITING')
+        .eq('step_order', 2)
+
+      if (waitingExpense && waitingExpense.length > 0) {
+        const repIds = waitingExpense.map((s: any) => s.expense_report_id)
+        const { data: step1s } = await admin
+          .from('expense_approval_steps')
+          .select(`expense_report_id, employees ( name )`)
+          .in('expense_report_id', repIds)
+          .eq('step_order', 1)
+          .eq('status', 'PENDING')
+
+        const managerByRepId = Object.fromEntries(
+          (step1s ?? []).map((s: any) => [s.expense_report_id, s.employees?.name ?? '—'])
+        )
+        fullApproveExpenseItems = waitingExpense
+          .filter((s: any) => managerByRepId[s.expense_report_id])
+          .flatMap((s: any) => {
+            const rep = s.expense_reports
+            if (!rep) return []
+            return [{
+              stepId:        s.id,
+              kind:          'expense' as const,
+              requestId:     rep.id,
+              employeeName:  rep.employees?.name ?? '—',
+              managerName:   managerByRepId[s.expense_report_id],
+              typeLabel:     EXPENSE_LABELS[rep.category] ?? rep.category,
+              detail:        `${rep.title} · ${Number(rep.amount).toLocaleString()}원`,
+              requestDate:   rep.created_at,
+              status:        'PENDING' as const,
+              paymentStatus: rep.payment_status ?? null,
+            }]
+          })
+      }
+    }
+  }
+
   // ── Merge, sort, paginate ─────────────────────────────────────
   const all = [...leaveItems, ...expenseItems, ...homeLocationItems].sort((a, b) => {
     const diff = new Date(a.requestDate).getTime() - new Date(b.requestDate).getTime()
@@ -187,6 +275,7 @@ export default async function AdminApprovalPage({
       type={type}
       period={period}
       sort={sort}
+      fullApproveItems={[...fullApproveLeaveItems, ...fullApproveExpenseItems]}
     />
   )
 }
