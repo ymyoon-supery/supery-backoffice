@@ -3,33 +3,13 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  Clock,
-  FileText,
-  BarChart2,
-  Users,
-  ClipboardList,
-  Home,
-  Bell,
-  FilePlus,
-  CalendarDays,
-  Settings,
-  Megaphone,
+  Clock, FileText, BarChart2, Users, ClipboardList, Home,
+  Bell, FilePlus, CalendarDays, Settings, Megaphone, Inbox,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-const employeeNavBase = [
-  { href: '/', label: '홈', icon: Home },
-  { href: '/attendance', label: '근태등록', icon: Clock },
-  { href: '/leave', label: '연차 사용 내역', icon: CalendarDays },
-  { href: '/approval/leave/new', label: '연차 신청', icon: FileText },
-  { href: '/approval/expense/new', label: '지출결의', icon: FileText },
-  { href: '/notices', label: '공지사항', icon: Megaphone },
-]
-
-const inboxNav = { href: '/approval/inbox', label: '결재함', icon: ClipboardList }
-
 const adminNav = [
-  { href: '/admin/approval', label: '결재함', icon: ClipboardList },
+  { href: '/admin/approval', label: '결재관리', icon: ClipboardList },
   { href: '/admin/employees', label: '출퇴근 현황', icon: Users },
   { href: '/admin/attendance', label: '근태 현황', icon: Clock },
   { href: '/admin/reports', label: '52시간 리포트', icon: BarChart2 },
@@ -39,10 +19,38 @@ const adminNav = [
   { href: '/admin/settings', label: '설정', icon: Settings },
 ]
 
-export default function Sidebar({ role }: { role: string }) {
+type NavItem = {
+  href: string
+  label: string
+  icon: React.ComponentType<{ size?: number }>
+  badge?: number
+}
+
+export default function Sidebar({
+  role,
+  position,
+  pendingCount,
+}: {
+  role: string
+  position: string | null
+  pendingCount: number
+}) {
   const pathname = usePathname()
   const isAdmin = role === 'ADMIN'
-  const employeeNav = isAdmin ? employeeNavBase : [...employeeNavBase, inboxNav]
+  const isTeamLead = position === '팀장'
+
+  const employeeNav: NavItem[] = [
+    { href: '/', label: '홈', icon: Home },
+    { href: '/attendance', label: '근태등록', icon: Clock },
+    { href: '/leave', label: '연차 사용 내역', icon: CalendarDays },
+    { href: '/approval/leave/new', label: '연차 신청', icon: FileText },
+    { href: '/approval/expense/new', label: '지출결의', icon: FileText },
+    { href: '/approval/my', label: '내 신청 내역', icon: Inbox },
+    ...(isTeamLead && !isAdmin
+      ? [{ href: '/approval/pending', label: '결재 대기', icon: ClipboardList, badge: pendingCount }]
+      : []),
+    { href: '/notices', label: '공지사항', icon: Megaphone },
+  ]
 
   return (
     <aside className="w-56 bg-white border-r border-gray-100 flex flex-col">
@@ -51,7 +59,7 @@ export default function Sidebar({ role }: { role: string }) {
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1">
-        {employeeNav.map(({ href, label, icon: Icon }) => (
+        {employeeNav.map(({ href, label, icon: Icon, badge }) => (
           <Link
             key={href}
             href={href}
@@ -63,16 +71,19 @@ export default function Sidebar({ role }: { role: string }) {
             )}
           >
             <Icon size={16} />
-            {label}
+            <span className="flex-1">{label}</span>
+            {badge != null && badge > 0 && (
+              <span className="text-xs bg-red-500 text-white rounded-full px-1.5 py-0.5 leading-none min-w-[18px] text-center">
+                {badge}
+              </span>
+            )}
           </Link>
         ))}
 
         {isAdmin && (
           <>
             <div className="pt-3 pb-1 px-3">
-              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">
-                관리자
-              </span>
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">관리자</span>
             </div>
             {adminNav.map(({ href, label, icon: Icon }) => (
               <Link

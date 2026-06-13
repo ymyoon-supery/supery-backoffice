@@ -25,7 +25,7 @@ export default async function AdminLayout({
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <Sidebar role={employee.role} />
+      <Sidebar role={employee.role} position={null} pendingCount={0} />
       <div className="flex flex-col flex-1 overflow-hidden">
         <Header employee={employee} />
         <main className="flex-1 overflow-y-auto p-6">{children}</main>
