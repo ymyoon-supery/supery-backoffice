@@ -87,12 +87,14 @@ export default function ExpenseForm({ employeeId, employeeName, employeePosition
     const supabase = createClient()
     const urls: string[] = []
     for (const file of files) {
-      const path = `${employeeId}/${Date.now()}_${file.name}`
+      const ext = file.name.split('.').pop()
+      const safeName = `${Date.now()}.${ext}`
+      const path = `${employeeId}/${safeName}`
       const { error } = await supabase.storage
         .from('receipts')
         .upload(path, file, { upsert: false })
       if (error) {
-        toast.error(`파일 업로드 실패: ${file.name}`)
+        toast.error(`파일 업로드 실패: ${error.message}`)
         return []
       }
       const { data } = supabase.storage.from('receipts').getPublicUrl(path)
