@@ -21,6 +21,28 @@ export async function fullApproveExpense(reportId: string) {
   return { error: null }
 }
 
+export async function fullRejectLeave(requestId: string, comment?: string) {
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('admin_full_reject_leave', {
+    p_request_id: requestId,
+    p_comment: comment ?? null,
+  })
+  if (error) return { error: error.message }
+  revalidateTag(CACHE_TAGS.approvalInbox)
+  return { error: null }
+}
+
+export async function fullRejectExpense(reportId: string, comment?: string) {
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('admin_full_reject_expense', {
+    p_report_id: reportId,
+    p_comment: comment ?? null,
+  })
+  if (error) return { error: error.message }
+  revalidateTag(CACHE_TAGS.approvalInbox)
+  return { error: null }
+}
+
 export async function updateExpensePaymentStatus(
   reportId: string,
   paymentStatus: 'PENDING_PAYMENT' | 'PAID' | 'SETTLED',

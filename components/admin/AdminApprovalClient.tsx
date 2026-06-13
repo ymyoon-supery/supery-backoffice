@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { AlertCircle, ChevronLeft, ChevronRight, ArrowUpDown, ChevronDown } from 'lucide-react'
 import { approveLeave } from '@/app/(dashboard)/approval/leave/actions'
 import { approveExpense } from '@/app/(dashboard)/approval/expense/actions'
-import { approveHomeLocationRequest, updateExpensePaymentStatus, fullApproveLeave, fullApproveExpense } from '@/app/(admin)/admin/approval/actions'
+import { approveHomeLocationRequest, updateExpensePaymentStatus, fullApproveLeave, fullApproveExpense, fullRejectLeave, fullRejectExpense } from '@/app/(admin)/admin/approval/actions'
 import type { ApprovalItem } from '@/app/(admin)/admin/approval/page'
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
@@ -123,7 +123,21 @@ export default function AdminApprovalClient({
     })
   }
 
+  function handleFullReject(item: ApprovalItem) {
+    startTransition(async () => {
+      const res = item.kind === 'leave'
+        ? await fullRejectLeave(item.requestId, rejectReason || undefined)
+        : await fullRejectExpense(item.requestId, rejectReason || undefined)
+      if (res.error) { toast.error(res.error); return }
+      toast.success('반려되었습니다.')
+      setRejectingId(null)
+      setRejectReason('')
+      router.refresh()
+    })
+  }
+
   const pageNums = getPageNums(page, totalPages)
+  const allItems = [...fullApproveItems, ...items]
 
   return (
     <div className="space-y-4 max-w-5xl">
@@ -150,7 +164,6 @@ export default function AdminApprovalClient({
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
-        {/* Type */}
         <div className="flex border border-gray-200 rounded-lg overflow-hidden text-xs">
           {[['all', '전체'], ['leave', '연차'], ['expense', '지결서'], ['home_location', '재택변경']].map(([k, l]) => (
             <button key={k} onClick={() => nav({ type: k, page: '1' })}
@@ -160,7 +173,6 @@ export default function AdminApprovalClient({
           ))}
         </div>
 
-        {/* Period */}
         <div className="flex border border-gray-200 rounded-lg overflow-hidden text-xs">
           {[['all', '전체'], ['day', '일간'], ['week', '주간'], ['month', '월간']].map(([k, l]) => (
             <button key={k} onClick={() => nav({ period: k, page: '1' })}
@@ -170,7 +182,6 @@ export default function AdminApprovalClient({
           ))}
         </div>
 
-        {/* Sort */}
         <button onClick={() => nav({ sort: sort === 'desc' ? 'asc' : 'desc', page: '1' })}
           className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50 transition-colors">
           <ArrowUpDown size={12} />
@@ -182,165 +193,6 @@ export default function AdminApprovalClient({
         )}
       </div>
 
-      {/* 전결 대기 섹션 */}
-      {tab === 'pending' && fullApproveItems.length > 0 && (
-        <div className="bg-white rounded-xl border border-orange-200 overflow-hidden">
-          <div className="px-4 py-2.5 bg-orange-50 border-b border-orange-200 flex items-center gap-2">
-            <span className="text-xs font-semibold text-orange-700">전결 가능</span>
-            <span className="text-xs text-orange-500">팀장 결재 대기 중 — 관리자가 직접 승인할 수 있습니다</span>
-            <span className="ml-auto text-xs font-medium text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full">{fullApproveItems.length}건</span>
-          </div>
-          <table className="w-full text-sm table-fixed">
-            <thead>
-              <tr className="border-b border-orange-100 text-xs text-gray-400 font-medium text-left bg-orange-50/30">
-                <th className="px-4 py-2.5 w-[130px]">신청자</th>
-                <th className="px-4 py-2.5 w-[150px]">유형</th>
-                <th className="px-4 py-2.5">내용</th>
-                <th className="px-4 py-2.5 w-[120px]">팀장</th>
-                <th className="px-4 py-2.5 w-[100px] text-right">전결</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-orange-50">
-              {fullApproveItems.map(item => (
-                <Fragment key={item.stepId}>
-                  <tr
-                    className="cursor-pointer hover:bg-orange-50/30"
-                    onClick={() => setExpandedId(expandedId === item.stepId ? null : item.stepId)}
-                  >
-                    <td className="px-4 py-3 font-medium text-gray-900">{item.employeeName}</td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        item.kind === 'leave' ? 'bg-blue-50 text-blue-600' : 'bg-violet-50 text-violet-600'
-                      }`}>
-                        {item.kind === 'leave' ? `연차 · ${item.typeLabel}` : `지결서 · ${item.typeLabel}`}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-gray-600 truncate">{item.detail}</td>
-                    <td className="px-4 py-3 text-xs text-gray-500">{item.managerName ?? '—'} 결재 대기중</td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleFullApprove(item) }}
-                        disabled={isPending}
-                        className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 transition-colors"
-                      >
-                        전결
-                      </button>
-                    </td>
-                  </tr>
-                  {expandedId === item.stepId && item.kind !== 'home_location' && (
-                    <tr className="bg-orange-50/40 border-l-[3px] border-l-orange-200">
-                      <td colSpan={5} className="px-6 py-4">
-                        {item.kind === 'leave' && (
-                          <div className="space-y-3 text-sm">
-                            <div className="flex items-center gap-6">
-                              <div>
-                                <span className="text-gray-400 text-xs">부여 연차</span>
-                                <p className="font-semibold text-gray-900 mt-0.5">
-                                  {item.totalLeaves != null ? `${item.totalLeaves}일` : '—'}
-                                </p>
-                              </div>
-                              <div>
-                                <span className="text-gray-400 text-xs">잔여 연차</span>
-                                <p className="font-semibold text-gray-900 mt-0.5">
-                                  {item.remainingLeaves != null ? `${item.remainingLeaves}일` : '—'}
-                                </p>
-                              </div>
-                              <div>
-                                <span className="text-gray-400 text-xs">유형</span>
-                                <p className="font-medium text-gray-900 mt-0.5">{item.typeLabel}</p>
-                              </div>
-                              <div>
-                                <span className="text-gray-400 text-xs">기간</span>
-                                <p className="font-medium text-gray-900 mt-0.5">{item.detail.split(' · ').slice(1).join(' · ')}</p>
-                              </div>
-                              <div>
-                                <span className="text-gray-400 text-xs">사용 일수</span>
-                                <p className="font-medium text-gray-900 mt-0.5">{item.detail.split(' · ')[0]}</p>
-                              </div>
-                            </div>
-                            {item.reason && (
-                              <div>
-                                <span className="text-gray-400 text-xs">사유</span>
-                                <p className="text-gray-700 mt-0.5">{item.reason}</p>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        {item.kind === 'expense' && (
-                          <div className="space-y-4 text-sm">
-                            <div className="flex items-center gap-6">
-                              <div>
-                                <span className="text-gray-400 text-xs">수취인</span>
-                                <p className="font-medium text-gray-900 mt-0.5">{item.payee ?? '—'}</p>
-                              </div>
-                              <div>
-                                <span className="text-gray-400 text-xs">결제방식</span>
-                                <p className="font-medium text-gray-900 mt-0.5">
-                                  {item.paymentMethod ? PAYMENT_METHOD_LABELS[item.paymentMethod] ?? item.paymentMethod : '—'}
-                                </p>
-                              </div>
-                              {item.paymentMethod === 'TRANSFER' && (
-                                <div>
-                                  <span className="text-gray-400 text-xs">계좌</span>
-                                  <p className="font-medium text-gray-900 mt-0.5">
-                                    {[item.bankName, item.accountNumber, item.accountHolder].filter(Boolean).join(' · ') || '—'}
-                                  </p>
-                                </div>
-                              )}
-                              <div>
-                                <span className="text-gray-400 text-xs">지급요청일</span>
-                                <p className="font-medium text-gray-900 mt-0.5">{item.paymentRequestDate ?? '—'}</p>
-                              </div>
-                            </div>
-                            {item.lineItems && item.lineItems.length > 0 && (
-                              <div>
-                                <span className="text-gray-400 text-xs block mb-1.5">지출 내역</span>
-                                <table className="w-full max-w-lg text-xs border border-gray-200 rounded-lg overflow-hidden">
-                                  <thead>
-                                    <tr className="bg-gray-100 text-gray-500">
-                                      <th className="px-3 py-2 text-left font-medium">항목</th>
-                                      <th className="px-3 py-2 text-left font-medium">날짜</th>
-                                      <th className="px-3 py-2 text-right font-medium">수량</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-gray-100 bg-white">
-                                    {item.lineItems.map((li, i) => (
-                                      <tr key={i}>
-                                        <td className="px-3 py-2 text-gray-700">{li.item}</td>
-                                        <td className="px-3 py-2 text-gray-500">{li.date}</td>
-                                        <td className="px-3 py-2 text-right text-gray-700">{li.count}</td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            )}
-                            {item.attachmentUrls && item.attachmentUrls.length > 0 && (
-                              <div>
-                                <span className="text-gray-400 text-xs block mb-1.5">첨부파일</span>
-                                <div className="flex flex-wrap gap-2">
-                                  {item.attachmentUrls.map((url, i) => (
-                                    <a key={i} href={url} target="_blank" rel="noreferrer"
-                                      className="text-xs px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-primary hover:bg-primary/5 transition-colors"
-                                      onClick={e => e.stopPropagation()}>
-                                      파일 {i + 1}
-                                    </a>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
         <table className="w-full text-sm table-fixed">
@@ -350,29 +202,37 @@ export default function AdminApprovalClient({
               <th className="px-4 py-3 w-[150px]">유형</th>
               <th className="px-4 py-3">내용</th>
               <th className="px-4 py-3 w-[120px] whitespace-nowrap">신청일시</th>
-              <th className="px-4 py-3 w-[140px] text-right">{tab === 'pending' ? '처리' : '상태'}</th>
+              <th className="px-4 py-3 w-[200px] text-right">{tab === 'pending' ? '처리' : '상태'}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {items.map(item => {
-              const isPendingRow = item.status === 'PENDING'
+            {allItems.map(item => {
+              const isFullApprove = item.managerName != null
+              const isPendingRow = item.status === 'PENDING' && !isFullApprove
               const cfg = STATUS_CFG[item.status]
 
               return (
                 <Fragment key={item.stepId}>
                   <tr
                     className={`cursor-pointer ${
-                      isPendingRow
+                      isFullApprove
+                        ? 'border-l-[3px] border-l-orange-400 bg-orange-50/30 hover:bg-orange-50/60'
+                        : isPendingRow
                         ? 'border-l-[3px] border-l-amber-400 bg-amber-50/40 hover:bg-amber-50/70'
                         : 'hover:bg-gray-50/50'
                     }`}
                     onClick={() => setExpandedId(expandedId === item.stepId ? null : item.stepId)}
                   >
                     <td className="px-4 py-3 font-medium text-gray-900">
-                      {isPendingRow && (
+                      {isFullApprove ? (
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-orange-500 mr-2 mb-px align-middle" />
+                      ) : isPendingRow ? (
                         <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 mr-2 mb-px align-middle" />
-                      )}
+                      ) : null}
                       {item.employeeName}
+                      {isFullApprove && item.managerName && (
+                        <p className="text-xs text-orange-500 mt-0.5 font-normal">{item.managerName} 결재 대기중</p>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -398,7 +258,24 @@ export default function AdminApprovalClient({
                         : '—'}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {isPendingRow ? (
+                      {isFullApprove ? (
+                        rejectingId !== item.stepId && (
+                          <div className="flex gap-1.5 justify-end items-center flex-wrap">
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium whitespace-nowrap">
+                              팀장결재대기
+                            </span>
+                            <button onClick={(e) => { e.stopPropagation(); handleFullApprove(item) }} disabled={isPending}
+                              className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 transition-colors">
+                              전결
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); setRejectingId(item.stepId); setRejectReason('') }}
+                              disabled={isPending}
+                              className="px-3 py-1.5 text-xs font-medium border border-red-200 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors">
+                              반려
+                            </button>
+                          </div>
+                        )
+                      ) : isPendingRow ? (
                         rejectingId !== item.stepId && (
                           <div className="flex gap-1.5 justify-end">
                             <button onClick={(e) => { e.stopPropagation(); handleApprove(item) }} disabled={isPending}
@@ -454,7 +331,10 @@ export default function AdminApprovalClient({
 
                   {/* Detail expansion */}
                   {expandedId === item.stepId && item.kind !== 'home_location' && (
-                    <tr className="bg-gray-50/60 border-l-[3px] border-l-gray-200">
+                    <tr className={isFullApprove
+                      ? 'bg-orange-50/40 border-l-[3px] border-l-orange-200'
+                      : 'bg-gray-50/60 border-l-[3px] border-l-gray-200'
+                    }>
                       <td colSpan={5} className="px-6 py-4">
                         {item.kind === 'leave' && (
                           <div className="space-y-3 text-sm">
@@ -570,12 +450,12 @@ export default function AdminApprovalClient({
                             type="text"
                             value={rejectReason}
                             onChange={e => setRejectReason(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && handleReject(item)}
+                            onKeyDown={e => e.key === 'Enter' && (isFullApprove ? handleFullReject(item) : handleReject(item))}
                             placeholder="반려 사유 (선택)"
                             autoFocus
                             className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-red-200"
                           />
-                          <button onClick={() => handleReject(item)} disabled={isPending}
+                          <button onClick={() => isFullApprove ? handleFullReject(item) : handleReject(item)} disabled={isPending}
                             className="px-3 py-1.5 text-xs font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 whitespace-nowrap">
                             반려 확인
                           </button>
@@ -591,7 +471,7 @@ export default function AdminApprovalClient({
               )
             })}
 
-            {items.length === 0 && (
+            {allItems.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-14 text-center text-sm text-gray-400">
                   {tab === 'pending' ? '미결재 항목이 없습니다.' : '결재 내역이 없습니다.'}
