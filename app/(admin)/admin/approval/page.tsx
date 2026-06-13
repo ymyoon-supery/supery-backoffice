@@ -27,6 +27,7 @@ export type ApprovalItem = {
   managerName?: string
   // leave detail
   reason?: string | null
+  totalLeaves?: number | null
   remainingLeaves?: number | null
   // expense detail
   lineItems?: Array<{ item: string; date: string; count: number }> | null
@@ -95,7 +96,7 @@ export default async function AdminApprovalPage({
         id, status, comment,
         leave_requests (
           id, leave_type, start_date, end_date, days_used, reason, created_at,
-          employees ( name, remaining_leaves )
+          employees ( name, annual_leave_days, remaining_leaves )
         )
       `)
       .eq('approver_id', employee.id)
@@ -117,6 +118,7 @@ export default async function AdminApprovalPage({
         status:          s.status,
         comment:         s.comment,
         reason:          req.reason ?? null,
+        totalLeaves:     req.employees?.annual_leave_days ?? null,
         remainingLeaves: req.employees?.remaining_leaves ?? null,
       }]
     })

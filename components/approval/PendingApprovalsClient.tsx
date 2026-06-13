@@ -82,6 +82,12 @@ export default function PendingApprovalsClient({ leaveSteps, expenseSteps, fullA
                 <div className="bg-gray-50 rounded-lg px-4 py-3 space-y-2 text-sm">
                   <div className="flex items-center gap-6">
                     <div>
+                      <span className="text-xs text-gray-400">부여 연차</span>
+                      <p className="font-semibold text-gray-900 mt-0.5">
+                        {req.employees?.annual_leave_days != null ? `${req.employees.annual_leave_days}일` : '—'}
+                      </p>
+                    </div>
+                    <div>
                       <span className="text-xs text-gray-400">잔여 연차</span>
                       <p className="font-semibold text-gray-900 mt-0.5">
                         {req.employees?.remaining_leaves != null ? `${req.employees.remaining_leaves}일` : '—'}

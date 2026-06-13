@@ -27,7 +27,7 @@ export default async function PendingApprovalsPage() {
         id, step_order, status,
         leave_requests (
           id, leave_type, start_date, end_date, days_used, reason, status, created_at,
-          employees ( name, email, department_id, remaining_leaves )
+          employees ( name, email, department_id, annual_leave_days, remaining_leaves )
         )
       `)
       .eq('approver_id', employee.id)

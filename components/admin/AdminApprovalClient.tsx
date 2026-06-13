@@ -348,6 +348,12 @@ export default function AdminApprovalClient({
                           <div className="space-y-3 text-sm">
                             <div className="flex items-center gap-6">
                               <div>
+                                <span className="text-gray-400 text-xs">부여 연차</span>
+                                <p className="font-semibold text-gray-900 mt-0.5">
+                                  {item.totalLeaves != null ? `${item.totalLeaves}일` : '—'}
+                                </p>
+                              </div>
+                              <div>
                                 <span className="text-gray-400 text-xs">잔여 연차</span>
                                 <p className="font-semibold text-gray-900 mt-0.5">
                                   {item.remainingLeaves != null ? `${item.remainingLeaves}일` : '—'}
