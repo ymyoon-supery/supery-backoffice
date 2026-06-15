@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { Toaster } from 'sonner'
 import ReactQueryProvider from '@/components/providers/ReactQueryProvider'
+import NextTopLoader from 'nextjs-toploader'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -19,6 +20,7 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body className={inter.className}>
+        <NextTopLoader color="#6366f1" showSpinner={false} height={3} />
         <ReactQueryProvider>
           {children}
           <Toaster richColors position="top-right" />
