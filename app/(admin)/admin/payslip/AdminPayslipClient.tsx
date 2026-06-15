@@ -143,7 +143,7 @@ export default function AdminPayslipClient({ employees }: { employees: Employee[
         <button
           type="button"
           onClick={handleUpload}
-          disabled={uploading}
+          disabled={uploading || !selectedEmployeeId || !yearMonth || !file}
           className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
         >
           {uploading ? '업로드 중...' : '업로드'}

@@ -51,12 +51,11 @@ export default async function PayslipPage() {
               </div>
               <a
                 href={slip.file_url}
-                download={slip.file_name ?? `${slip.year_month}_급여명세서.pdf`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary/90 transition-colors"
               >
-                다운로드
+                보기
               </a>
             </div>
           ))}
