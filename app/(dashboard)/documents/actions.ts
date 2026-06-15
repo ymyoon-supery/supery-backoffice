@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { revalidatePath } from 'next/cache'
 
 export async function submitDocumentRequest(input: {
   docType: 'EMPLOYMENT_CERT' | 'WITHHOLDING_RECEIPT'
@@ -22,6 +23,7 @@ export async function submitDocumentRequest(input: {
     .insert({ employee_id: employee.id, doc_type: input.docType, purpose: input.purpose ?? null })
 
   if (error) return { error: error.message }
+  revalidatePath('/admin/documents')
   return { error: null }
 }
 
