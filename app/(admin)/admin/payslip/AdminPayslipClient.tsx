@@ -37,7 +37,7 @@ export default function AdminPayslipClient({ employees }: { employees: Employee[
   const fileRef = useRef<HTMLInputElement>(null)
 
   // ── 관리 탭 상태 ──
-  const [manageMonth, setManageMonth] = useState(thisMonth)
+  const [manageMonth, setManageMonth] = useState('')
   const [manageSlips, setManageSlips] = useState<PayslipRow[]>([])
   const [loadingManage, startManageList] = useTransition()
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -51,15 +51,15 @@ export default function AdminPayslipClient({ employees }: { employees: Employee[
     })
   }, [])
 
-  const refreshManageMonth = useCallback((ym: string) => {
+  const refreshManageMonth = useCallback((ym?: string) => {
     startManageList(async () => {
-      const res = await listPayslipsByMonth(ym)
+      const res = await listPayslipsByMonth(ym || undefined)
       if (res.data) setManageSlips(res.data)
     })
   }, [])
 
   useEffect(() => { refreshUploadMonth() }, [refreshUploadMonth])
-  useEffect(() => { if (tab === 'manage') refreshManageMonth(manageMonth) }, [tab, manageMonth, refreshManageMonth])
+  useEffect(() => { if (tab === 'manage') refreshManageMonth(manageMonth || undefined) }, [tab, manageMonth, refreshManageMonth])
 
   async function handleUpload() {
     if (!selectedEmployeeId || !yearMonth || !file) return
@@ -237,25 +237,34 @@ export default function AdminPayslipClient({ employees }: { employees: Employee[
       {/* ── 관리 탭 ── */}
       {tab === 'manage' && (
         <div className="space-y-4">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <input
               type="month"
               value={manageMonth}
               onChange={e => setManageMonth(e.target.value)}
               className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
-            <span className="text-sm text-gray-500">{formatYearMonth(manageMonth)} 급여명세서</span>
+            {manageMonth ? (
+              <button
+                type="button"
+                onClick={() => setManageMonth('')}
+                className="text-xs px-3 py-2 border border-gray-200 text-gray-500 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                전체 보기
+              </button>
+            ) : (
+              <span className="text-sm text-gray-400">전체 급여명세서</span>
+            )}
           </div>
 
           {loadingManage ? (
             <p className="text-sm text-gray-400 py-8 text-center">불러오는 중...</p>
           ) : manageSlips.length === 0 ? (
-            <p className="text-sm text-gray-400 py-12 text-center">해당 월에 업로드된 급여명세서가 없습니다.</p>
+            <p className="text-sm text-gray-400 py-12 text-center">업로드된 급여명세서가 없습니다.</p>
           ) : (
             <div className="space-y-2">
               {manageSlips.map(slip => (
                 <div key={slip.id} className="bg-white rounded-xl border border-gray-100 px-5 py-3.5 flex items-center justify-between gap-4">
-                  {/* Hidden file input for replace */}
                   <input
                     type="file"
                     accept=".pdf"
@@ -264,9 +273,11 @@ export default function AdminPayslipClient({ employees }: { employees: Employee[
                     onChange={e => handleReplace(slip, e.target.files?.[0] ?? null)}
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{slip.employeeLabel}</p>
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {slip.employeeName} — {formatYearMonth(slip.yearMonth)} 급여명세서
+                    </p>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      {slip.fileName ?? '급여명세서.pdf'} · {new Date(slip.createdAt).toLocaleDateString('ko-KR')}
+                      {slip.employeeLabel} · {new Date(slip.createdAt).toLocaleDateString('ko-KR')} 업로드
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
@@ -274,7 +285,7 @@ export default function AdminPayslipClient({ employees }: { employees: Employee[
                       className="text-xs px-2.5 py-1 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors">
                       보기
                     </a>
-                    <PayslipDownloadButton url={slip.fileUrl} fileName={slip.fileName ?? `${slip.yearMonth}_급여명세서.pdf`}
+                    <PayslipDownloadButton url={slip.fileUrl} fileName={slip.fileName ?? `${slip.yearMonth}_${slip.employeeName}_급여명세서.pdf`}
                       className="text-xs px-2.5 py-1 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors" />
                     <button
                       type="button"

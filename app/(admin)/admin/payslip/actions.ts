@@ -52,14 +52,17 @@ export interface PayslipRow {
   createdAt: string
 }
 
-export async function listPayslipsByMonth(yearMonth: string): Promise<{ error: string | null; data: PayslipRow[] | null }> {
+export async function listPayslipsByMonth(yearMonth?: string): Promise<{ error: string | null; data: PayslipRow[] | null }> {
   const admin = getAdmin()
 
-  const { data: payslips, error } = await admin
+  let query = admin
     .from('payslips')
     .select('id, employee_id, year_month, file_url, file_name, created_at')
-    .eq('year_month', yearMonth)
-    .order('created_at', { ascending: false })
+    .order('year_month', { ascending: false })
+
+  if (yearMonth) query = query.eq('year_month', yearMonth)
+
+  const { data: payslips, error } = await query
 
   if (error) return { error: error.message, data: null }
   if (!payslips || payslips.length === 0) return { error: null, data: [] }
