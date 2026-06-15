@@ -27,7 +27,15 @@ const FIXED_DAYS: Partial<Record<LeaveType, number>> = {
 
 const DEDUCTS_LEAVE = new Set<LeaveType>(['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF', 'GROUP'])
 
-export default function LeaveForm({ remainingLeaves }: { remainingLeaves: number }) {
+const DAY_KO = ['일', '월', '화', '수', '목', '금', '토']
+
+function getDayLabel(dateStr: string): string {
+  if (!dateStr) return ''
+  const d = new Date(dateStr + 'T00:00:00')
+  return DAY_KO[d.getDay()] + '요일'
+}
+
+export default function LeaveForm({ remainingLeaves, annualLeaveDays }: { remainingLeaves: number; annualLeaveDays: number }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [leaveType, setLeaveType] = useState<LeaveType>('ANNUAL')
@@ -70,9 +78,16 @@ export default function LeaveForm({ remainingLeaves }: { remainingLeaves: number
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-6 space-y-5">
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-gray-500">잔여 연차</span>
-        <span className="font-semibold text-gray-900">{remainingLeaves}일</span>
+      <div className="flex items-center justify-between gap-3 bg-gray-50 rounded-lg px-4 py-3">
+        <div className="text-center flex-1">
+          <p className="text-xs text-gray-400 mb-0.5">보유 연차</p>
+          <p className="text-base font-semibold text-gray-900">{annualLeaveDays}일</p>
+        </div>
+        <div className="w-px h-8 bg-gray-200" />
+        <div className="text-center flex-1">
+          <p className="text-xs text-gray-400 mb-0.5">잔여 연차</p>
+          <p className={`text-base font-semibold ${remainingLeaves <= 0 ? 'text-red-500' : 'text-primary'}`}>{remainingLeaves}일</p>
+        </div>
       </div>
 
       {/* 휴가 유형 */}
@@ -120,7 +135,9 @@ export default function LeaveForm({ remainingLeaves }: { remainingLeaves: number
       {/* 날짜 */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
-          <label className="text-sm font-medium text-gray-700">시작일</label>
+          <label className="text-sm font-medium text-gray-700">
+            시작일{startDate && <span className="ml-1 text-xs font-normal text-primary">({getDayLabel(startDate)})</span>}
+          </label>
           <input
             type="date"
             value={startDate}
@@ -131,7 +148,9 @@ export default function LeaveForm({ remainingLeaves }: { remainingLeaves: number
         </div>
         {!isHalfDay && (
           <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">종료일</label>
+            <label className="text-sm font-medium text-gray-700">
+              종료일{endDate && <span className="ml-1 text-xs font-normal text-primary">({getDayLabel(endDate)})</span>}
+            </label>
             <input
               type="date"
               value={endDate}

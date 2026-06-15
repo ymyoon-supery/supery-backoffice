@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 
 export async function submitDocumentRequest(input: {
   docType: 'EMPLOYMENT_CERT' | 'WITHHOLDING_RECEIPT'
+  purpose?: string | null
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -18,7 +19,7 @@ export async function submitDocumentRequest(input: {
 
   const { error } = await supabase
     .from('document_requests')
-    .insert({ employee_id: employee.id, doc_type: input.docType })
+    .insert({ employee_id: employee.id, doc_type: input.docType, purpose: input.purpose ?? null })
 
   if (error) return { error: error.message }
   return { error: null }
@@ -48,7 +49,7 @@ export async function submitSupplyRequest(input: {
   }))
 
   const { error } = await supabase.rpc('submit_supply_request', {
-    p_items: JSON.stringify(pItems),
+    p_items: pItems,
   })
 
   if (error) return { error: error.message }

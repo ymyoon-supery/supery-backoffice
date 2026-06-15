@@ -25,6 +25,11 @@ function emptyItem(): SupplyItem {
   return { category: 'EQUIPMENT', description: '', estimatedAmount: '', note: '' }
 }
 
+function formatKRWInput(value: string) {
+  const n = value.replace(/[^0-9]/g, '')
+  return n ? Number(n).toLocaleString('ko-KR') : ''
+}
+
 interface Props {
   employeeId: string
   employeeName: string
@@ -41,6 +46,8 @@ export default function DocumentRequestClient({
   const [tab, setTab] = useState<Tab>('EMPLOYMENT_CERT')
   const [items, setItems] = useState<SupplyItem[]>([emptyItem()])
   const [isPending, startTransition] = useTransition()
+  const [employmentPurpose, setEmploymentPurpose] = useState('')
+  const [withholdingPurpose, setWithholdingPurpose] = useState('')
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'EMPLOYMENT_CERT', label: '재직증명서' },
@@ -48,11 +55,15 @@ export default function DocumentRequestClient({
     { key: 'SUPPLY', label: '비품/소모품 신청' },
   ]
 
-  function handleDocSubmit(docType: 'EMPLOYMENT_CERT' | 'WITHHOLDING_RECEIPT') {
+  function handleDocSubmit(docType: 'EMPLOYMENT_CERT' | 'WITHHOLDING_RECEIPT', purpose: string) {
+    const label = docType === 'EMPLOYMENT_CERT' ? '재직증명서' : '원천징수영수증'
+    if (!confirm(`${label} 발급을 관리자에게 신청하시겠습니까?`)) return
     startTransition(async () => {
-      const res = await submitDocumentRequest({ docType })
+      const res = await submitDocumentRequest({ docType, purpose: purpose.trim() || null })
       if (res.error) { toast.error(res.error); return }
       toast.success('신청이 접수되었습니다.')
+      if (docType === 'EMPLOYMENT_CERT') setEmploymentPurpose('')
+      else setWithholdingPurpose('')
     })
   }
 
@@ -72,6 +83,7 @@ export default function DocumentRequestClient({
   function handleSupplySubmit() {
     const valid = items.every(it => it.description.trim())
     if (!valid) { toast.error('내역을 모두 입력해주세요.'); return }
+    if (!confirm('비품/소모품 신청을 관리자에게 제출하시겠습니까?')) return
 
     startTransition(async () => {
       const res = await submitSupplyRequest({
@@ -124,9 +136,19 @@ export default function DocumentRequestClient({
               {[departmentName, employeePosition, employeeName].filter(Boolean).join(' · ')}
             </p>
           </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-gray-700">서류 용도 <span className="text-xs font-normal text-gray-400">(선택)</span></label>
+            <input
+              type="text"
+              value={employmentPurpose}
+              onChange={e => setEmploymentPurpose(e.target.value)}
+              placeholder="예: 은행 제출용, 임대차 계약용"
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
           <button
             type="button"
-            onClick={() => handleDocSubmit('EMPLOYMENT_CERT')}
+            onClick={() => handleDocSubmit('EMPLOYMENT_CERT', employmentPurpose)}
             disabled={isPending}
             className="w-full py-2.5 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
           >
@@ -150,9 +172,19 @@ export default function DocumentRequestClient({
               {[departmentName, employeePosition, employeeName].filter(Boolean).join(' · ')}
             </p>
           </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-gray-700">서류 용도 <span className="text-xs font-normal text-gray-400">(선택)</span></label>
+            <input
+              type="text"
+              value={withholdingPurpose}
+              onChange={e => setWithholdingPurpose(e.target.value)}
+              placeholder="예: 연말정산용, 대출 신청용"
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
           <button
             type="button"
-            onClick={() => handleDocSubmit('WITHHOLDING_RECEIPT')}
+            onClick={() => handleDocSubmit('WITHHOLDING_RECEIPT', withholdingPurpose)}
             disabled={isPending}
             className="w-full py-2.5 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
           >
@@ -195,10 +227,11 @@ export default function DocumentRequestClient({
                 />
                 <input
                   type="text"
+                  inputMode="numeric"
                   value={item.estimatedAmount}
-                  onChange={e => updateItem(idx, 'estimatedAmount', e.target.value.replace(/[^0-9]/g, ''))}
-                  placeholder="금액(원)"
-                  className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  onChange={e => updateItem(idx, 'estimatedAmount', formatKRWInput(e.target.value))}
+                  placeholder="0"
+                  className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30 text-right"
                 />
                 <input
                   type="text"

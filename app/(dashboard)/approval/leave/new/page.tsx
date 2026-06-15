@@ -9,7 +9,7 @@ export default async function NewLeavePage() {
 
   const { data: employee } = await supabase
     .from('employees')
-    .select('id, remaining_leaves')
+    .select('id, remaining_leaves, annual_leave_days')
     .eq('auth_user_id', user.id)
     .single()
 
@@ -18,7 +18,7 @@ export default async function NewLeavePage() {
   return (
     <div className="max-w-lg">
       <h1 className="text-xl font-semibold text-gray-900 mb-6">연차 신청</h1>
-      <LeaveForm remainingLeaves={employee.remaining_leaves} />
+      <LeaveForm remainingLeaves={employee.remaining_leaves} annualLeaveDays={employee.annual_leave_days} />
     </div>
   )
 }

@@ -14,15 +14,23 @@ export default async function MyRequestsPage() {
 
   const { data: employee } = await supabase
     .from('employees')
-    .select('id, name, position, department_id, departments ( name )')
+    .select('id, name, position, department_id')
     .eq('auth_user_id', user.id)
     .single()
   if (!employee) redirect('/login')
 
-  const emp = employee as any
-  const employeeName = emp.name ?? ''
-  const employeePosition = emp.position ?? null
-  const departmentName = emp.departments?.name ?? null
+  const employeeName = employee.name ?? ''
+  const employeePosition = employee.position ?? null
+
+  let departmentName: string | null = null
+  if (employee.department_id) {
+    const { data: dept } = await supabase
+      .from('departments')
+      .select('name')
+      .eq('id', employee.department_id)
+      .single()
+    departmentName = dept?.name ?? null
+  }
 
   const [
     { data: myLeave },
