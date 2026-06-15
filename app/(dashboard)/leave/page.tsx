@@ -33,6 +33,7 @@ export default async function LeavePage() {
       .from('leave_requests')
       .select('id, leave_type, start_date, end_date, days_used, reason, status, created_at, leave_approval_steps(comment, status)')
       .eq('employee_id', employee.id)
+      .in('status', ['PENDING', 'APPROVED'])
       .order('start_date', { ascending: false }),
     supabase
       .from('leave_requests')

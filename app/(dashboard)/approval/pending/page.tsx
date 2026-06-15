@@ -57,7 +57,7 @@ export default async function PendingApprovalsPage() {
               payee, payment_method, bank_name, account_number, account_holder,
               payment_request_date, settlement_date, line_items, attachment_urls,
               tax_type, evidence_type,
-              employees ( name, email, position, departments ( name ) )
+              employees ( name, email, position )
             )
           `)
           .eq('approver_id', employee.id)
@@ -99,14 +99,14 @@ export default async function PendingApprovalsPage() {
           .limit(10)
       : Promise.resolve({ data: [] as unknown[] }),
 
-    isSupplyManager
+    isTeamLead || isSupplyManager
       ? supabase
           .from('supply_approval_steps')
           .select(`
             id, step_order, status,
             supply_requests (
               id, status, created_at,
-              employees ( name, position, departments ( name ) ),
+              employees ( name, position ),
               supply_request_items ( id, category, description, estimated_amount, note, sort_order )
             )
           `)
