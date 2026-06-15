@@ -161,25 +161,34 @@ export default function Sidebar({
           </div>
         ))}
 
-        {isAdmin && adminNavGroups.map(group => (
-          <div key={group.label}>
-            <div className="pt-3 pb-1 px-3">
-              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">{group.label}</span>
+        {isAdmin && (
+          <div className="mt-3 -mx-3 border-t border-gray-200">
+            <div className="px-4 pt-3 pb-2 flex items-center gap-2">
+              <span className="text-[10px] font-semibold text-white bg-primary/80 rounded px-1.5 py-0.5 tracking-widest uppercase">Admin</span>
             </div>
-            {group.items.map(({ href, label, icon: Icon }) => (
-              <Link
-                key={href}
-                href={href}
-                onClick={() => setPendingHref(href)}
-                className={linkClass(href, false)}
-              >
-                <Icon size={16} />
-                <span className="flex-1">{label}</span>
-                {pendingHref === href && <Loader2 size={12} className="animate-spin text-primary" />}
-              </Link>
-            ))}
+            <div className="px-3 space-y-1 pb-2 bg-gray-50/60">
+              {adminNavGroups.map(group => (
+                <div key={group.label}>
+                  <div className="pt-2 pb-1 px-3">
+                    <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">{group.label}</span>
+                  </div>
+                  {group.items.map(({ href, label, icon: Icon }) => (
+                    <Link
+                      key={href}
+                      href={href}
+                      onClick={() => setPendingHref(href)}
+                      className={linkClass(href, false)}
+                    >
+                      <Icon size={16} />
+                      <span className="flex-1">{label}</span>
+                      {pendingHref === href && <Loader2 size={12} className="animate-spin text-primary" />}
+                    </Link>
+                  ))}
+                </div>
+              ))}
+            </div>
           </div>
-        ))}
+        )}
       </nav>
     </aside>
   )
