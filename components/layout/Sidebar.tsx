@@ -2,10 +2,11 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import {
   Clock, FileText, BarChart2, Users, ClipboardList, Home,
   Bell, FilePlus, CalendarDays, Settings, Megaphone, Inbox,
-  Receipt, Package,
+  Receipt, Package, Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -39,8 +40,24 @@ export default function Sidebar({
   pendingCount: number
 }) {
   const pathname = usePathname()
+  const [pendingHref, setPendingHref] = useState<string | null>(null)
   const isAdmin = role === 'ADMIN'
   const isTeamLead = position === '팀장'
+
+  // 페이지 이동 완료 시 pending 초기화
+  useEffect(() => {
+    setPendingHref(null)
+  }, [pathname])
+
+  function linkClass(href: string, exact = false) {
+    const active = pendingHref !== null
+      ? pendingHref === href
+      : exact ? pathname === href : pathname.startsWith(href)
+    return cn(
+      'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
+      active ? 'bg-primary/10 text-primary font-medium' : 'text-gray-600 hover:bg-gray-50',
+    )
+  }
 
   const employeeNav: NavItem[] = [
     { href: '/', label: '홈', icon: Home },
@@ -68,20 +85,17 @@ export default function Sidebar({
           <Link
             key={href}
             href={href}
-            className={cn(
-              'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
-              pathname === href
-                ? 'bg-primary/10 text-primary font-medium'
-                : 'text-gray-600 hover:bg-gray-50',
-            )}
+            onClick={() => setPendingHref(href)}
+            className={linkClass(href, true)}
           >
             <Icon size={16} />
             <span className="flex-1">{label}</span>
-            {badge != null && badge > 0 && (
-              <span className="text-xs bg-red-500 text-white rounded-full px-1.5 py-0.5 leading-none min-w-[18px] text-center">
-                {badge}
-              </span>
-            )}
+            {pendingHref === href
+              ? <Loader2 size={12} className="animate-spin text-primary" />
+              : badge != null && badge > 0
+                ? <span className="text-xs bg-red-500 text-white rounded-full px-1.5 py-0.5 leading-none min-w-[18px] text-center">{badge}</span>
+                : null
+            }
           </Link>
         ))}
 
@@ -94,15 +108,12 @@ export default function Sidebar({
               <Link
                 key={href}
                 href={href}
-                className={cn(
-                  'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
-                  pathname.startsWith(href)
-                    ? 'bg-primary/10 text-primary font-medium'
-                    : 'text-gray-600 hover:bg-gray-50',
-                )}
+                onClick={() => setPendingHref(href)}
+                className={linkClass(href, false)}
               >
                 <Icon size={16} />
-                {label}
+                <span className="flex-1">{label}</span>
+                {pendingHref === href && <Loader2 size={12} className="animate-spin text-primary" />}
               </Link>
             ))}
           </>
