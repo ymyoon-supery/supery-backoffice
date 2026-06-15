@@ -89,19 +89,41 @@ export default function Sidebar({
     )
   }
 
-  const employeeNav: NavItem[] = [
-    { href: '/', label: '홈', icon: Home },
-    { href: '/attendance', label: '근태등록', icon: Clock },
-    { href: '/leave', label: '연차 사용 내역', icon: CalendarDays },
-    { href: '/approval/leave/new', label: '연차 신청', icon: FileText },
-    { href: '/approval/expense/new', label: '지출결의', icon: FileText },
-    { href: '/payslip', label: '급여명세서', icon: Receipt },
-    { href: '/documents', label: '서류/비품 신청', icon: Package },
-    { href: '/approval/my', label: '내 신청 내역', icon: Inbox },
-    ...(isTeamLead && !isAdmin
-      ? [{ href: '/approval/pending', label: '결재 대기', icon: ClipboardList, badge: pendingCount }]
-      : []),
-    { href: '/notices', label: '공지사항', icon: Megaphone },
+  const employeeNavGroups = [
+    {
+      label: null,
+      items: [{ href: '/', label: '홈', icon: Home, exact: true }],
+    },
+    {
+      label: '근태',
+      items: [{ href: '/attendance', label: '근태등록', icon: Clock, exact: false }],
+    },
+    {
+      label: '연차',
+      items: [
+        { href: '/leave', label: '연차 사용 내역', icon: CalendarDays, exact: false },
+        { href: '/approval/leave/new', label: '연차 신청', icon: FileText, exact: true },
+      ],
+    },
+    {
+      label: '신청/결재',
+      items: [
+        { href: '/approval/expense/new', label: '지출결의', icon: FileText, exact: true },
+        { href: '/documents', label: '서류/비품 신청', icon: Package, exact: false },
+        { href: '/approval/my', label: '내 신청 내역', icon: Inbox, exact: false },
+        ...(isTeamLead && !isAdmin
+          ? [{ href: '/approval/pending', label: '결재 대기', icon: ClipboardList, exact: false, badge: pendingCount }]
+          : []),
+      ],
+    },
+    {
+      label: '급여',
+      items: [{ href: '/payslip', label: '급여명세서', icon: Receipt, exact: false }],
+    },
+    {
+      label: '공지',
+      items: [{ href: '/notices', label: '공지사항', icon: Megaphone, exact: false }],
+    },
   ]
 
   return (
@@ -110,23 +132,32 @@ export default function Sidebar({
         <span className="font-bold text-gray-900 text-sm">WorkSync</span>
       </div>
 
-      <nav className="flex-1 px-3 py-4 space-y-1">
-        {employeeNav.map(({ href, label, icon: Icon, badge }) => (
-          <Link
-            key={href}
-            href={href}
-            onClick={() => setPendingHref(href)}
-            className={linkClass(href, true)}
-          >
-            <Icon size={16} />
-            <span className="flex-1">{label}</span>
-            {pendingHref === href
-              ? <Loader2 size={12} className="animate-spin text-primary" />
-              : badge != null && badge > 0
-                ? <span className="text-xs bg-red-500 text-white rounded-full px-1.5 py-0.5 leading-none min-w-[18px] text-center">{badge}</span>
-                : null
-            }
-          </Link>
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        {employeeNavGroups.map((group, gi) => (
+          <div key={gi}>
+            {group.label && (
+              <div className="pt-3 pb-1 px-3">
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">{group.label}</span>
+              </div>
+            )}
+            {group.items.map(({ href, label, icon: Icon, exact, badge }) => (
+              <Link
+                key={href}
+                href={href}
+                onClick={() => setPendingHref(href)}
+                className={linkClass(href, exact)}
+              >
+                <Icon size={16} />
+                <span className="flex-1">{label}</span>
+                {pendingHref === href
+                  ? <Loader2 size={12} className="animate-spin text-primary" />
+                  : badge != null && badge > 0
+                    ? <span className="text-xs bg-red-500 text-white rounded-full px-1.5 py-0.5 leading-none min-w-[18px] text-center">{badge}</span>
+                    : null
+                }
+              </Link>
+            ))}
+          </div>
         ))}
 
         {isAdmin && adminNavGroups.map(group => (
