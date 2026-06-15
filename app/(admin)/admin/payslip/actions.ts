@@ -41,29 +41,65 @@ export async function uploadPayslip(input: {
   return { error: null }
 }
 
-export async function listAllPayslips() {
+export interface PayslipRow {
+  id: string
+  employeeId: string
+  employeeName: string
+  employeeLabel: string
+  yearMonth: string
+  fileUrl: string
+  fileName: string | null
+  createdAt: string
+}
+
+export async function listPayslipsByMonth(yearMonth: string): Promise<{ error: string | null; data: PayslipRow[] | null }> {
   const admin = getAdmin()
 
-  const { data, error } = await admin
+  const { data: payslips, error } = await admin
     .from('payslips')
-    .select(`
-      id, year_month, file_url, file_name, created_at,
-      employees ( name )
-    `)
+    .select('id, employee_id, year_month, file_url, file_name, created_at')
+    .eq('year_month', yearMonth)
     .order('created_at', { ascending: false })
-    .limit(50)
 
   if (error) return { error: error.message, data: null }
+  if (!payslips || payslips.length === 0) return { error: null, data: [] }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rows = (data ?? []).map((r: any) => ({
-    id: r.id as string,
-    employee_name: r.employees?.name as string ?? '—',
-    year_month: r.year_month as string,
-    file_url: r.file_url as string,
-    file_name: r.file_name as string | null,
-    created_at: r.created_at as string,
-  }))
+  const employeeIds = [...new Set(payslips.map((p: any) => p.employee_id as string))]
+
+  const [{ data: employees }, { data: departments }] = await Promise.all([
+    admin.from('employees').select('id, name, position, department_id').in('id', employeeIds),
+    admin.from('departments').select('id, name'),
+  ])
+
+  const deptMap = Object.fromEntries((departments ?? []).map((d: any) => [d.id as string, d.name as string]))
+  const empMap = Object.fromEntries((employees ?? []).map((e: any) => [e.id as string, e]))
+
+  const rows: PayslipRow[] = (payslips as any[]).map(p => {
+    const emp = empMap[p.employee_id]
+    const deptName = emp?.department_id ? deptMap[emp.department_id] : null
+    return {
+      id: p.id as string,
+      employeeId: p.employee_id as string,
+      employeeName: emp?.name ?? '—',
+      employeeLabel: [deptName, emp?.position, emp?.name].filter(Boolean).join(' · '),
+      yearMonth: p.year_month as string,
+      fileUrl: p.file_url as string,
+      fileName: p.file_name as string | null,
+      createdAt: p.created_at as string,
+    }
+  })
 
   return { error: null, data: rows }
+}
+
+export async function deletePayslip(id: string, employeeId: string, yearMonth: string) {
+  const admin = getAdmin()
+
+  await admin.storage.from('payslips').remove([`${employeeId}/${yearMonth}.pdf`])
+
+  const { error } = await admin.from('payslips').delete().eq('id', id)
+  if (error) return { error: error.message }
+
+  revalidatePath('/admin/payslip')
+  return { error: null }
 }
