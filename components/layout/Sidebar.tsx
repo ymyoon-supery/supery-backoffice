@@ -57,6 +57,7 @@ type NavItem = {
   href: string
   label: string
   icon: React.ComponentType<{ size?: number }>
+  exact?: boolean
   badge?: number
 }
 
@@ -89,7 +90,7 @@ export default function Sidebar({
     )
   }
 
-  const employeeNavGroups = [
+  const employeeNavGroups: { label: string | null; items: NavItem[] }[] = [
     {
       label: null,
       items: [{ href: '/', label: '홈', icon: Home, exact: true }],
