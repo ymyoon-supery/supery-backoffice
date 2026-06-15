@@ -57,9 +57,10 @@ export default function DocumentRequestClient({
 
   function handleDocSubmit(docType: 'EMPLOYMENT_CERT' | 'WITHHOLDING_RECEIPT', purpose: string) {
     const label = docType === 'EMPLOYMENT_CERT' ? '재직증명서' : '원천징수영수증'
+    if (!purpose.trim()) { toast.error('서류 용도를 입력해주세요.'); return }
     if (!confirm(`${label} 발급을 관리자에게 신청하시겠습니까?`)) return
     startTransition(async () => {
-      const res = await submitDocumentRequest({ docType, purpose: purpose.trim() || null })
+      const res = await submitDocumentRequest({ docType, purpose: purpose.trim() })
       if (res.error) { toast.error(res.error); return }
       toast.success('신청이 접수되었습니다.')
       if (docType === 'EMPLOYMENT_CERT') setEmploymentPurpose('')
@@ -137,7 +138,7 @@ export default function DocumentRequestClient({
             </p>
           </div>
           <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">서류 용도 <span className="text-xs font-normal text-gray-400">(선택)</span></label>
+            <label className="text-sm font-medium text-gray-700">서류 용도 <span className="text-red-500">*</span></label>
             <input
               type="text"
               value={employmentPurpose}
@@ -173,7 +174,7 @@ export default function DocumentRequestClient({
             </p>
           </div>
           <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">서류 용도 <span className="text-xs font-normal text-gray-400">(선택)</span></label>
+            <label className="text-sm font-medium text-gray-700">서류 용도 <span className="text-red-500">*</span></label>
             <input
               type="text"
               value={withholdingPurpose}
