@@ -115,7 +115,10 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests 
                   return (
                     <tr key={req.id} className="hover:bg-gray-50/50">
                       <td className="px-5 py-3 text-gray-800">{empLabel}</td>
-                      <td className="px-4 py-3 text-gray-700">{DOC_TYPE_LABELS[req.doc_type] ?? req.doc_type}</td>
+                      <td className="px-4 py-3">
+                        <p className="text-gray-700">{DOC_TYPE_LABELS[req.doc_type] ?? req.doc_type}</p>
+                        {req.purpose && <p className="text-xs text-gray-400 mt-0.5">{req.purpose}</p>}
+                      </td>
                       <td className="px-4 py-3 text-gray-400 text-xs">{format(new Date(req.created_at), 'yyyy.MM.dd')}</td>
                       <td className="px-4 py-3">
                         {isPending_ ? (

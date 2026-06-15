@@ -64,7 +64,7 @@ export async function listDocumentRequests() {
   const { data, error } = await admin
     .from('document_requests')
     .select(`
-      id, doc_type, status, completed_at, created_at,
+      id, doc_type, status, purpose, completed_at, created_at,
       employees ( name, position, departments ( name ) )
     `)
     .order('created_at', { ascending: false })
