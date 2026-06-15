@@ -24,7 +24,12 @@ export default async function MyRequestsPage() {
   const employeePosition = emp.position ?? null
   const departmentName = emp.departments?.name ?? null
 
-  const [{ data: myLeave }, { data: myExpense }] = await Promise.all([
+  const [
+    { data: myLeave },
+    { data: myExpense },
+    { data: myDocuments },
+    { data: mySupply },
+  ] = await Promise.all([
     supabase
       .from('leave_requests')
       .select('id, leave_type, start_date, end_date, days_used, status, created_at, leave_approval_steps(comment, status)')
@@ -37,6 +42,18 @@ export default async function MyRequestsPage() {
       .select('id, title, amount, category, status, created_at, tax_type, evidence_type, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls')
       .eq('employee_id', employee.id)
       .in('status', ['PENDING', 'APPROVED', 'REJECTED'])
+      .order('created_at', { ascending: false })
+      .limit(20),
+    supabase
+      .from('document_requests')
+      .select('id, doc_type, status, created_at')
+      .eq('employee_id', employee.id)
+      .order('created_at', { ascending: false })
+      .limit(20),
+    supabase
+      .from('supply_requests')
+      .select('id, status, created_at, supply_request_items ( id, category, description, estimated_amount, note, sort_order )')
+      .eq('employee_id', employee.id)
       .order('created_at', { ascending: false })
       .limit(20),
   ])
@@ -63,6 +80,8 @@ export default async function MyRequestsPage() {
       employeeName={employeeName}
       employeePosition={employeePosition}
       departmentName={departmentName}
+      documentRequests={myDocuments ?? []}
+      supplyRequests={(mySupply ?? []) as any[]}
     />
   )
 }

@@ -6,9 +6,22 @@ import ExpenseDetailModal from '@/components/approval/ExpenseDetailModal'
 import type { ExpenseViewData } from '@/components/approval/ExpenseDetailView'
 
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
-  PENDING:  { label: '대기', className: 'bg-yellow-50 text-yellow-700' },
-  APPROVED: { label: '승인', className: 'bg-green-50 text-green-700' },
-  REJECTED: { label: '반려', className: 'bg-red-50 text-red-600' },
+  PENDING:   { label: '대기',   className: 'bg-yellow-50 text-yellow-700' },
+  APPROVED:  { label: '승인',   className: 'bg-green-50 text-green-700' },
+  REJECTED:  { label: '반려',   className: 'bg-red-50 text-red-600' },
+  COMPLETED: { label: '완료',   className: 'bg-blue-50 text-blue-700' },
+}
+
+const DOC_TYPE_LABELS: Record<string, string> = {
+  EMPLOYMENT_CERT: '재직증명서',
+  WITHHOLDING_RECEIPT: '원천징수영수증',
+}
+
+const CATEGORY_LABELS: Record<string, string> = {
+  EQUIPMENT: '비품',
+  CONSUMABLE: '소모품',
+  SOFTWARE: '소프트웨어',
+  OTHER: '기타',
 }
 
 interface LeaveItem {
@@ -46,6 +59,29 @@ interface ExpenseItem {
   attachment_urls?: string[] | null
 }
 
+interface DocumentRequest {
+  id: string
+  doc_type: string
+  status: string
+  created_at: string
+}
+
+interface SupplyRequestItem {
+  id: string
+  category: string
+  description: string
+  estimated_amount: number | null
+  note: string | null
+  sort_order: number
+}
+
+interface SupplyRequest {
+  id: string
+  status: string
+  created_at: string
+  supply_request_items: SupplyRequestItem[]
+}
+
 type AnyItem = LeaveItem | ExpenseItem
 
 interface Props {
@@ -53,10 +89,20 @@ interface Props {
   employeeName: string
   employeePosition: string | null
   departmentName: string | null
+  documentRequests: DocumentRequest[]
+  supplyRequests: SupplyRequest[]
 }
 
-export default function MyRequestsClient({ items, employeeName, employeePosition, departmentName }: Props) {
+export default function MyRequestsClient({
+  items,
+  employeeName,
+  employeePosition,
+  departmentName,
+  documentRequests,
+  supplyRequests,
+}: Props) {
   const [selectedExpense, setSelectedExpense] = useState<ExpenseViewData | null>(null)
+  const [expandedSupplyId, setExpandedSupplyId] = useState<string | null>(null)
 
   function openExpense(item: ExpenseItem) {
     const viewData: ExpenseViewData = {
@@ -83,9 +129,14 @@ export default function MyRequestsClient({ items, employeeName, employeePosition
   }
 
   return (
-    <div className="max-w-2xl space-y-4">
+    <div className="max-w-2xl space-y-6">
       <h1 className="text-xl font-semibold text-gray-900">내 신청 내역</h1>
+
+      {/* Leave & Expense */}
       <div className="space-y-2">
+        {items.length > 0 && (
+          <p className="text-xs font-medium text-gray-400 uppercase tracking-wider px-1">연차 / 지출결의</p>
+        )}
         {items.map(item => {
           const status = STATUS_LABELS[item.status] ?? STATUS_LABELS.PENDING
           const rejectionReason = item.kind === 'leave' && item.status === 'REJECTED'
@@ -120,10 +171,98 @@ export default function MyRequestsClient({ items, employeeName, employeePosition
             </div>
           )
         })}
-        {items.length === 0 && (
+        {items.length === 0 && documentRequests.length === 0 && supplyRequests.length === 0 && (
           <div className="py-12 text-center text-sm text-gray-400">신청 내역이 없습니다.</div>
         )}
       </div>
+
+      {/* Document Requests */}
+      {documentRequests.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-gray-400 uppercase tracking-wider px-1">서류 신청</p>
+          {documentRequests.map(doc => {
+            const status = STATUS_LABELS[doc.status] ?? STATUS_LABELS.PENDING
+            return (
+              <div key={doc.id} className="bg-white rounded-xl border border-gray-100 px-5 py-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {DOC_TYPE_LABELS[doc.doc_type] ?? doc.doc_type}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {format(new Date(doc.created_at), 'yyyy.MM.dd')}
+                    </p>
+                  </div>
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${status.className}`}>
+                    {status.label}
+                  </span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Supply Requests */}
+      {supplyRequests.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-gray-400 uppercase tracking-wider px-1">비품/소모품 신청</p>
+          {supplyRequests.map(req => {
+            const status = STATUS_LABELS[req.status] ?? STATUS_LABELS.PENDING
+            const isExpanded = expandedSupplyId === req.id
+            const sortedItems = [...(req.supply_request_items ?? [])].sort((a, b) => a.sort_order - b.sort_order)
+
+            return (
+              <div key={req.id} className="bg-white rounded-xl border border-gray-100 px-5 py-4 space-y-3">
+                <div
+                  className="flex items-center justify-between cursor-pointer"
+                  onClick={() => setExpandedSupplyId(isExpanded ? null : req.id)}
+                >
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      비품/소모품 신청 · {sortedItems.length}개 항목
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {format(new Date(req.created_at), 'yyyy.MM.dd')}
+                      <span className="ml-2 text-primary">· {isExpanded ? '접기' : '상세보기'}</span>
+                    </p>
+                  </div>
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${status.className}`}>
+                    {status.label}
+                  </span>
+                </div>
+
+                {isExpanded && (
+                  <div className="rounded-lg border border-gray-100 overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="text-left px-3 py-2 text-gray-500 font-medium">구분</th>
+                          <th className="text-left px-3 py-2 text-gray-500 font-medium">내역</th>
+                          <th className="text-left px-3 py-2 text-gray-500 font-medium">예상금액</th>
+                          <th className="text-left px-3 py-2 text-gray-500 font-medium">비고</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {sortedItems.map(item => (
+                          <tr key={item.id}>
+                            <td className="px-3 py-2 text-gray-600">{CATEGORY_LABELS[item.category] ?? item.category}</td>
+                            <td className="px-3 py-2 text-gray-800">{item.description}</td>
+                            <td className="px-3 py-2 text-gray-600">
+                              {item.estimated_amount != null ? `${Number(item.estimated_amount).toLocaleString()}원` : '—'}
+                            </td>
+                            <td className="px-3 py-2 text-gray-400">{item.note ?? '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       <ExpenseDetailModal
         data={selectedExpense}

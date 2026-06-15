@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Trash2, Plus, Wifi } from 'lucide-react'
-import { updateInactivityMinutes, updateAutoBreakMode, updateRemoteRadius, addOfficeIp, removeOfficeIp, updateWorkSchedule } from './actions'
+import { updateInactivityMinutes, updateAutoBreakMode, updateRemoteRadius, addOfficeIp, removeOfficeIp, updateWorkSchedule, updateSupplyManager } from './actions'
 
 const INACTIVITY_OPTIONS = [
   { value: 10, label: '10분' },
@@ -22,6 +22,13 @@ const RADIUS_OPTIONS = [
   { value: 2000, label: '2km' },
 ]
 
+interface EmployeeOption {
+  id: string
+  name: string
+  position: string | null
+  departmentName: string | null
+}
+
 export default function GeneralSettingsClient({
   inactivityMinutes,
   officeIps,
@@ -32,6 +39,8 @@ export default function GeneralSettingsClient({
   workEndTime,
   lunchStartTime,
   lunchEndTime,
+  supplyManagerId,
+  employees,
 }: {
   inactivityMinutes: number
   officeIps: string[]
@@ -42,6 +51,8 @@ export default function GeneralSettingsClient({
   workEndTime: string
   lunchStartTime: string
   lunchEndTime: string
+  supplyManagerId: string | null
+  employees: EmployeeOption[]
 }) {
   const [minutes, setMinutes] = useState(inactivityMinutes)
   const [breakMode, setBreakMode] = useState<'frontend' | 'server'>(autoBreakMode)
@@ -52,8 +63,10 @@ export default function GeneralSettingsClient({
   const [endTime, setEndTime] = useState(workEndTime)
   const [lunchStart, setLunchStart] = useState(lunchStartTime)
   const [lunchEnd, setLunchEnd] = useState(lunchEndTime)
+  const [supplyMgrId, setSupplyMgrId] = useState<string>(supplyManagerId ?? '')
   const [isPending, startTransition] = useTransition()
   const [isSchedulePending, startScheduleTransition] = useTransition()
+  const [isSupplyMgrPending, startSupplyMgrTransition] = useTransition()
 
   function handleSaveInactivity() {
     startTransition(async () => {
@@ -98,6 +111,15 @@ export default function GeneralSettingsClient({
       if (res.error) { toast.error(res.error); return }
       setIps(prev => prev.filter(x => x !== ip))
       toast.success(`${ip} 삭제되었습니다.`)
+    })
+  }
+
+  function handleSupplyManagerChange(id: string) {
+    setSupplyMgrId(id)
+    startSupplyMgrTransition(async () => {
+      const res = await updateSupplyManager(id || null)
+      if (res.error) { toast.error(res.error); return }
+      toast.success('총무팀장이 저장되었습니다.')
     })
   }
 
@@ -327,6 +349,30 @@ export default function GeneralSettingsClient({
           >
             <Plus size={14} /> 추가
           </button>
+        </div>
+      </div>
+
+      {/* 총무팀장 설정 */}
+      <div className="bg-white rounded-xl border border-gray-100 p-6 space-y-4">
+        <h2 className="text-sm font-semibold text-gray-800">총무팀장 설정</h2>
+        <p className="text-xs text-gray-400">
+          비품/소모품 신청의 1차 결재자를 지정합니다. 미지정 시 관리자가 직접 결재합니다.
+        </p>
+        <div className="space-y-1">
+          <label className="text-sm text-gray-600">총무팀장 선택</label>
+          <select
+            value={supplyMgrId}
+            onChange={e => handleSupplyManagerChange(e.target.value)}
+            disabled={isSupplyMgrPending}
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
+          >
+            <option value="">미지정 (관리자 직접 결재)</option>
+            {employees.map(emp => (
+              <option key={emp.id} value={emp.id}>
+                {[emp.departmentName, emp.position, emp.name].filter(Boolean).join(' · ')}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 

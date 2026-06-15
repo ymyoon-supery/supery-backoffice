@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import {
   Clock, FileText, BarChart2, Users, ClipboardList, Home,
   Bell, FilePlus, CalendarDays, Settings, Megaphone, Inbox,
+  Receipt, Package,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -16,6 +17,8 @@ const adminNav = [
   { href: '/admin/leave-manual', label: '연차관리', icon: FilePlus },
   { href: '/admin/leave-promotion', label: '연차사용촉진', icon: Bell },
   { href: '/admin/notices', label: '공지사항 관리', icon: Megaphone },
+  { href: '/admin/payslip', label: '급여명세서 관리', icon: Receipt },
+  { href: '/admin/documents', label: '서류/비품 관리', icon: Package },
   { href: '/admin/settings', label: '설정', icon: Settings },
 ]
 
@@ -45,6 +48,8 @@ export default function Sidebar({
     { href: '/leave', label: '연차 사용 내역', icon: CalendarDays },
     { href: '/approval/leave/new', label: '연차 신청', icon: FileText },
     { href: '/approval/expense/new', label: '지출결의', icon: FileText },
+    { href: '/payslip', label: '급여명세서', icon: Receipt },
+    { href: '/documents', label: '서류/비품 신청', icon: Package },
     { href: '/approval/my', label: '내 신청 내역', icon: Inbox },
     ...(isTeamLead && !isAdmin
       ? [{ href: '/approval/pending', label: '결재 대기', icon: ClipboardList, badge: pendingCount }]

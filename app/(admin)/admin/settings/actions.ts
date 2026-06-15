@@ -107,6 +107,20 @@ export async function removeOfficeIp(ip: string) {
   return { ok: true }
 }
 
+export async function updateSupplyManager(employeeId: string | null) {
+  const admin = await getAdminClient()
+  if (!admin) return { error: 'Unauthorized' }
+
+  const { error } = await admin
+    .from('company_settings')
+    .update({ supply_manager_id: employeeId ?? null, updated_at: new Date().toISOString() })
+    .not('id', 'is', null)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/settings')
+  return { ok: true }
+}
+
 export async function updateWorkSchedule(
   workStartTime: string,
   workEndTime: string,

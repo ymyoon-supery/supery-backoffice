@@ -6,6 +6,7 @@ import { format } from 'date-fns'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { approveLeave } from '@/app/(dashboard)/approval/leave/actions'
 import { approveExpense } from '@/app/(dashboard)/approval/expense/actions'
+import { approveSupplyAction } from '@/app/(dashboard)/documents/actions'
 import { useRouter } from 'next/navigation'
 import ExpenseDetailModal from '@/components/approval/ExpenseDetailModal'
 import type { ExpenseViewData } from '@/components/approval/ExpenseDetailView'
@@ -18,14 +19,20 @@ const EXPENSE_LABELS: Record<string, string> = {
   TRANSPORT: '교통비', MEAL: '식대', ACCOMMODATION: '숙박비', SUPPLIES: '소모품', OTHER: '기타',
 }
 
+const CATEGORY_LABELS: Record<string, string> = {
+  EQUIPMENT: '비품', CONSUMABLE: '소모품', SOFTWARE: '소프트웨어', OTHER: '기타',
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export default function PendingApprovalsClient({ leaveSteps, expenseSteps, fullApprovedLeaveSteps = [], fullApprovedExpenseSteps = [] }: { leaveSteps: any[]; expenseSteps: any[]; fullApprovedLeaveSteps?: any[]; fullApprovedExpenseSteps?: any[] }) {
+export default function PendingApprovalsClient({ leaveSteps, expenseSteps, fullApprovedLeaveSteps = [], fullApprovedExpenseSteps = [], supplySteps = [] }: { leaveSteps: any[]; expenseSteps: any[]; fullApprovedLeaveSteps?: any[]; fullApprovedExpenseSteps?: any[]; supplySteps?: any[] }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [rejectingLeaveId, setRejectingLeaveId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [selectedExpense, setSelectedExpense] = useState<{ step: any; viewData: ExpenseViewData } | null>(null)
+  const [rejectingSupplyId, setRejectingSupplyId] = useState<string | null>(null)
+  const [supplyRejectComment, setSupplyRejectComment] = useState('')
 
   function handleLeave(requestId: string, approved: boolean, comment?: string) {
     startTransition(async () => {
@@ -82,6 +89,26 @@ export default function PendingApprovalsClient({ leaveSteps, expenseSteps, fullA
       comment: null,
     }
     setSelectedExpense({ step, viewData })
+  }
+
+  function handleSupplyApprove(requestId: string) {
+    startTransition(async () => {
+      const result = await approveSupplyAction(requestId, true)
+      if (result.error) { toast.error(result.error); return }
+      toast.success('승인되었습니다.')
+      router.refresh()
+    })
+  }
+
+  function handleSupplyReject(requestId: string) {
+    startTransition(async () => {
+      const result = await approveSupplyAction(requestId, false, supplyRejectComment || undefined)
+      if (result.error) { toast.error(result.error); return }
+      toast.success('반려되었습니다.')
+      setRejectingSupplyId(null)
+      setSupplyRejectComment('')
+      router.refresh()
+    })
   }
 
   const totalPending = leaveSteps.length + expenseSteps.length
@@ -230,6 +257,104 @@ export default function PendingApprovalsClient({ leaveSteps, expenseSteps, fullA
           <div className="py-12 text-center text-sm text-gray-400">결재 대기 항목이 없습니다.</div>
         )}
       </div>
+
+      {/* Supply steps */}
+      {supplySteps.length > 0 && (
+        <div className="space-y-2 pt-2">
+          <h2 className="text-sm font-medium text-gray-700">비품/소모품 결재 대기</h2>
+          {supplySteps.map((step: any) => {
+            const req = step.supply_requests
+            if (!req) return null
+            const emp = req.employees
+            const empLabel = [emp?.departments?.name, emp?.position, emp?.name].filter(Boolean).join(' / ')
+            const sortedItems = [...(req.supply_request_items ?? [])].sort((a: any, b: any) => a.sort_order - b.sort_order)
+            const isRejecting = rejectingSupplyId === req.id
+
+            return (
+              <div key={step.id} className="bg-white rounded-xl border border-gray-100 p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{empLabel}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {format(new Date(req.created_at), 'MM/dd')} · {sortedItems.length}개 항목
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-gray-100 overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="text-left px-3 py-2 text-gray-500 font-medium">구분</th>
+                        <th className="text-left px-3 py-2 text-gray-500 font-medium">내역</th>
+                        <th className="text-left px-3 py-2 text-gray-500 font-medium">예상금액</th>
+                        <th className="text-left px-3 py-2 text-gray-500 font-medium">비고</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {sortedItems.map((item: any) => (
+                        <tr key={item.id}>
+                          <td className="px-3 py-2 text-gray-600">{CATEGORY_LABELS[item.category] ?? item.category}</td>
+                          <td className="px-3 py-2 text-gray-800">{item.description}</td>
+                          <td className="px-3 py-2 text-gray-600">
+                            {item.estimated_amount != null ? `${Number(item.estimated_amount).toLocaleString()}원` : '—'}
+                          </td>
+                          <td className="px-3 py-2 text-gray-400">{item.note ?? '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {isRejecting ? (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={supplyRejectComment}
+                      onChange={e => setSupplyRejectComment(e.target.value)}
+                      placeholder="반려 사유 (선택)"
+                      className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-200"
+                      autoFocus
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleSupplyReject(req.id)}
+                        disabled={isPending}
+                        className="flex-1 py-2 text-sm font-medium bg-red-600 text-white rounded-lg disabled:opacity-50 hover:bg-red-700"
+                      >
+                        반려 확인
+                      </button>
+                      <button
+                        onClick={() => { setRejectingSupplyId(null); setSupplyRejectComment('') }}
+                        className="flex-1 py-2 text-sm font-medium border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50"
+                      >
+                        취소
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleSupplyApprove(req.id)}
+                      disabled={isPending}
+                      className="flex-1 py-2 text-sm font-medium bg-primary text-white rounded-lg disabled:opacity-50 hover:bg-primary/90"
+                    >
+                      승인
+                    </button>
+                    <button
+                      onClick={() => setRejectingSupplyId(req.id)}
+                      disabled={isPending}
+                      className="flex-1 py-2 text-sm font-medium border border-red-200 text-red-600 rounded-lg disabled:opacity-50 hover:bg-red-50"
+                    >
+                      반려
+                    </button>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* 전결 처리됨 */}
       {(fullApprovedLeaveSteps.length > 0 || fullApprovedExpenseSteps.length > 0) && (
