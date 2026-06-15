@@ -49,14 +49,23 @@ export default async function PayslipPage() {
                   {new Date(slip.created_at).toLocaleDateString('ko-KR')} 업로드
                 </p>
               </div>
-              <a
-                href={slip.file_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary/90 transition-colors"
-              >
-                보기
-              </a>
+              <div className="flex items-center gap-2">
+                <a
+                  href={slip.file_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 border border-gray-200 text-gray-600 text-xs font-medium rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  보기
+                </a>
+                <a
+                  href={slip.file_url}
+                  download={slip.file_name ?? `${slip.year_month}_급여명세서.pdf`}
+                  className="px-3 py-1.5 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  다운로드
+                </a>
+              </div>
             </div>
           ))}
         </div>
