@@ -10,17 +10,47 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-const adminNav = [
-  { href: '/admin/approval', label: '결재관리', icon: ClipboardList },
-  { href: '/admin/employees', label: '출퇴근 현황', icon: Users },
-  { href: '/admin/attendance', label: '근태 현황', icon: Clock },
-  { href: '/admin/reports', label: '52시간 리포트', icon: BarChart2 },
-  { href: '/admin/leave-manual', label: '연차관리', icon: FilePlus },
-  { href: '/admin/leave-promotion', label: '연차사용촉진', icon: Bell },
-  { href: '/admin/notices', label: '공지사항 관리', icon: Megaphone },
-  { href: '/admin/payslip', label: '급여명세서 관리', icon: Receipt },
-  { href: '/admin/documents', label: '서류/비품 관리', icon: Package },
-  { href: '/admin/settings', label: '설정', icon: Settings },
+const adminNavGroups = [
+  {
+    label: '결재',
+    items: [
+      { href: '/admin/approval', label: '결재관리', icon: ClipboardList },
+      { href: '/admin/documents', label: '서류/비품 관리', icon: Package },
+    ],
+  },
+  {
+    label: '근태',
+    items: [
+      { href: '/admin/employees', label: '출퇴근 현황', icon: Users },
+      { href: '/admin/attendance', label: '근태 현황', icon: Clock },
+      { href: '/admin/reports', label: '52시간 리포트', icon: BarChart2 },
+    ],
+  },
+  {
+    label: '연차',
+    items: [
+      { href: '/admin/leave-manual', label: '연차관리', icon: FilePlus },
+      { href: '/admin/leave-promotion', label: '연차사용촉진', icon: Bell },
+    ],
+  },
+  {
+    label: '인사/급여',
+    items: [
+      { href: '/admin/payslip', label: '급여명세서 관리', icon: Receipt },
+    ],
+  },
+  {
+    label: '공지',
+    items: [
+      { href: '/admin/notices', label: '공지사항 관리', icon: Megaphone },
+    ],
+  },
+  {
+    label: '시스템',
+    items: [
+      { href: '/admin/settings', label: '설정', icon: Settings },
+    ],
+  },
 ]
 
 type NavItem = {
@@ -99,12 +129,12 @@ export default function Sidebar({
           </Link>
         ))}
 
-        {isAdmin && (
-          <>
+        {isAdmin && adminNavGroups.map(group => (
+          <div key={group.label}>
             <div className="pt-3 pb-1 px-3">
-              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">관리자</span>
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">{group.label}</span>
             </div>
-            {adminNav.map(({ href, label, icon: Icon }) => (
+            {group.items.map(({ href, label, icon: Icon }) => (
               <Link
                 key={href}
                 href={href}
@@ -116,8 +146,8 @@ export default function Sidebar({
                 {pendingHref === href && <Loader2 size={12} className="animate-spin text-primary" />}
               </Link>
             ))}
-          </>
-        )}
+          </div>
+        ))}
       </nav>
     </aside>
   )
