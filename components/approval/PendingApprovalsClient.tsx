@@ -7,6 +7,8 @@ import { ChevronDown, ChevronUp } from 'lucide-react'
 import { approveLeave } from '@/app/(dashboard)/approval/leave/actions'
 import { approveExpense } from '@/app/(dashboard)/approval/expense/actions'
 import { useRouter } from 'next/navigation'
+import ExpenseDetailModal from '@/components/approval/ExpenseDetailModal'
+import type { ExpenseViewData } from '@/components/approval/ExpenseDetailView'
 
 const LEAVE_LABELS: Record<string, string> = {
   ANNUAL: '연차', HALF_DAY: '반차', AM_HALF: '오전반차', PM_HALF: '오후반차',
@@ -15,36 +17,71 @@ const LEAVE_LABELS: Record<string, string> = {
 const EXPENSE_LABELS: Record<string, string> = {
   TRANSPORT: '교통비', MEAL: '식대', ACCOMMODATION: '숙박비', SUPPLIES: '소모품', OTHER: '기타',
 }
-const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  CASH: '현금', CARD: '회사카드', TRANSFER: '계좌송금',
-}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function PendingApprovalsClient({ leaveSteps, expenseSteps, fullApprovedLeaveSteps = [], fullApprovedExpenseSteps = [] }: { leaveSteps: any[]; expenseSteps: any[]; fullApprovedLeaveSteps?: any[]; fullApprovedExpenseSteps?: any[] }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
-  const [rejectingId, setRejectingId] = useState<string | null>(null)
+  const [rejectingLeaveId, setRejectingLeaveId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [selectedExpense, setSelectedExpense] = useState<{ step: any; viewData: ExpenseViewData } | null>(null)
 
   function handleLeave(requestId: string, approved: boolean, comment?: string) {
     startTransition(async () => {
       const result = await approveLeave(requestId, approved, comment)
       if (result.error) { toast.error(result.error); return }
       toast.success(approved ? '승인되었습니다.' : '반려되었습니다.')
-      setRejectingId(null)
+      setRejectingLeaveId(null)
       setRejectReason('')
       router.refresh()
     })
   }
 
-  function handleExpense(reportId: string, approved: boolean) {
+  function handleExpenseApprove(reportId: string) {
     startTransition(async () => {
-      const result = await approveExpense(reportId, approved)
+      const result = await approveExpense(reportId, true)
       if (result.error) { toast.error(result.error); return }
-      toast.success(approved ? '승인되었습니다.' : '반려되었습니다.')
+      toast.success('승인되었습니다.')
+      setSelectedExpense(null)
       router.refresh()
     })
+  }
+
+  function handleExpenseReject(reportId: string, reason?: string) {
+    startTransition(async () => {
+      const result = await approveExpense(reportId, false, reason)
+      if (result.error) { toast.error(result.error); return }
+      toast.success('반려되었습니다.')
+      setSelectedExpense(null)
+      router.refresh()
+    })
+  }
+
+  function openExpenseDetail(step: any) {
+    const rep = step.expense_reports
+    if (!rep) return
+    const viewData: ExpenseViewData = {
+      title: rep.title ?? '',
+      taxType: rep.tax_type ?? null,
+      evidenceType: rep.evidence_type ?? null,
+      payee: rep.payee ?? null,
+      paymentMethod: rep.payment_method ?? null,
+      bankName: rep.bank_name ?? null,
+      accountNumber: rep.account_number ?? null,
+      accountHolder: rep.account_holder ?? null,
+      paymentRequestDate: rep.payment_request_date ?? null,
+      settlementDate: rep.settlement_date ?? null,
+      lineItems: rep.line_items ?? [],
+      attachmentUrls: rep.attachment_urls ?? [],
+      employeeName: rep.employees?.name ?? '—',
+      employeePosition: rep.employees?.position ?? null,
+      departmentName: rep.employees?.departments?.name ?? null,
+      requestDate: rep.created_at,
+      status: 'PENDING',
+      comment: null,
+    }
+    setSelectedExpense({ step, viewData })
   }
 
   const totalPending = leaveSteps.length + expenseSteps.length
@@ -115,7 +152,7 @@ export default function PendingApprovalsClient({ leaveSteps, expenseSteps, fullA
                 </div>
               )}
 
-              {rejectingId === step.id ? (
+              {rejectingLeaveId === step.id ? (
                 <div className="space-y-2">
                   <input
                     type="text"
@@ -134,7 +171,7 @@ export default function PendingApprovalsClient({ leaveSteps, expenseSteps, fullA
                       반려 확인
                     </button>
                     <button
-                      onClick={() => { setRejectingId(null); setRejectReason('') }}
+                      onClick={() => { setRejectingLeaveId(null); setRejectReason('') }}
                       className="flex-1 py-2 text-sm font-medium border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50"
                     >
                       취소
@@ -151,7 +188,7 @@ export default function PendingApprovalsClient({ leaveSteps, expenseSteps, fullA
                     승인
                   </button>
                   <button
-                    onClick={() => setRejectingId(step.id)}
+                    onClick={() => setRejectingLeaveId(step.id)}
                     disabled={isPending}
                     className="flex-1 py-2 text-sm font-medium border border-red-200 text-red-600 rounded-lg disabled:opacity-50 hover:bg-red-50"
                   >
@@ -165,9 +202,12 @@ export default function PendingApprovalsClient({ leaveSteps, expenseSteps, fullA
 
         {expenseSteps.map((step: any) => {
           const rep = step.expense_reports
-          const isExpanded = expandedId === step.id
           return (
-            <div key={step.id} className="bg-white rounded-xl border border-gray-100 p-5 space-y-3">
+            <div
+              key={step.id}
+              className="bg-white rounded-xl border border-gray-100 p-5 space-y-3 cursor-pointer hover:border-primary/30 hover:bg-primary/5 transition-colors"
+              onClick={() => openExpenseDetail(step)}
+            >
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-900">
@@ -179,93 +219,8 @@ export default function PendingApprovalsClient({ leaveSteps, expenseSteps, fullA
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-gray-400">{format(new Date(rep.created_at), 'MM/dd')}</span>
-                  <button onClick={() => setExpandedId(isExpanded ? null : step.id)}
-                    className="p-1 rounded-lg hover:bg-gray-50 text-gray-400 transition-colors">
-                    {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  </button>
+                  <span className="text-xs text-primary font-medium">상세보기</span>
                 </div>
-              </div>
-
-              {isExpanded && (
-                <div className="bg-gray-50 rounded-lg px-4 py-3 space-y-3 text-sm">
-                  <div className="flex flex-wrap items-start gap-6">
-                    <div>
-                      <span className="text-xs text-gray-400">수취인</span>
-                      <p className="font-medium text-gray-900 mt-0.5">{rep.payee ?? '—'}</p>
-                    </div>
-                    <div>
-                      <span className="text-xs text-gray-400">결제방식</span>
-                      <p className="font-medium text-gray-900 mt-0.5">
-                        {rep.payment_method ? PAYMENT_METHOD_LABELS[rep.payment_method] ?? rep.payment_method : '—'}
-                      </p>
-                    </div>
-                    {rep.payment_method === 'TRANSFER' && (
-                      <div>
-                        <span className="text-xs text-gray-400">계좌</span>
-                        <p className="font-medium text-gray-900 mt-0.5">
-                          {[rep.bank_name, rep.account_number, rep.account_holder].filter(Boolean).join(' · ') || '—'}
-                        </p>
-                      </div>
-                    )}
-                    <div>
-                      <span className="text-xs text-gray-400">지급요청일</span>
-                      <p className="font-medium text-gray-900 mt-0.5">{rep.payment_request_date ?? '—'}</p>
-                    </div>
-                  </div>
-                  {rep.line_items && rep.line_items.length > 0 && (
-                    <div>
-                      <span className="text-xs text-gray-400 block mb-1.5">지출 내역</span>
-                      <table className="w-full text-xs border border-gray-200 rounded-lg overflow-hidden">
-                        <thead>
-                          <tr className="bg-gray-100 text-gray-500">
-                            <th className="px-3 py-2 text-left font-medium">항목</th>
-                            <th className="px-3 py-2 text-left font-medium">날짜</th>
-                            <th className="px-3 py-2 text-right font-medium">수량</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 bg-white">
-                          {rep.line_items.map((li: any, i: number) => (
-                            <tr key={i}>
-                              <td className="px-3 py-2 text-gray-700">{li.item}</td>
-                              <td className="px-3 py-2 text-gray-500">{li.date}</td>
-                              <td className="px-3 py-2 text-right text-gray-700">{li.count}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                  {rep.attachment_urls && rep.attachment_urls.length > 0 && (
-                    <div>
-                      <span className="text-xs text-gray-400 block mb-1.5">첨부파일</span>
-                      <div className="flex flex-wrap gap-2">
-                        {rep.attachment_urls.map((url: string, i: number) => (
-                          <a key={i} href={url} target="_blank" rel="noreferrer"
-                            className="text-xs px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-primary hover:bg-primary/5 transition-colors">
-                            파일 {i + 1}
-                          </a>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleExpense(rep.id, true)}
-                  disabled={isPending}
-                  className="flex-1 py-2 text-sm font-medium bg-primary text-white rounded-lg disabled:opacity-50 hover:bg-primary/90"
-                >
-                  승인
-                </button>
-                <button
-                  onClick={() => handleExpense(rep.id, false)}
-                  disabled={isPending}
-                  className="flex-1 py-2 text-sm font-medium border border-red-200 text-red-600 rounded-lg disabled:opacity-50 hover:bg-red-50"
-                >
-                  반려
-                </button>
               </div>
             </div>
           )
@@ -324,6 +279,17 @@ export default function PendingApprovalsClient({ leaveSteps, expenseSteps, fullA
             )
           })}
         </div>
+      )}
+
+      {/* Expense detail modal */}
+      {selectedExpense && (
+        <ExpenseDetailModal
+          data={selectedExpense.viewData}
+          onClose={() => setSelectedExpense(null)}
+          onApprove={() => handleExpenseApprove(selectedExpense.step.expense_reports?.id)}
+          onReject={(reason) => handleExpenseReject(selectedExpense.step.expense_reports?.id, reason)}
+          isPending={isPending}
+        />
       )}
     </div>
   )

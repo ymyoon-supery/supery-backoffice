@@ -23,9 +23,25 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
   { value: 'CASH', label: '현금' },
 ]
 
+const TAX_TYPE_OPTIONS = [
+  { value: 'TAXABLE', label: '과세' },
+  { value: 'EXEMPT', label: '면세 (면세사업자 또는 해외 인보이스)' },
+  { value: 'WITHHOLDING_BUSINESS', label: '원천징수 (사업소득)' },
+  { value: 'WITHHOLDING_OTHER_WITH', label: '원천징수 (기타소득 - 제세공과금 포함)' },
+  { value: 'WITHHOLDING_OTHER_WITHOUT', label: '원천징수 (기타소득 - 제세공과금 불포함)' },
+]
+
+const EVIDENCE_TYPE_OPTIONS = [
+  { value: 'TAX_INVOICE', label: '세금계산서 (또는 인보이스)' },
+  { value: 'BUSINESS_RECEIPT', label: '사업자 지출증빙' },
+  { value: 'CORPORATE_CARD', label: '법인카드' },
+  { value: 'PERSONAL_CARD', label: '개인카드' },
+  { value: 'OTHER_RECEIPT', label: '기타 - 개별 영수증' },
+]
+
 const today = format(new Date(), 'yyyy-MM-dd')
 
-function formatKRW(value: string) {
+function formatKRWInput(value: string) {
   const n = value.replace(/[^0-9]/g, '')
   return n ? Number(n).toLocaleString('ko-KR') : ''
 }
@@ -36,7 +52,8 @@ export default function ExpenseForm({ employeeId, employeeName, employeePosition
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [title, setTitle] = useState('')
-  const [amountRaw, setAmountRaw] = useState('')
+  const [taxType, setTaxType] = useState<string>('')
+  const [evidenceType, setEvidenceType] = useState<string>('')
   const [payee, setPayee] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('TRANSFER')
   const [bankName, setBankName] = useState('')
@@ -44,33 +61,42 @@ export default function ExpenseForm({ employeeId, employeeName, employeePosition
   const [accountHolder, setAccountHolder] = useState('')
   const [paymentRequestDate, setPaymentRequestDate] = useState(today)
   const [settlementDate, setSettlementDate] = useState('')
-  const [lineItems, setLineItems] = useState<LineItem[]>([
-    { item: '', date: today, count: 1 },
+  const [lineItems, setLineItems] = useState<Array<{ item: string; date: string; amountRaw: string; note: string }>>([
+    { item: '', date: today, amountRaw: '', note: '' },
   ])
   const [attachments, setAttachments] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
 
-  const amount = Number(amountRaw.replace(/[^0-9]/g, ''))
+  const totalAmount = lineItems.reduce((sum, r) => {
+    const n = Number(r.amountRaw.replace(/[^0-9]/g, ''))
+    return sum + (isNaN(n) ? 0 : n)
+  }, 0)
 
   const canSubmit =
     title.trim() &&
-    amount > 0 &&
+    taxType &&
+    evidenceType &&
     payee.trim() &&
     paymentRequestDate &&
+    totalAmount > 0 &&
     (paymentMethod !== 'TRANSFER' || (bankName.trim() && accountNumber.trim() && accountHolder.trim())) &&
     lineItems.every(r => r.item.trim() && r.date) &&
     !uploading
 
   function addLineItem() {
-    setLineItems(prev => [...prev, { item: '', date: today, count: 1 }])
+    setLineItems(prev => [...prev, { item: '', date: today, amountRaw: '', note: '' }])
   }
 
   function removeLineItem(idx: number) {
     setLineItems(prev => prev.filter((_, i) => i !== idx))
   }
 
-  function updateLineItem<K extends keyof LineItem>(idx: number, key: K, value: LineItem[K]) {
+  function updateLineItem(idx: number, key: string, value: string) {
     setLineItems(prev => prev.map((row, i) => i === idx ? { ...row, [key]: value } : row))
+  }
+
+  function handleAmountChange(idx: number, raw: string) {
+    updateLineItem(idx, 'amountRaw', formatKRWInput(raw))
   }
 
   function handleFileAdd(e: React.ChangeEvent<HTMLInputElement>) {
@@ -113,9 +139,15 @@ export default function ExpenseForm({ employeeId, employeeName, employeePosition
         if (attachmentUrls.length !== attachments.length) return
       }
 
+      const items: LineItem[] = lineItems.map(r => ({
+        item: r.item.trim(),
+        date: r.date,
+        amount: Number(r.amountRaw.replace(/[^0-9]/g, '')) || 0,
+        note: r.note.trim() || undefined,
+      }))
+
       const result = await submitExpense({
         title: title.trim(),
-        amount,
         payee: payee.trim(),
         paymentMethod,
         bankName: paymentMethod === 'TRANSFER' ? bankName.trim() : null,
@@ -123,8 +155,10 @@ export default function ExpenseForm({ employeeId, employeeName, employeePosition
         accountHolder: paymentMethod === 'TRANSFER' ? accountHolder.trim() : null,
         paymentRequestDate,
         settlementDate: settlementDate || null,
-        lineItems: lineItems.map(r => ({ ...r, count: Number(r.count) })),
+        lineItems: items,
         attachmentUrls,
+        taxType: taxType || null,
+        evidenceType: evidenceType || null,
       })
 
       if (result.error) {
@@ -158,32 +192,64 @@ export default function ExpenseForm({ employeeId, employeeName, employeePosition
           />
         </div>
 
-        {/* 지출금액 + 지급처 */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">지출금액</label>
-            <div className="relative">
-              <input
-                type="text"
-                inputMode="numeric"
-                value={amountRaw}
-                onChange={(e) => setAmountRaw(formatKRW(e.target.value))}
-                placeholder="0"
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 pr-8 focus:outline-none focus:ring-2 focus:ring-primary/30 text-right"
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">원</span>
-            </div>
+        {/* 구분 (세목) */}
+        <div className="space-y-2">
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">구분 (세목)</label>
+          <div className="flex flex-col gap-2">
+            {TAX_TYPE_OPTIONS.map(opt => (
+              <label
+                key={opt.value}
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-lg border cursor-pointer transition-colors ${
+                  taxType === opt.value
+                    ? 'border-primary bg-primary/5 text-primary'
+                    : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="taxType"
+                  value={opt.value}
+                  checked={taxType === opt.value}
+                  onChange={() => setTaxType(opt.value)}
+                  className="accent-primary"
+                />
+                <span className="text-sm">{opt.label}</span>
+              </label>
+            ))}
           </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">지급처</label>
-            <input
-              type="text"
-              value={payee}
-              onChange={(e) => setPayee(e.target.value)}
-              placeholder="예: 주식회사 OO"
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
+        </div>
+
+        {/* 증빙 */}
+        <div className="space-y-2">
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">증빙</label>
+          <div className="flex flex-wrap gap-2">
+            {EVIDENCE_TYPE_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setEvidenceType(opt.value)}
+                className={`px-3 py-2 rounded-lg text-sm border transition-colors ${
+                  evidenceType === opt.value
+                    ? 'bg-primary text-white border-primary'
+                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
+        </div>
+
+        {/* 지급처 */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">지급처</label>
+          <input
+            type="text"
+            value={payee}
+            onChange={(e) => setPayee(e.target.value)}
+            placeholder="예: 주식회사 OO"
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
         </div>
 
         {/* 지급방식 */}
@@ -275,8 +341,9 @@ export default function ExpenseForm({ employeeId, employeeName, employeePosition
                 <tr>
                   <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500">지출항목</th>
                   <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[140px]">지출일</th>
-                  <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500 w-[90px]">입금건수</th>
-                  <th className="w-[40px]" />
+                  <th className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 w-[130px]">금액(원)</th>
+                  <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[140px]">비고</th>
+                  <th className="w-[36px]" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -301,11 +368,21 @@ export default function ExpenseForm({ employeeId, employeeName, employeePosition
                     </td>
                     <td className="px-2 py-1.5">
                       <input
-                        type="number"
-                        min={1}
-                        value={row.count}
-                        onChange={(e) => updateLineItem(idx, 'count', Number(e.target.value))}
-                        className="w-full text-sm px-2 py-1.5 rounded border border-transparent focus:border-gray-300 focus:outline-none bg-transparent hover:bg-gray-50 focus:bg-white text-center"
+                        type="text"
+                        inputMode="numeric"
+                        value={row.amountRaw}
+                        onChange={(e) => handleAmountChange(idx, e.target.value)}
+                        placeholder="0"
+                        className="w-full text-sm px-2 py-1.5 rounded border border-transparent focus:border-gray-300 focus:outline-none bg-transparent hover:bg-gray-50 focus:bg-white text-right"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <input
+                        type="text"
+                        value={row.note}
+                        onChange={(e) => updateLineItem(idx, 'note', e.target.value)}
+                        placeholder="비고"
+                        className="w-full text-sm px-2 py-1.5 rounded border border-transparent focus:border-gray-300 focus:outline-none bg-transparent hover:bg-gray-50 focus:bg-white"
                       />
                     </td>
                     <td className="px-2 py-1.5 text-center">
@@ -322,6 +399,15 @@ export default function ExpenseForm({ employeeId, employeeName, employeePosition
                   </tr>
                 ))}
               </tbody>
+              <tfoot className="border-t border-gray-200 bg-gray-50">
+                <tr>
+                  <td colSpan={2} className="px-3 py-2 text-xs font-semibold text-gray-600">지출합계</td>
+                  <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums">
+                    {totalAmount > 0 ? totalAmount.toLocaleString('ko-KR') + '원' : '—'}
+                  </td>
+                  <td colSpan={2} />
+                </tr>
+              </tfoot>
             </table>
           </div>
           <button

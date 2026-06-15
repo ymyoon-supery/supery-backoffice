@@ -7,12 +7,12 @@ import { CACHE_TAGS } from '@/lib/cache/tags'
 export type LineItem = {
   item: string
   date: string
-  count: number
+  amount: number
+  note?: string
 }
 
 type SubmitExpenseInput = {
   title: string
-  amount: number
   payee: string
   paymentMethod: 'CASH' | 'CARD' | 'TRANSFER'
   bankName: string | null
@@ -22,6 +22,8 @@ type SubmitExpenseInput = {
   settlementDate: string | null
   lineItems: LineItem[]
   attachmentUrls: string[]
+  taxType: string | null
+  evidenceType: string | null
 }
 
 export async function submitExpense(input: SubmitExpenseInput) {
@@ -29,9 +31,11 @@ export async function submitExpense(input: SubmitExpenseInput) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: '인증이 필요합니다.' }
 
+  const totalAmount = input.lineItems.reduce((sum, li) => sum + (li.amount ?? 0), 0)
+
   const { data, error } = await supabase.rpc('submit_expense_report', {
     p_title: input.title,
-    p_amount: input.amount,
+    p_amount: totalAmount,
     p_category: 'OTHER',
     p_expense_date: input.paymentRequestDate,
     p_receipt_url: null,
@@ -45,6 +49,8 @@ export async function submitExpense(input: SubmitExpenseInput) {
     p_settlement_date: input.settlementDate,
     p_line_items: input.lineItems,
     p_attachment_urls: input.attachmentUrls,
+    p_tax_type: input.taxType,
+    p_evidence_type: input.evidenceType,
   })
 
   if (error) return { error: error.message }

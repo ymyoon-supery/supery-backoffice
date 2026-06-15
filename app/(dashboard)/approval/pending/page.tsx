@@ -40,8 +40,9 @@ export default async function PendingApprovalsPage() {
         expense_reports (
           id, title, amount, category, expense_date, status, created_at,
           payee, payment_method, bank_name, account_number, account_holder,
-          payment_request_date, line_items, attachment_urls,
-          employees ( name, email )
+          payment_request_date, settlement_date, line_items, attachment_urls,
+          tax_type, evidence_type,
+          employees ( name, email, position, departments ( name ) )
         )
       `)
       .eq('approver_id', employee.id)

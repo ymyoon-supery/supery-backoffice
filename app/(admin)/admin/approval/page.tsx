@@ -18,6 +18,8 @@ export type ApprovalItem = {
   kind: 'leave' | 'expense' | 'home_location'
   requestId: string
   employeeName: string
+  employeePosition?: string | null
+  departmentName?: string | null
   typeLabel: string
   detail: string
   requestDate: string
@@ -30,13 +32,17 @@ export type ApprovalItem = {
   totalLeaves?: number | null
   remainingLeaves?: number | null
   // expense detail
-  lineItems?: Array<{ item: string; date: string; count: number }> | null
+  title?: string | null
+  taxType?: string | null
+  evidenceType?: string | null
+  lineItems?: Array<{ item: string; date: string; amount?: number; note?: string; count?: number }> | null
   payee?: string | null
   paymentMethod?: string | null
   bankName?: string | null
   accountNumber?: string | null
   accountHolder?: string | null
   paymentRequestDate?: string | null
+  settlementDate?: string | null
   attachmentUrls?: string[] | null
 }
 
@@ -134,8 +140,9 @@ export default async function AdminApprovalPage({
         expense_reports (
           id, title, amount, category, created_at, payment_status,
           payee, payment_method, bank_name, account_number, account_holder,
-          payment_request_date, line_items, attachment_urls,
-          employees ( name )
+          payment_request_date, settlement_date, line_items, attachment_urls,
+          tax_type, evidence_type,
+          employees ( name, position, departments ( name ) )
         )
       `)
       .eq('approver_id', employee.id)
@@ -151,17 +158,23 @@ export default async function AdminApprovalPage({
         kind:               'expense' as const,
         requestId:          rep.id,
         employeeName:       rep.employees?.name ?? '—',
+        employeePosition:   rep.employees?.position ?? null,
+        departmentName:     rep.employees?.departments?.name ?? null,
         typeLabel:          EXPENSE_LABELS[rep.category] ?? rep.category,
         detail:             `${rep.title} · ${Number(rep.amount).toLocaleString()}원`,
         requestDate:        rep.created_at,
         status:             s.status,
         paymentStatus:      rep.payment_status ?? null,
+        title:              rep.title ?? null,
+        taxType:            rep.tax_type ?? null,
+        evidenceType:       rep.evidence_type ?? null,
         payee:              rep.payee ?? null,
         paymentMethod:      rep.payment_method ?? null,
         bankName:           rep.bank_name ?? null,
         accountNumber:      rep.account_number ?? null,
         accountHolder:      rep.account_holder ?? null,
         paymentRequestDate: rep.payment_request_date ?? null,
+        settlementDate:     rep.settlement_date ?? null,
         lineItems:          rep.line_items ?? null,
         attachmentUrls:     rep.attachment_urls ?? null,
       }]
@@ -244,7 +257,7 @@ export default async function AdminApprovalPage({
     if (type !== 'leave' && type !== 'home_location') {
       const { data: waitingExpense } = await admin
         .from('expense_approval_steps')
-        .select(`id, expense_report_id, expense_reports ( id, title, amount, category, created_at, payment_status, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, line_items, attachment_urls, employees ( name ) )`)
+        .select(`id, expense_report_id, expense_reports ( id, title, amount, category, created_at, payment_status, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls, tax_type, evidence_type, employees ( name, position, departments ( name ) ) )`)
         .eq('approver_id', employee.id)
         .eq('status', 'WAITING')
         .eq('step_order', 2)
@@ -271,18 +284,24 @@ export default async function AdminApprovalPage({
               kind:               'expense' as const,
               requestId:          rep.id,
               employeeName:       rep.employees?.name ?? '—',
+              employeePosition:   rep.employees?.position ?? null,
+              departmentName:     rep.employees?.departments?.name ?? null,
               managerName:        managerByRepId[s.expense_report_id],
               typeLabel:          EXPENSE_LABELS[rep.category] ?? rep.category,
               detail:             `${rep.title} · ${Number(rep.amount).toLocaleString()}원`,
               requestDate:        rep.created_at,
               status:             'PENDING' as const,
               paymentStatus:      rep.payment_status ?? null,
+              title:              rep.title ?? null,
+              taxType:            rep.tax_type ?? null,
+              evidenceType:       rep.evidence_type ?? null,
               payee:              rep.payee ?? null,
               paymentMethod:      rep.payment_method ?? null,
               bankName:           rep.bank_name ?? null,
               accountNumber:      rep.account_number ?? null,
               accountHolder:      rep.account_holder ?? null,
               paymentRequestDate: rep.payment_request_date ?? null,
+              settlementDate:     rep.settlement_date ?? null,
               lineItems:          rep.line_items ?? null,
               attachmentUrls:     rep.attachment_urls ?? null,
             }]
