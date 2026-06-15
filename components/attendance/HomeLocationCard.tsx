@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { Home, MapPin, RefreshCw, Clock } from 'lucide-react'
+import { Home, MapPin, RefreshCw, Clock, Smartphone } from 'lucide-react'
 import { registerHomeLocation, createHomeLocationRequest } from '@/app/(dashboard)/attendance/actions'
 
 function getCurrentPosition(): Promise<GeolocationPosition> {
@@ -81,6 +81,11 @@ export default function HomeLocationCard({
           <RefreshCw size={12} className={isPending ? 'animate-spin' : ''} />
           {location ? '변경 신청' : '현재 위치로 등록'}
         </button>
+      </div>
+
+      <div className="flex items-center gap-1.5 bg-blue-50 rounded-lg px-3 py-2 border border-blue-100">
+        <Smartphone size={12} className="text-blue-400 shrink-0" />
+        <p className="text-xs text-blue-600">정확한 위치 등록을 위해 <span className="font-semibold">핸드폰</span>으로 신청해주세요.</p>
       </div>
 
       {pendingReq ? (
