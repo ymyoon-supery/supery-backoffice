@@ -54,7 +54,7 @@ export default async function MyRequestsPage() {
       .limit(20),
     supabase
       .from('document_requests')
-      .select('id, doc_type, status, created_at')
+      .select('id, doc_type, status, purpose, created_at')
       .eq('employee_id', employee.id)
       .order('created_at', { ascending: false })
       .limit(20),

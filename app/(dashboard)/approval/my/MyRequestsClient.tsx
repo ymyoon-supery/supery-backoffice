@@ -63,6 +63,7 @@ interface DocumentRequest {
   id: string
   doc_type: string
   status: string
+  purpose?: string | null
   created_at: string
 }
 
@@ -191,6 +192,7 @@ export default function MyRequestsClient({
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">
                       {format(new Date(doc.created_at), 'yyyy.MM.dd')}
+                      {doc.purpose && <span className="ml-2">· {doc.purpose}</span>}
                     </p>
                   </div>
                   <span className={`text-xs px-2 py-1 rounded-full font-medium ${status.className}`}>
