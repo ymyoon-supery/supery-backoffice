@@ -174,14 +174,23 @@ export default function AdminPayslipClient({ employees }: { employees: Employee[
                     {new Date(slip.created_at).toLocaleDateString('ko-KR')}
                   </p>
                 </div>
-                <a
-                  href={slip.file_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs px-2.5 py-1 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  보기
-                </a>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={slip.file_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs px-2.5 py-1 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    보기
+                  </a>
+                  <a
+                    href={slip.file_url}
+                    download={slip.file_name ?? `${slip.year_month}_급여명세서.pdf`}
+                    className="text-xs px-2.5 py-1 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                  >
+                    다운로드
+                  </a>
+                </div>
               </div>
             ))}
           </div>
