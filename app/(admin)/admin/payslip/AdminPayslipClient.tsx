@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useTransition } from 'react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { uploadPayslip, listAllPayslips } from './actions'
+import PayslipDownloadButton from '@/components/payslip/PayslipDownloadButton'
 
 interface Employee {
   id: string
@@ -183,13 +184,11 @@ export default function AdminPayslipClient({ employees }: { employees: Employee[
                   >
                     보기
                   </a>
-                  <a
-                    href={slip.file_url}
-                    download={slip.file_name ?? `${slip.year_month}_급여명세서.pdf`}
-                    className="text-xs px-2.5 py-1 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-                  >
-                    다운로드
-                  </a>
+                  <PayslipDownloadButton
+                    url={slip.file_url}
+                    fileName={slip.file_name ?? `${slip.year_month}_급여명세서.pdf`}
+                    className="text-xs px-2.5 py-1 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                  />
                 </div>
               </div>
             ))}

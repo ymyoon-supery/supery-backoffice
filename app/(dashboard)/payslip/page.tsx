@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import PayslipDownloadButton from '@/components/payslip/PayslipDownloadButton'
 
 function formatYearMonth(ym: string): string {
   const [year, month] = ym.split('-')
@@ -58,13 +59,11 @@ export default async function PayslipPage() {
                 >
                   보기
                 </a>
-                <a
-                  href={slip.file_url}
-                  download={slip.file_name ?? `${slip.year_month}_급여명세서.pdf`}
-                  className="px-3 py-1.5 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary/90 transition-colors"
-                >
-                  다운로드
-                </a>
+                <PayslipDownloadButton
+                  url={slip.file_url}
+                  fileName={slip.file_name ?? `${slip.year_month}_급여명세서.pdf`}
+                  className="px-3 py-1.5 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                />
               </div>
             </div>
           ))}
