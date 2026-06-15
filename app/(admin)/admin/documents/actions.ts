@@ -65,7 +65,7 @@ export async function listDocumentRequests() {
     .from('document_requests')
     .select(`
       id, doc_type, status, purpose, completed_at, created_at,
-      employees ( name, position )
+      employees!employee_id ( name, position )
     `)
     .order('created_at', { ascending: false })
     .limit(100)
