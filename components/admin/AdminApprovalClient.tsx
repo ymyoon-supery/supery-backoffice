@@ -296,26 +296,15 @@ export default function AdminApprovalClient({
                       ) : isPendingRow ? (
                         rejectingId !== item.stepId && (
                           <div className="flex gap-1.5 justify-end">
-                            {item.kind === 'expense' ? (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setSelectedExpense(item) }}
-                                className="px-3 py-1.5 text-xs font-medium border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
-                              >
-                                상세보기
-                              </button>
-                            ) : (
-                              <>
-                                <button onClick={(e) => { e.stopPropagation(); handleApprove(item) }} disabled={isPending}
-                                  className="px-3 py-1.5 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors">
-                                  승인
-                                </button>
-                                <button onClick={(e) => { e.stopPropagation(); setRejectingId(item.stepId); setRejectReason('') }}
-                                  disabled={isPending}
-                                  className="px-3 py-1.5 text-xs font-medium border border-red-200 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors">
-                                  반려
-                                </button>
-                              </>
-                            )}
+                            <button onClick={(e) => { e.stopPropagation(); handleApprove(item) }} disabled={isPending}
+                              className="px-3 py-1.5 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors">
+                              승인
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); setRejectingId(item.stepId); setRejectReason('') }}
+                              disabled={isPending}
+                              className="px-3 py-1.5 text-xs font-medium border border-red-200 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors">
+                              반려
+                            </button>
                           </div>
                         )
                       ) : (
