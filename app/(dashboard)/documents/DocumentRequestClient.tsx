@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { Fragment, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Plus, Trash2 } from 'lucide-react'
 import { submitDocumentRequest, submitSupplyRequest } from './actions'
@@ -200,20 +200,20 @@ export default function DocumentRequestClient({
           <p className="text-sm font-medium text-gray-900">비품/소모품 신청</p>
 
           {/* Items table */}
-          <div className="space-y-2">
-            <div className="grid grid-cols-[120px_1fr_110px_1fr_32px] gap-2">
-              <span className="text-xs text-gray-400">구분</span>
-              <span className="text-xs text-gray-400">내역 *</span>
-              <span className="text-xs text-gray-400">예상금액</span>
-              <span className="text-xs text-gray-400">비고</span>
-              <span />
-            </div>
+          <div className="grid grid-cols-[120px_1fr_110px_1fr_32px] gap-x-2 gap-y-2 items-center">
+            {/* Header */}
+            <span className="text-xs text-gray-400">구분</span>
+            <span className="text-xs text-gray-400">내역 *</span>
+            <span className="text-xs text-gray-400">예상금액</span>
+            <span className="text-xs text-gray-400">비고</span>
+            <span />
+            {/* Rows */}
             {items.map((item, idx) => (
-              <div key={idx} className="grid grid-cols-[120px_1fr_110px_1fr_32px] gap-2 items-start">
+              <Fragment key={idx}>
                 <select
                   value={item.category}
                   onChange={e => updateItem(idx, 'category', e.target.value)}
-                  className="text-sm border border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="text-sm border border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30 self-start"
                 >
                   {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
                     <option key={k} value={k}>{v}</option>
@@ -224,7 +224,7 @@ export default function DocumentRequestClient({
                   value={item.description}
                   onChange={e => updateItem(idx, 'description', e.target.value)}
                   placeholder="내역 입력"
-                  className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30 self-start"
                 />
                 <input
                   type="text"
@@ -232,24 +232,24 @@ export default function DocumentRequestClient({
                   value={item.estimatedAmount}
                   onChange={e => updateItem(idx, 'estimatedAmount', formatKRWInput(e.target.value))}
                   placeholder="0"
-                  className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30 text-right"
+                  className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30 text-right self-start"
                 />
                 <input
                   type="text"
                   value={item.note}
                   onChange={e => updateItem(idx, 'note', e.target.value)}
                   placeholder="비고"
-                  className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30 self-start"
                 />
                 <button
                   type="button"
                   onClick={() => removeItem(idx)}
                   disabled={items.length === 1}
-                  className="mt-2 text-gray-300 hover:text-red-400 disabled:opacity-30 transition-colors"
+                  className="text-gray-300 hover:text-red-400 disabled:opacity-30 transition-colors self-start pt-2"
                 >
                   <Trash2 size={14} />
                 </button>
-              </div>
+              </Fragment>
             ))}
           </div>
 
