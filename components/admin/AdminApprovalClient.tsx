@@ -282,26 +282,15 @@ export default function AdminApprovalClient({
                       {isFullApprove ? (
                         rejectingId !== item.stepId && (
                           <div className="flex gap-1.5 justify-end items-center">
-                            {item.kind === 'expense' ? (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setSelectedExpense(item) }}
-                                className="px-3 py-1.5 text-xs font-medium border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
-                              >
-                                상세보기
-                              </button>
-                            ) : (
-                              <>
-                                <button onClick={(e) => { e.stopPropagation(); handleFullApprove(item) }} disabled={isPending}
-                                  className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 transition-colors">
-                                  전결
-                                </button>
-                                <button onClick={(e) => { e.stopPropagation(); setRejectingId(item.stepId); setRejectReason('') }}
-                                  disabled={isPending}
-                                  className="px-3 py-1.5 text-xs font-medium border border-red-200 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors">
-                                  반려
-                                </button>
-                              </>
-                            )}
+                            <button onClick={(e) => { e.stopPropagation(); handleFullApprove(item) }} disabled={isPending}
+                              className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 transition-colors">
+                              전결
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); setRejectingId(item.stepId); setRejectReason('') }}
+                              disabled={isPending}
+                              className="px-3 py-1.5 text-xs font-medium border border-red-200 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors">
+                              반려
+                            </button>
                           </div>
                         )
                       ) : isPendingRow ? (
@@ -416,8 +405,8 @@ export default function AdminApprovalClient({
                     </tr>
                   )}
 
-                  {/* Inline reject form (for non-expense items) */}
-                  {rejectingId === item.stepId && item.kind !== 'expense' && (
+                  {/* Inline reject form */}
+                  {rejectingId === item.stepId && (item.kind !== 'expense' || isFullApprove) && (
                     <tr className="bg-red-50/30 border-l-[3px] border-l-red-300">
                       <td colSpan={5} className="px-4 py-3">
                         <div className="flex items-center gap-2">
