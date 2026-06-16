@@ -40,7 +40,7 @@ export default async function MyRequestsPage() {
   ] = await Promise.all([
     supabase
       .from('leave_requests')
-      .select('id, leave_type, start_date, end_date, days_used, status, created_at, leave_approval_steps(comment, status)')
+      .select('id, leave_type, start_date, end_date, days_used, reason, status, created_at, leave_approval_steps(comment, status)')
       .eq('employee_id', employee.id)
       .in('status', ['PENDING', 'APPROVED', 'REJECTED'])
       .order('created_at', { ascending: false })
