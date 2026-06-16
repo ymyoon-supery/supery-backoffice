@@ -202,10 +202,10 @@ export default function DocumentRequestClient({
           {/* Items table */}
           <div className="grid grid-cols-[120px_1fr_110px_1fr_32px] gap-x-2 gap-y-2 items-center">
             {/* Header */}
-            <span className="text-xs text-gray-400">구분</span>
-            <span className="text-xs text-gray-400">내역 *</span>
-            <span className="text-xs text-gray-400">예상금액</span>
-            <span className="text-xs text-gray-400">비고</span>
+            <span className="text-xs text-gray-400 text-center">구분</span>
+            <span className="text-xs text-gray-400 text-center">내역 *</span>
+            <span className="text-xs text-gray-400 text-center">예상금액</span>
+            <span className="text-xs text-gray-400 text-center">비고</span>
             <span />
             {/* Rows */}
             {items.map((item, idx) => (
