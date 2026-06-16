@@ -279,7 +279,16 @@ export default function AdminApprovalClient({
                         : '—'}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {isFullApprove ? (
+                      {(isFullApprove || isPendingRow) && item.kind === 'expense' ? (
+                        <div className="flex justify-end">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setSelectedExpense(item) }}
+                            className="px-3 py-1.5 text-xs font-medium border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
+                          >
+                            상세보기
+                          </button>
+                        </div>
+                      ) : isFullApprove ? (
                         rejectingId !== item.stepId && (
                           <div className="flex gap-1.5 justify-end items-center">
                             <button onClick={(e) => { e.stopPropagation(); handleFullApprove(item) }} disabled={isPending}
@@ -394,8 +403,8 @@ export default function AdminApprovalClient({
                     </tr>
                   )}
 
-                  {/* Inline reject form */}
-                  {rejectingId === item.stepId && (item.kind !== 'expense' || isFullApprove) && (
+                  {/* Inline reject form (leave / home_location only — expense uses detail sheet) */}
+                  {rejectingId === item.stepId && item.kind !== 'expense' && (
                     <tr className="bg-red-50/30 border-l-[3px] border-l-red-300">
                       <td colSpan={5} className="px-4 py-3">
                         <div className="flex items-center gap-2">
