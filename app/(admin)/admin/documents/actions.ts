@@ -80,6 +80,31 @@ export async function approveSupplyRequest(
   return { error: null }
 }
 
+export async function confirmSupplyPurchase(requestId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const { data: adminEmp } = await supabase
+    .from('employees')
+    .select('id, role')
+    .eq('auth_user_id', user.id)
+    .single()
+  if (adminEmp?.role !== 'ADMIN') return { error: 'Unauthorized' }
+
+  const admin = getAdmin()
+  const { error } = await admin
+    .from('supply_requests')
+    .update({ status: 'COMPLETED' })
+    .eq('id', requestId)
+    .eq('status', 'APPROVED')
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/documents')
+  revalidatePath('/approval/my')
+  return { error: null }
+}
+
 export async function listDocumentRequests() {
   const admin = getAdmin()
 

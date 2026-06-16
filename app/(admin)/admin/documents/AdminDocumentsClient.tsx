@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { useRouter } from 'next/navigation'
-import { completeDocumentRequest, approveSupplyRequest } from './actions'
+import { completeDocumentRequest, approveSupplyRequest, confirmSupplyPurchase } from './actions'
 
 type Tab = 'documents' | 'supply'
 
@@ -21,9 +21,10 @@ const CATEGORY_LABELS: Record<string, string> = {
 }
 
 const SUPPLY_STATUS: Record<string, { label: string; className: string }> = {
-  PENDING:  { label: '대기중',  className: 'bg-amber-50 text-amber-700' },
-  APPROVED: { label: '승인',    className: 'bg-green-50 text-green-700' },
-  REJECTED: { label: '반려',    className: 'bg-red-50 text-red-600' },
+  PENDING:   { label: '대기중',   className: 'bg-amber-50 text-amber-700' },
+  APPROVED:  { label: '승인완료', className: 'bg-green-50 text-green-700' },
+  REJECTED:  { label: '반려',     className: 'bg-red-50 text-red-600' },
+  COMPLETED: { label: '처리완료', className: 'bg-blue-50 text-blue-700' },
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -59,6 +60,15 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests 
       toast.success('반려되었습니다.')
       setRejectingId(null)
       setRejectComment('')
+      router.refresh()
+    })
+  }
+
+  function handlePurchaseConfirm(requestId: string) {
+    startTransition(async () => {
+      const res = await confirmSupplyPurchase(requestId)
+      if (res.error) { toast.error(res.error); return }
+      toast.success('구매 확인 처리되었습니다.')
       router.refresh()
     })
   }
@@ -259,6 +269,17 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests 
                         </button>
                       </div>
                     )
+                  )}
+
+                  {!canAct && req.status === 'APPROVED' && (
+                    <button
+                      type="button"
+                      onClick={() => handlePurchaseConfirm(req.id)}
+                      disabled={isPending}
+                      className="w-full py-2 text-sm font-medium bg-blue-600 text-white rounded-lg disabled:opacity-50 hover:bg-blue-700 transition-colors"
+                    >
+                      구매확인
+                    </button>
                   )}
                 </div>
               )
