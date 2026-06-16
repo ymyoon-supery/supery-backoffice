@@ -201,7 +201,7 @@ export default function DocumentRequestClient({
 
           {/* Items table */}
           <div className="space-y-2">
-            <div className="grid grid-cols-[120px_1fr_110px_1fr_32px] gap-2 px-1">
+            <div className="grid grid-cols-[120px_1fr_110px_1fr_32px] gap-2">
               <span className="text-xs text-gray-400">구분</span>
               <span className="text-xs text-gray-400">내역 *</span>
               <span className="text-xs text-gray-400">예상금액</span>

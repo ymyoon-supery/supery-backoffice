@@ -47,13 +47,35 @@ export async function approveSupplyRequest(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
 
-  const { error } = await supabase.rpc('approve_supply_step', {
-    p_request_id: requestId,
-    p_approved: approved,
-    p_comment: comment ?? null,
-  })
+  const { data: adminEmp } = await supabase
+    .from('employees')
+    .select('id, role')
+    .eq('auth_user_id', user.id)
+    .single()
+  if (adminEmp?.role !== 'ADMIN') return { error: 'Unauthorized' }
 
-  if (error) return { error: error.message }
+  const admin = getAdmin()
+  const now = new Date().toISOString()
+
+  const { error: stepErr } = await admin
+    .from('supply_approval_steps')
+    .update({
+      status: approved ? 'APPROVED' : 'REJECTED',
+      comment: comment ?? null,
+      acted_at: now,
+    })
+    .eq('supply_request_id', requestId)
+    .in('status', ['PENDING', 'WAITING'])
+
+  if (stepErr) return { error: stepErr.message }
+
+  const { error: reqErr } = await admin
+    .from('supply_requests')
+    .update({ status: approved ? 'APPROVED' : 'REJECTED' })
+    .eq('id', requestId)
+
+  if (reqErr) return { error: reqErr.message }
+
   revalidatePath('/admin/documents')
   return { error: null }
 }
