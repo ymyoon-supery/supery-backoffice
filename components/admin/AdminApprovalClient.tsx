@@ -57,6 +57,7 @@ export default function AdminApprovalClient({
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const [isNavPending, startNavTransition] = useTransition()
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [paymentDropdownId, setPaymentDropdownId] = useState<string | null>(null)
@@ -74,7 +75,7 @@ export default function AdminApprovalClient({
     const p = new URLSearchParams({ tab, type, period, sort, page: String(page), ...overrides })
     return `/admin/approval?${p}`
   }
-  const nav = (o: Record<string, string>) => router.push(buildUrl(o))
+  const nav = (o: Record<string, string>) => startNavTransition(() => router.push(buildUrl(o)))
 
   function handleApprove(item: ApprovalItem) {
     startTransition(async () => {
@@ -200,7 +201,18 @@ export default function AdminApprovalClient({
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+      <div className="relative bg-white rounded-xl border border-gray-100 overflow-hidden">
+        {isNavPending && (
+          <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center">
+            <div className="flex items-center gap-2 text-sm text-gray-400">
+              <svg className="animate-spin h-4 w-4 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              </svg>
+              불러오는 중...
+            </div>
+          </div>
+        )}
         <table className="w-full text-sm table-fixed">
           <thead>
             <tr className="border-b border-gray-100 text-xs text-gray-400 font-medium text-left bg-gray-50/50">
