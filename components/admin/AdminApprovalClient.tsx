@@ -247,26 +247,28 @@ export default function AdminApprovalClient({
                           {item.employeePosition && (
                             <p className="text-xs text-gray-400">{item.employeePosition}</p>
                           )}
-                          {isFullApprove && item.managerName && (
-                            <p className="text-xs text-orange-500 mt-0.5">{item.managerName} 결재 대기중</p>
-                          )}
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${
-                        item.kind === 'leave'
-                          ? 'bg-blue-50 text-blue-600'
-                          : item.kind === 'expense'
-                          ? 'bg-violet-50 text-violet-600'
-                          : 'bg-emerald-50 text-emerald-600'
-                      }`}>
-                        {item.kind === 'leave'
-                          ? `연차 · ${item.typeLabel}`
-                          : item.kind === 'expense'
-                          ? `지결서 · ${item.typeLabel}`
-                          : item.typeLabel}
-                      </span>
+                      <div className="space-y-1">
+                        <span className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${
+                          item.kind === 'leave'
+                            ? 'bg-blue-50 text-blue-600'
+                            : item.kind === 'expense'
+                            ? 'bg-violet-50 text-violet-600'
+                            : 'bg-emerald-50 text-emerald-600'
+                        }`}>
+                          {item.kind === 'leave'
+                            ? `연차 · ${item.typeLabel}`
+                            : item.kind === 'expense'
+                            ? `지결서 · ${item.typeLabel}`
+                            : item.typeLabel}
+                        </span>
+                        {isFullApprove && item.managerName && (
+                          <p className="text-xs text-orange-500">{item.managerName} 결재 대기중</p>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-600 leading-relaxed">
                       {item.detail}
@@ -279,11 +281,15 @@ export default function AdminApprovalClient({
                     <td className="px-4 py-3 text-right">
                       {isFullApprove ? (
                         rejectingId !== item.stepId && (
-                          <div className="flex gap-1.5 justify-end items-center flex-wrap">
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium whitespace-nowrap">
-                              팀장결재대기
-                            </span>
-                            {item.kind !== 'expense' && (
+                          <div className="flex gap-1.5 justify-end items-center">
+                            {item.kind === 'expense' ? (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setSelectedExpense(item) }}
+                                className="px-3 py-1.5 text-xs font-medium border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
+                              >
+                                상세보기
+                              </button>
+                            ) : (
                               <>
                                 <button onClick={(e) => { e.stopPropagation(); handleFullApprove(item) }} disabled={isPending}
                                   className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 transition-colors">
@@ -296,15 +302,19 @@ export default function AdminApprovalClient({
                                 </button>
                               </>
                             )}
-                            {item.kind === 'expense' && (
-                              <span className="text-xs text-gray-400">클릭하여 상세보기</span>
-                            )}
                           </div>
                         )
                       ) : isPendingRow ? (
                         rejectingId !== item.stepId && (
                           <div className="flex gap-1.5 justify-end">
-                            {item.kind !== 'expense' ? (
+                            {item.kind === 'expense' ? (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setSelectedExpense(item) }}
+                                className="px-3 py-1.5 text-xs font-medium border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
+                              >
+                                상세보기
+                              </button>
+                            ) : (
                               <>
                                 <button onClick={(e) => { e.stopPropagation(); handleApprove(item) }} disabled={isPending}
                                   className="px-3 py-1.5 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors">
@@ -316,8 +326,6 @@ export default function AdminApprovalClient({
                                   반려
                                 </button>
                               </>
-                            ) : (
-                              <span className="text-xs text-primary">클릭하여 상세보기</span>
                             )}
                           </div>
                         )
