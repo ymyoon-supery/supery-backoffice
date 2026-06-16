@@ -235,19 +235,26 @@ export default function AdminApprovalClient({
                       }
                     }}
                   >
-                    <td className="px-4 py-3 font-medium text-gray-900">
-                      {isFullApprove ? (
-                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-orange-500 mr-2 mb-px align-middle" />
-                      ) : isPendingRow ? (
-                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 mr-2 mb-px align-middle" />
-                      ) : null}
-                      {item.employeeName}
-                      {isFullApprove && item.managerName && (
-                        <p className="text-xs text-orange-500 mt-0.5 font-normal">{item.managerName} 결재 대기중</p>
-                      )}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5">
+                        {isFullApprove ? (
+                          <span className="w-1.5 h-1.5 rounded-full bg-orange-500 shrink-0" />
+                        ) : isPendingRow ? (
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                        ) : null}
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{item.employeeName}</p>
+                          {item.employeePosition && (
+                            <p className="text-xs text-gray-400">{item.employeePosition}</p>
+                          )}
+                          {isFullApprove && item.managerName && (
+                            <p className="text-xs text-orange-500 mt-0.5">{item.managerName} 결재 대기중</p>
+                          )}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${
                         item.kind === 'leave'
                           ? 'bg-blue-50 text-blue-600'
                           : item.kind === 'expense'
@@ -261,7 +268,7 @@ export default function AdminApprovalClient({
                           : item.typeLabel}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-600 truncate">
+                    <td className="px-4 py-3 text-xs text-gray-600 leading-relaxed">
                       {item.detail}
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-400 tabular-nums whitespace-nowrap">

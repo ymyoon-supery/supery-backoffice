@@ -193,7 +193,7 @@ export default function MyRequestsClient({
                     </p>
                   )}
                 </div>
-                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                <div className="flex items-center gap-1.5 shrink-0">
                   <span className={`text-xs px-2 py-1 rounded-full font-medium ${status.className}`}>
                     {status.label}
                   </span>
@@ -203,14 +203,14 @@ export default function MyRequestsClient({
                       onClick={e => {
                         e.stopPropagation()
                         handleCancel(
-                          item.kind === 'leave' ? item.displayLabel : item.displayLabel,
+                          item.displayLabel,
                           () => item.kind === 'leave'
                             ? cancelLeaveRequest(item.id)
                             : cancelExpenseRequest(item.id),
                         )
                       }}
                       disabled={isPending}
-                      className="text-xs text-gray-400 hover:text-red-500 disabled:opacity-50 transition-colors"
+                      className="text-xs px-2 py-1 rounded-full border border-red-200 text-red-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 transition-colors"
                     >
                       취소
                     </button>
@@ -246,7 +246,7 @@ export default function MyRequestsClient({
                       {doc.purpose && <span className="ml-2">· {doc.purpose}</span>}
                     </p>
                   </div>
-                  <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <span className={`text-xs px-2 py-1 rounded-full font-medium ${status.className}`}>
                       {status.label}
                     </span>
@@ -255,7 +255,7 @@ export default function MyRequestsClient({
                         type="button"
                         onClick={() => handleCancel(DOC_TYPE_LABELS[doc.doc_type] ?? doc.doc_type, () => cancelDocumentRequest(doc.id))}
                         disabled={isPending}
-                        className="text-xs text-gray-400 hover:text-red-500 disabled:opacity-50 transition-colors"
+                        className="text-xs px-2 py-1 rounded-full border border-red-200 text-red-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 transition-colors"
                       >
                         취소
                       </button>
@@ -292,7 +292,7 @@ export default function MyRequestsClient({
                       <span className="ml-2 text-primary">· {isExpanded ? '접기' : '상세보기'}</span>
                     </p>
                   </div>
-                  <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <span className={`text-xs px-2 py-1 rounded-full font-medium ${status.className}`}>
                       {status.label}
                     </span>
@@ -301,7 +301,7 @@ export default function MyRequestsClient({
                         type="button"
                         onClick={() => handleCancel('비품/소모품 신청', () => cancelSupplyRequest(req.id))}
                         disabled={isPending}
-                        className="text-xs text-gray-400 hover:text-red-500 disabled:opacity-50 transition-colors"
+                        className="text-xs px-2 py-1 rounded-full border border-red-200 text-red-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 transition-colors"
                       >
                         취소
                       </button>
