@@ -102,6 +102,8 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
       <style>{`
         @media print {
           .no-print { display: none !important; }
+          html, body { overflow: visible !important; height: auto !important; }
+          body > div, main { overflow: visible !important; height: auto !important; max-height: none !important; }
           body * { visibility: hidden; }
           .print-area, .print-area * { visibility: visible; }
           .print-area { position: absolute; top: 0; left: 0; right: 0; padding: 24px; }
