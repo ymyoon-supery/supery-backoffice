@@ -32,7 +32,7 @@ export default async function NewExpensePage() {
   }
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-4xl">
       <h1 className="text-xl font-semibold text-gray-900 mb-6">지출결의서 작성</h1>
       <ExpenseForm
         employeeId={employee.id}

@@ -24,6 +24,7 @@ type SubmitExpenseInput = {
   attachmentUrls: string[]
   taxType: string | null
   evidenceType: string | null
+  category?: string
 }
 
 export async function submitExpense(input: SubmitExpenseInput) {
@@ -36,7 +37,7 @@ export async function submitExpense(input: SubmitExpenseInput) {
   const { data, error } = await supabase.rpc('submit_expense_report', {
     p_title: input.title,
     p_amount: totalAmount,
-    p_category: 'OTHER',
+    p_category: input.category ?? 'OTHER',
     p_expense_date: input.paymentRequestDate,
     p_receipt_url: null,
     p_description: null,
