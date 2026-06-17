@@ -655,7 +655,7 @@ function CorporateCardTab({
         item: [r.merchantName.trim(), r.description.trim()].filter(Boolean).join(' — '),
         date: r.usageDate,
         amount: Number(r.amountRaw.replace(/[^0-9]/g, '')) || 0,
-        note: [r.userName.trim(), r.note.trim()].filter(Boolean).join(' / ') || undefined,
+        note: r.note.trim() || undefined,
       }))
 
       const cardDisplay = representativeCard ? `(${representativeCard})` : ''
