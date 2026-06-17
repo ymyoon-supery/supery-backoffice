@@ -35,7 +35,7 @@ export type ApprovalItem = {
   title?: string | null
   taxType?: string | null
   evidenceType?: string | null
-  lineItems?: Array<{ item: string; date: string; amount?: number; note?: string; count?: number }> | null
+  lineItems?: Array<{ item: string; date: string; amount?: number; note?: string; count?: number; userName?: string }> | null
   payee?: string | null
   paymentMethod?: string | null
   bankName?: string | null

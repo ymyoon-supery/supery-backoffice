@@ -64,7 +64,7 @@ interface ExpenseItem {
   account_holder?: string | null
   payment_request_date?: string | null
   settlement_date?: string | null
-  line_items?: Array<{ item: string; date: string; amount?: number; note?: string; count?: number }> | null
+  line_items?: Array<{ item: string; date: string; amount?: number; note?: string; count?: number; userName?: string }> | null
   attachment_urls?: string[] | null
 }
 
