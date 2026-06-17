@@ -9,6 +9,7 @@ export type LineItem = {
   date: string
   amount: number
   note?: string
+  userName?: string
 }
 
 type SubmitExpenseInput = {

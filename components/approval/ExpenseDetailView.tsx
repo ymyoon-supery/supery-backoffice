@@ -13,7 +13,7 @@ export interface ExpenseViewData {
   accountHolder: string | null
   paymentRequestDate: string | null
   settlementDate: string | null
-  lineItems: Array<{ item: string; date: string; amount?: number; note?: string; count?: number }>
+  lineItems: Array<{ item: string; date: string; amount?: number; note?: string; count?: number; userName?: string }>
   attachmentUrls: string[]
   employeeName: string
   employeePosition?: string | null
@@ -175,7 +175,12 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
                   {data.lineItems.map((li, i) => (
                     <tr key={i} className="hover:bg-gray-50/50">
                       <td className="px-3 py-2.5 text-gray-500 text-xs whitespace-nowrap">{li.date}</td>
-                      <td className="px-3 py-2.5 text-gray-700">{li.item}</td>
+                      <td className="px-3 py-2.5 text-gray-700">
+                        <span>{li.item}</span>
+                        {li.userName && (
+                          <span className="block text-xs text-gray-400 mt-0.5">{li.userName}</span>
+                        )}
+                      </td>
                       <td className="px-3 py-2.5 text-right text-gray-700 tabular-nums whitespace-nowrap">
                         {li.amount !== undefined
                           ? formatKRW(li.amount)

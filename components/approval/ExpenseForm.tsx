@@ -652,7 +652,8 @@ function CorporateCardTab({
       }
 
       const items: LineItem[] = lineItems.map(r => ({
-        item: [[r.merchantName.trim(), r.description.trim()].filter(Boolean).join(' — '), r.userName.trim() && `(${r.userName.trim()})`].filter(Boolean).join(' '),
+        item: [r.merchantName.trim(), r.description.trim()].filter(Boolean).join(' — '),
+        userName: r.userName.trim() || undefined,
         date: r.usageDate,
         amount: Number(r.amountRaw.replace(/[^0-9]/g, '')) || 0,
         note: r.note.trim() || undefined,
