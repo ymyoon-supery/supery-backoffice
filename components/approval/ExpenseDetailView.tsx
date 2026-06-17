@@ -88,7 +88,25 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
     : '—'
 
   function handlePrint() {
-    window.print()
+    const el = document.querySelector('.print-area') as HTMLElement | null
+    if (!el) { window.print(); return }
+
+    const links = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'))
+      .map(l => l.outerHTML).join('\n')
+
+    const w = window.open('', '_blank')
+    if (!w) { window.print(); return }
+
+    w.document.write(`<!DOCTYPE html>
+<html><head>
+  <meta charset="utf-8" />
+  ${links}
+  <style>body { background: white; padding: 24px; } .no-print { display: none !important; }</style>
+</head><body>
+  ${el.innerHTML}
+  <script>window.addEventListener('load', function() { setTimeout(function() { window.print(); window.close(); }, 300); });<\/script>
+</body></html>`)
+    w.document.close()
   }
 
   function handleRejectSubmit() {
@@ -100,14 +118,7 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
   return (
     <>
       <style>{`
-        @media print {
-          .no-print { display: none !important; }
-          html, body { overflow: visible !important; height: auto !important; }
-          body > div, main { overflow: visible !important; height: auto !important; max-height: none !important; }
-          body * { visibility: hidden; }
-          .print-area, .print-area * { visibility: visible; }
-          .print-area { position: absolute; top: 0; left: 0; right: 0; padding: 24px; }
-        }
+        @media print { .no-print { display: none !important; } }
       `}</style>
 
       <div className="print-area">
