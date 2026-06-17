@@ -498,10 +498,10 @@ function ExpenseTab({
           <table className="w-full text-sm" style={{ minWidth: 480 }}>
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
+                <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[110px] whitespace-nowrap">지출일</th>
                 <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500">지출항목</th>
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[140px]">지출일</th>
-                <th className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 w-[130px]">금액(원)</th>
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[140px]">비고</th>
+                <th className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 w-[120px] whitespace-nowrap">금액(원)</th>
+                <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[110px]">비고</th>
                 <th className="w-[36px]" />
               </tr>
             </thead>
@@ -509,10 +509,10 @@ function ExpenseTab({
               {lineItems.map((row, idx) => (
                 <tr key={idx}>
                   <td className="px-2 py-1.5">
-                    <input type="text" value={row.item} onChange={e => updateRow(idx, 'item', e.target.value)} placeholder="항목 입력" className="w-full text-sm px-2 py-1.5 rounded border border-transparent focus:border-gray-300 focus:outline-none bg-transparent hover:bg-gray-50 focus:bg-white" />
+                    <input type="date" value={row.date} onChange={e => updateRow(idx, 'date', e.target.value)} className="w-full text-sm px-2 py-1.5 rounded border border-transparent focus:border-gray-300 focus:outline-none bg-transparent hover:bg-gray-50 focus:bg-white" />
                   </td>
                   <td className="px-2 py-1.5">
-                    <input type="date" value={row.date} onChange={e => updateRow(idx, 'date', e.target.value)} className="w-full text-sm px-2 py-1.5 rounded border border-transparent focus:border-gray-300 focus:outline-none bg-transparent hover:bg-gray-50 focus:bg-white" />
+                    <input type="text" value={row.item} onChange={e => updateRow(idx, 'item', e.target.value)} placeholder="항목 입력" className="w-full text-sm px-2 py-1.5 rounded border border-transparent focus:border-gray-300 focus:outline-none bg-transparent hover:bg-gray-50 focus:bg-white" />
                   </td>
                   <td className="px-2 py-1.5">
                     <input type="text" inputMode="numeric" value={row.amountRaw} onChange={e => updateRow(idx, 'amountRaw', formatKRWInput(e.target.value))} placeholder="0" className="w-full text-sm px-2 py-1.5 rounded border border-transparent focus:border-gray-300 focus:outline-none bg-transparent hover:bg-gray-50 focus:bg-white text-right" />
