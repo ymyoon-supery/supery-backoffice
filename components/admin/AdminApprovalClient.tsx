@@ -11,10 +11,6 @@ import { approveHomeLocationRequest, updateExpensePaymentStatus, fullApproveLeav
 import type { ApprovalItem } from '@/app/(admin)/admin/approval/page'
 import ExpenseDetailSheet from '@/components/admin/ExpenseDetailSheet'
 
-const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  CASH: '현금', CARD: '회사카드', TRANSFER: '계좌송금',
-}
-
 const STATUS_CFG = {
   PENDING:  { label: '미결재', cls: 'bg-amber-100 text-amber-700' },
   APPROVED: { label: '승인',   cls: 'bg-green-100 text-green-700' },
@@ -200,7 +196,7 @@ export default function AdminApprovalClient({
         )}
       </div>
 
-      {/* Table */}
+      {/* List container */}
       <div className="relative bg-white rounded-xl border border-gray-100 overflow-hidden">
         {isNavPending && (
           <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center">
@@ -213,13 +209,231 @@ export default function AdminApprovalClient({
             </div>
           </div>
         )}
-        <table className="w-full text-sm">
+
+        {/* ── Mobile card list ── */}
+        <div className="md:hidden divide-y divide-gray-50">
+          {allItems.map(item => {
+            const isFullApprove = item.managerName != null
+            const isPendingRow = item.status === 'PENDING' && !isFullApprove
+            const cfg = STATUS_CFG[item.status]
+            return (
+              <Fragment key={`m-${item.stepId}`}>
+                <div
+                  className={`px-4 py-3 cursor-pointer ${
+                    isFullApprove
+                      ? 'border-l-[3px] border-l-orange-400 bg-orange-50/30'
+                      : isPendingRow
+                      ? 'border-l-[3px] border-l-amber-400 bg-amber-50/40'
+                      : ''
+                  }`}
+                  onClick={() => {
+                    if (item.kind === 'expense') {
+                      setSelectedExpense(item)
+                    } else {
+                      setExpandedId(expandedId === item.stepId ? null : item.stepId)
+                    }
+                  }}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    {/* Left: name + type + detail */}
+                    <div className="flex items-start gap-1.5 min-w-0 flex-1">
+                      {(isFullApprove || isPendingRow) && (
+                        <span className={`mt-[7px] w-1.5 h-1.5 rounded-full shrink-0 ${isFullApprove ? 'bg-orange-500' : 'bg-amber-500'}`} />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-sm font-medium text-gray-900">{item.employeeName}</span>
+                          {item.employeePosition && (
+                            <span className="text-xs text-gray-400">{item.employeePosition}</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className={`inline-flex shrink-0 text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                            item.kind === 'leave' ? 'bg-blue-50 text-blue-600' :
+                            item.kind === 'expense' ? 'bg-violet-50 text-violet-600' :
+                            'bg-emerald-50 text-emerald-600'
+                          }`}>
+                            {item.kind === 'leave' ? `연차 · ${item.typeLabel}` :
+                             item.kind === 'expense' ? `지결서 · ${item.typeLabel}` :
+                             item.typeLabel}
+                          </span>
+                          {item.requestDate && (
+                            <span className="text-xs text-gray-400 tabular-nums">
+                              {format(new Date(item.requestDate), 'MM.dd')}
+                            </span>
+                          )}
+                        </div>
+                        {isFullApprove && item.managerName && (
+                          <p className="text-xs text-orange-500 mt-0.5">{item.managerName} 결재 대기중</p>
+                        )}
+                        {item.detail && (
+                          <p className="text-xs text-gray-500 mt-1 truncate">{item.detail}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right: action buttons or status */}
+                    <div className="shrink-0 flex flex-col items-end gap-1">
+                      {(isFullApprove || isPendingRow) && item.kind === 'expense' ? (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setSelectedExpense(item) }}
+                          className="px-2.5 py-1 text-xs font-medium border border-gray-200 text-gray-600 rounded-lg"
+                        >
+                          상세
+                        </button>
+                      ) : isFullApprove ? (
+                        rejectingId !== item.stepId && (
+                          <div className="flex gap-1">
+                            <button onClick={(e) => { e.stopPropagation(); handleFullApprove(item) }} disabled={isPending}
+                              className="px-2.5 py-1 text-xs font-medium bg-orange-500 text-white rounded-lg disabled:opacity-50">
+                              전결
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); setRejectingId(item.stepId); setRejectReason('') }}
+                              disabled={isPending}
+                              className="px-2.5 py-1 text-xs font-medium border border-red-200 text-red-600 rounded-lg disabled:opacity-50">
+                              반려
+                            </button>
+                          </div>
+                        )
+                      ) : isPendingRow ? (
+                        rejectingId !== item.stepId && (
+                          <div className="flex gap-1">
+                            <button onClick={(e) => { e.stopPropagation(); handleApprove(item) }} disabled={isPending}
+                              className="px-2.5 py-1 text-xs font-medium bg-primary text-white rounded-lg disabled:opacity-50">
+                              승인
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); setRejectingId(item.stepId); setRejectReason('') }}
+                              disabled={isPending}
+                              className="px-2.5 py-1 text-xs font-medium border border-red-200 text-red-600 rounded-lg disabled:opacity-50">
+                              반려
+                            </button>
+                          </div>
+                        )
+                      ) : (
+                        <div className="flex flex-col items-end gap-1">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cfg.cls}`}>
+                            {cfg.label}
+                          </span>
+                          {item.status === 'REJECTED' && item.comment && (
+                            <span className="text-xs text-gray-400 max-w-[120px] truncate">{item.comment}</span>
+                          )}
+                          {item.status === 'APPROVED' && item.kind === 'expense' && item.paymentStatus && (
+                            <div className="relative">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setPaymentDropdownId(paymentDropdownId === item.stepId ? null : item.stepId) }}
+                                disabled={isPending}
+                                className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${PAYMENT_STATUS_CFG[item.paymentStatus].cls} hover:opacity-80`}
+                              >
+                                {PAYMENT_STATUS_CFG[item.paymentStatus].label}
+                                <ChevronDown size={10} />
+                              </button>
+                              {paymentDropdownId === item.stepId && (
+                                <div className="absolute right-0 top-full mt-1 z-10 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[140px]">
+                                  {PAYMENT_STATUS_NEXT[item.paymentStatus!].map(opt => (
+                                    <button key={opt.value} onClick={() => handlePaymentStatus(item, opt.value)}
+                                      className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50">
+                                      {opt.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Inline expansion (leave only) */}
+                {expandedId === item.stepId && item.kind !== 'expense' && item.kind !== 'home_location' && (
+                  <div className={`px-4 py-4 ${
+                    isFullApprove
+                      ? 'bg-orange-50/40 border-l-[3px] border-l-orange-200'
+                      : 'bg-gray-50/60 border-l-[3px] border-l-gray-200'
+                  }`}>
+                    {item.kind === 'leave' && (
+                      <div className="space-y-3 text-sm">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <span className="text-gray-400 text-xs">부여 연차</span>
+                            <p className="font-semibold text-gray-900 mt-0.5">
+                              {item.totalLeaves != null ? `${item.totalLeaves}일` : '—'}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-gray-400 text-xs">잔여 연차</span>
+                            <p className="font-semibold text-gray-900 mt-0.5">
+                              {item.remainingLeaves != null ? `${item.remainingLeaves}일` : '—'}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-gray-400 text-xs">유형</span>
+                            <p className="font-medium text-gray-900 mt-0.5">{item.typeLabel}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-400 text-xs">기간</span>
+                            <p className="font-medium text-gray-900 mt-0.5">{item.detail.split(' · ').slice(1).join(' · ')}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-400 text-xs">사용 일수</span>
+                            <p className="font-medium text-gray-900 mt-0.5">{item.detail.split(' · ')[0]}</p>
+                          </div>
+                        </div>
+                        {item.reason && (
+                          <div>
+                            <span className="text-gray-400 text-xs">사유</span>
+                            <p className="text-gray-700 mt-0.5">{item.reason}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Inline reject form */}
+                {rejectingId === item.stepId && item.kind !== 'expense' && (
+                  <div className="bg-red-50/30 border-l-[3px] border-l-red-300 px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={rejectReason}
+                        onChange={e => setRejectReason(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && (isFullApprove ? handleFullReject(item, rejectReason || undefined) : handleReject(item, rejectReason || undefined))}
+                        placeholder="반려 사유 (선택)"
+                        autoFocus
+                        className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-red-200"
+                      />
+                      <button onClick={() => isFullApprove ? handleFullReject(item, rejectReason || undefined) : handleReject(item, rejectReason || undefined)} disabled={isPending}
+                        className="px-3 py-1.5 text-xs font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 whitespace-nowrap">
+                        반려 확인
+                      </button>
+                      <button onClick={() => setRejectingId(null)}
+                        className="px-3 py-1.5 text-xs text-gray-500">
+                        취소
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </Fragment>
+            )
+          })}
+
+          {allItems.length === 0 && (
+            <div className="px-4 py-14 text-center text-sm text-gray-400">
+              {tab === 'pending' ? '미결재 항목이 없습니다.' : '결재 내역이 없습니다.'}
+            </div>
+          )}
+        </div>
+
+        {/* ── Desktop table ── */}
+        <table className="hidden md:table w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 text-xs text-gray-400 font-medium text-left bg-gray-50/50">
               <th className="px-4 py-3">직원</th>
               <th className="px-4 py-3">유형</th>
-              <th className="px-4 py-3 hidden md:table-cell">내용</th>
-              <th className="px-4 py-3 hidden md:table-cell whitespace-nowrap">신청일시</th>
+              <th className="px-4 py-3">내용</th>
+              <th className="px-4 py-3 whitespace-nowrap">신청일시</th>
               <th className="px-4 py-3 text-right">{tab === 'pending' ? '처리' : '상태'}</th>
             </tr>
           </thead>
@@ -282,10 +496,10 @@ export default function AdminApprovalClient({
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-600 leading-relaxed hidden md:table-cell">
+                    <td className="px-4 py-3 text-xs text-gray-600 leading-relaxed">
                       {item.detail}
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-400 tabular-nums whitespace-nowrap hidden md:table-cell">
+                    <td className="px-4 py-3 text-xs text-gray-400 tabular-nums whitespace-nowrap">
                       {item.requestDate
                         ? format(new Date(item.requestDate), 'yyyy.MM.dd HH:mm')
                         : '—'}
@@ -415,7 +629,7 @@ export default function AdminApprovalClient({
                     </tr>
                   )}
 
-                  {/* Inline reject form (leave / home_location only — expense uses detail sheet) */}
+                  {/* Inline reject form (leave / home_location only) */}
                   {rejectingId === item.stepId && item.kind !== 'expense' && (
                     <tr className="bg-red-50/30 border-l-[3px] border-l-red-300">
                       <td colSpan={5} className="px-4 py-3">
@@ -485,7 +699,7 @@ export default function AdminApprovalClient({
         </div>
       )}
 
-      {/* Expense detail sheet (right panel) */}
+      {/* Expense detail sheet */}
       {selectedExpense && (
         <ExpenseDetailSheet
           item={selectedExpense}
