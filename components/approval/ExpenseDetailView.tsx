@@ -157,7 +157,7 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
             <div>
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">지출 내역</p>
               <div className="overflow-x-auto">
-              <table className="w-full border border-gray-200 rounded-lg overflow-hidden text-sm">
+              <table className="w-full border border-gray-200 rounded-lg overflow-hidden text-sm" style={{ minWidth: 400 }}>
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[16%] whitespace-nowrap">지출일</th>
