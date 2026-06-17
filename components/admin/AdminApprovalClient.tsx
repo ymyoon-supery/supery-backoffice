@@ -213,14 +213,14 @@ export default function AdminApprovalClient({
             </div>
           </div>
         )}
-        <table className="w-full text-sm table-fixed">
+        <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 text-xs text-gray-400 font-medium text-left bg-gray-50/50">
-              <th className="px-4 py-3 w-[130px]">직원</th>
-              <th className="px-4 py-3 w-[150px]">유형</th>
-              <th className="px-4 py-3">내용</th>
-              <th className="px-4 py-3 w-[120px] whitespace-nowrap">신청일시</th>
-              <th className="px-4 py-3 w-[200px] text-right">{tab === 'pending' ? '처리' : '상태'}</th>
+              <th className="px-4 py-3">직원</th>
+              <th className="px-4 py-3">유형</th>
+              <th className="px-4 py-3 hidden md:table-cell">내용</th>
+              <th className="px-4 py-3 hidden md:table-cell whitespace-nowrap">신청일시</th>
+              <th className="px-4 py-3 text-right">{tab === 'pending' ? '처리' : '상태'}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -282,10 +282,10 @@ export default function AdminApprovalClient({
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-600 leading-relaxed">
+                    <td className="px-4 py-3 text-xs text-gray-600 leading-relaxed hidden md:table-cell">
                       {item.detail}
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-400 tabular-nums whitespace-nowrap">
+                    <td className="px-4 py-3 text-xs text-gray-400 tabular-nums whitespace-nowrap hidden md:table-cell">
                       {item.requestDate
                         ? format(new Date(item.requestDate), 'yyyy.MM.dd HH:mm')
                         : '—'}
@@ -377,7 +377,7 @@ export default function AdminApprovalClient({
                       <td colSpan={5} className="px-6 py-4">
                         {item.kind === 'leave' && (
                           <div className="space-y-3 text-sm">
-                            <div className="flex items-center gap-6">
+                            <div className="grid grid-cols-2 gap-3 sm:flex sm:items-center sm:gap-6">
                               <div>
                                 <span className="text-gray-400 text-xs">부여 연차</span>
                                 <p className="font-semibold text-gray-900 mt-0.5">

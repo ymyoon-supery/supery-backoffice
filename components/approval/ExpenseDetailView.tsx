@@ -66,7 +66,7 @@ function formatKRW(n: number) {
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <tr className="border-b border-gray-200">
-      <td className="px-4 py-2.5 text-xs font-medium text-gray-500 bg-gray-50 w-[130px] whitespace-nowrap border-r border-gray-200">
+      <td className="px-4 py-2.5 text-xs font-medium text-gray-500 bg-gray-50 w-20 md:w-[130px] whitespace-nowrap border-r border-gray-200">
         {label}
       </td>
       <td className="px-4 py-2.5 text-sm text-gray-900">{value || '—'}</td>
@@ -127,8 +127,9 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
             </div>
           </div>
 
-          <div className="p-6 space-y-5">
+          <div className="p-4 md:p-6 space-y-5">
             {/* Basic info table */}
+            <div className="overflow-x-auto">
             <table className="w-full border border-gray-200 rounded-lg overflow-hidden text-sm">
               <tbody>
                 <Row label="제목" value={data.title} />
@@ -150,17 +151,19 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
                 <Row label="신청일" value={requestDateStr} />
               </tbody>
             </table>
+            </div>
 
             {/* Line items table */}
             <div>
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">지출 내역</p>
+              <div className="overflow-x-auto">
               <table className="w-full border border-gray-200 rounded-lg overflow-hidden text-sm">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500">지출항목</th>
-                    <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 w-[130px]">지출일</th>
-                    <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 w-[130px]">금액</th>
-                    <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 w-[160px]">비고</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 w-[110px]">지출일</th>
+                    <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 w-[110px]">금액</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 w-[100px]">비고</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -194,6 +197,7 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
                   </tr>
                 </tfoot>
               </table>
+              </div>
             </div>
 
             {/* Attachments */}
