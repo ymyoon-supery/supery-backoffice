@@ -14,9 +14,15 @@ export async function createClient() {
         },
         setAll(cookiesToSet: Parameters<SetAllCookies>[0]) {
           try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options as never),
-            )
+            cookiesToSet.forEach(({ name, value, options }) => {
+              const opts = (options ?? {}) as Record<string, unknown>
+              cookieStore.set(name, value, {
+                ...options,
+                maxAge: typeof opts.maxAge === 'number' ? opts.maxAge : 60 * 60 * 24 * 365,
+                sameSite: 'lax',
+                secure: process.env.NODE_ENV === 'production',
+              } as never)
+            })
           } catch {
             // setAll called from Server Component — safe to ignore
           }
@@ -39,9 +45,15 @@ export async function createServiceClient() {
         },
         setAll(cookiesToSet: Parameters<SetAllCookies>[0]) {
           try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options as never),
-            )
+            cookiesToSet.forEach(({ name, value, options }) => {
+              const opts = (options ?? {}) as Record<string, unknown>
+              cookieStore.set(name, value, {
+                ...options,
+                maxAge: typeof opts.maxAge === 'number' ? opts.maxAge : 60 * 60 * 24 * 365,
+                sameSite: 'lax',
+                secure: process.env.NODE_ENV === 'production',
+              } as never)
+            })
           } catch {}
         },
       },

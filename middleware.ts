@@ -17,9 +17,16 @@ export async function middleware(request: NextRequest) {
             request.cookies.set(name, value),
           )
           supabaseResponse = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options as never),
-          )
+          cookiesToSet.forEach(({ name, value, options }) => {
+            const opts = (options ?? {}) as Record<string, unknown>
+            supabaseResponse.cookies.set(name, value, {
+              ...options,
+              // 모바일 브라우저가 앱 종료 시 쿠키를 삭제하지 않도록 maxAge 명시
+              maxAge: typeof opts.maxAge === 'number' ? opts.maxAge : 60 * 60 * 24 * 365,
+              sameSite: 'lax',
+              secure: process.env.NODE_ENV === 'production',
+            } as never)
+          })
         },
       },
     },
