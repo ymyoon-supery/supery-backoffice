@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Sidebar from '@/components/layout/Sidebar'
 import Header from '@/components/layout/Header'
+import { MobileSidebarProvider } from '@/components/layout/MobileSidebarContext'
+import MobileMenuButton from '@/components/layout/MobileMenuButton'
 
 export default async function DashboardLayout({
   children,
@@ -38,16 +40,18 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar
-        role={employee.role}
-        position={employee.position ?? null}
-        pendingCount={pendingCount}
-      />
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <Header employee={employee} />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+    <MobileSidebarProvider>
+      <div className="flex h-screen bg-gray-50">
+        <Sidebar
+          role={employee.role}
+          position={employee.position ?? null}
+          pendingCount={pendingCount}
+        />
+        <div className="flex flex-col flex-1 overflow-hidden min-w-0">
+          <Header employee={employee} leftSlot={<MobileMenuButton />} />
+          <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
+        </div>
       </div>
-    </div>
+    </MobileSidebarProvider>
   )
 }

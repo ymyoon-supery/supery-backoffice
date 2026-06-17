@@ -6,9 +6,10 @@ import { useState, useEffect } from 'react'
 import {
   Clock, FileText, BarChart2, Users, ClipboardList, Home,
   Bell, FilePlus, CalendarDays, Settings, Megaphone, Inbox,
-  Receipt, Package, Loader2,
+  Receipt, Package, Loader2, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useMobileSidebar } from './MobileSidebarContext'
 
 const adminNavGroups = [
   {
@@ -72,6 +73,7 @@ export default function Sidebar({
 }) {
   const pathname = usePathname()
   const [pendingHref, setPendingHref] = useState<string | null>(null)
+  const { isOpen, close } = useMobileSidebar()
   const isAdmin = role === 'ADMIN'
   const isTeamLead = position === '팀장'
 
@@ -128,9 +130,31 @@ export default function Sidebar({
   ]
 
   return (
-    <aside className="w-56 bg-white border-r border-gray-100 flex flex-col">
-      <div className="h-14 flex items-center px-5 border-b border-gray-100">
+    <>
+      {/* 모바일 오버레이 */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-40 md:hidden"
+          onClick={close}
+          aria-hidden="true"
+        />
+      )}
+
+    <aside className={cn(
+      'fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-100 flex flex-col transition-transform duration-300 ease-in-out',
+      'md:relative md:z-auto md:w-56 md:translate-x-0 md:transition-none',
+      isOpen ? 'translate-x-0' : '-translate-x-full',
+    )}>
+      <div className="h-14 flex items-center justify-between px-5 border-b border-gray-100">
         <span className="font-bold text-gray-900 text-sm">WorkSync</span>
+        <button
+          type="button"
+          onClick={close}
+          aria-label="메뉴 닫기"
+          className="md:hidden p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
+        >
+          <X size={16} />
+        </button>
       </div>
 
       <nav className="flex-1 px-2 py-2 space-y-0.5 overflow-y-auto">
@@ -145,7 +169,7 @@ export default function Sidebar({
               <Link
                 key={href}
                 href={href}
-                onClick={() => setPendingHref(href)}
+                onClick={() => { setPendingHref(href); close() }}
                 className={linkClass(href, exact)}
               >
                 <Icon size={16} />
@@ -176,7 +200,7 @@ export default function Sidebar({
                     <Link
                       key={href}
                       href={href}
-                      onClick={() => setPendingHref(href)}
+                      onClick={() => { setPendingHref(href); close() }}
                       className={linkClass(href, false)}
                     >
                       <Icon size={16} />
@@ -191,5 +215,6 @@ export default function Sidebar({
         )}
       </nav>
     </aside>
+    </>
   )
 }

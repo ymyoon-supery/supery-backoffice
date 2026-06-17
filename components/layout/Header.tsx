@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Image from 'next/image'
@@ -19,10 +20,10 @@ async function signOut() {
   redirect('/login')
 }
 
-export default function Header({ employee }: { employee: Employee }) {
+export default function Header({ employee, leftSlot }: { employee: Employee; leftSlot?: ReactNode }) {
   return (
-    <header className="h-14 bg-white border-b border-gray-100 flex items-center justify-between px-6">
-      <div />
+    <header className="h-14 bg-white border-b border-gray-100 flex items-center justify-between px-4 md:px-6">
+      <div className="flex items-center">{leftSlot}</div>
       <div className="flex items-center gap-3">
         <span className="text-sm text-gray-600">{employee.name}</span>
         {employee.avatar_url ? (

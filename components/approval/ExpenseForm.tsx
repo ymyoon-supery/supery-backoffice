@@ -446,7 +446,7 @@ function ExpenseTab({
           ))}
         </div>
         {paymentMethod === 'TRANSFER' && (
-          <div className="grid grid-cols-3 gap-3 pt-1">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
             {[
               { label: '은행명', value: bankName, onChange: setBankName, placeholder: '국민은행' },
               { label: '계좌번호', value: accountNumber, onChange: setAccountNumber, placeholder: '000-0000-0000' },
@@ -468,7 +468,7 @@ function ExpenseTab({
       </div>
 
       {/* 날짜 */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <SectionLabel>지급요청일</SectionLabel>
           <input
