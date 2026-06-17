@@ -104,7 +104,7 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
           .no-print { display: none !important; }
           body * { visibility: hidden; }
           .print-area, .print-area * { visibility: visible; }
-          .print-area { position: fixed; inset: 0; padding: 24px; }
+          .print-area { position: absolute; top: 0; left: 0; right: 0; padding: 24px; }
         }
       `}</style>
 
