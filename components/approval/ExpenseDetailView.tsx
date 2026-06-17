@@ -160,10 +160,10 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
               <table className="w-full border border-gray-200 rounded-lg overflow-hidden text-sm">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500">지출항목</th>
-                    <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 w-[110px]">지출일</th>
-                    <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 w-[110px]">금액</th>
-                    <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 w-[100px]">비고</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[88px] whitespace-nowrap">지출일</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500">지출항목</th>
+                    <th className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 w-[110px] whitespace-nowrap">금액</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[80px]">비고</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -174,16 +174,16 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
                   )}
                   {data.lineItems.map((li, i) => (
                     <tr key={i} className="hover:bg-gray-50/50">
-                      <td className="px-4 py-2.5 text-gray-700">{li.item}</td>
-                      <td className="px-4 py-2.5 text-gray-500">{li.date}</td>
-                      <td className="px-4 py-2.5 text-right text-gray-700 tabular-nums">
+                      <td className="px-3 py-2.5 text-gray-500 text-xs whitespace-nowrap">{li.date}</td>
+                      <td className="px-3 py-2.5 text-gray-700">{li.item}</td>
+                      <td className="px-3 py-2.5 text-right text-gray-700 tabular-nums whitespace-nowrap">
                         {li.amount !== undefined
                           ? formatKRW(li.amount)
                           : li.count !== undefined
                           ? `${li.count}건`
                           : '—'}
                       </td>
-                      <td className="px-4 py-2.5 text-gray-500 text-xs">{li.note ?? ''}</td>
+                      <td className="px-3 py-2.5 text-gray-500 text-xs">{li.note ?? ''}</td>
                     </tr>
                   ))}
                 </tbody>
