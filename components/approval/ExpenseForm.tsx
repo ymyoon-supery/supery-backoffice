@@ -498,11 +498,11 @@ function ExpenseTab({
           <table className="w-full text-sm" style={{ minWidth: 480 }}>
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[110px] whitespace-nowrap">지출일</th>
+                <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[18%] whitespace-nowrap">지출일</th>
                 <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500">지출항목</th>
-                <th className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 w-[120px] whitespace-nowrap">금액(원)</th>
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[110px]">비고</th>
-                <th className="w-[36px]" />
+                <th className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 w-[20%] whitespace-nowrap">금액(원)</th>
+                <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[16%]">비고</th>
+                <th className="w-[4%]" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
