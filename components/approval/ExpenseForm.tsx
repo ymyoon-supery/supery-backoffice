@@ -714,19 +714,19 @@ function CorporateCardTab({
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 {/* Excel 자동 추출 항목 */}
-                <th className="px-3 py-2.5 text-center text-xs font-medium text-blue-600 w-[90px] bg-blue-50/60">
+                <th className="px-3 py-2.5 text-center text-xs font-medium text-blue-600 w-[8%] bg-blue-50/60">
                   카드번호<br />(끝4자리)
                 </th>
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-blue-600 w-[90px] bg-blue-50/60">이용자명</th>
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-blue-600 w-[130px] bg-blue-50/60">이용일</th>
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-blue-600 bg-blue-50/60">가맹점명</th>
-                <th className="px-3 py-2.5 text-right text-xs font-medium text-blue-600 w-[120px] bg-blue-50/60">이용금액(원)</th>
+                <th className="px-3 py-2.5 text-left text-xs font-medium text-blue-600 w-[9%] bg-blue-50/60">이용자명</th>
+                <th className="px-3 py-2.5 text-left text-xs font-medium text-blue-600 w-[12%] bg-blue-50/60 whitespace-nowrap">이용일</th>
+                <th className="px-3 py-2.5 text-left text-xs font-medium text-blue-600 w-[18%] bg-blue-50/60">가맹점명</th>
+                <th className="px-3 py-2.5 text-right text-xs font-medium text-blue-600 w-[12%] bg-blue-50/60 whitespace-nowrap">이용금액(원)</th>
                 {/* 수동 입력 항목 */}
                 <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 border-l-2 border-blue-100">사용내역</th>
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[120px]">
+                <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[10%]">
                   비고 <span className="text-gray-400 font-normal">(선택)</span>
                 </th>
-                <th className="w-[36px]" />
+                <th className="w-[4%]" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -909,13 +909,13 @@ function TransportationTab({
           <table className="w-full text-sm" style={{ minWidth: 420 }}>
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[140px]">이용일</th>
-                <th className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 w-[130px]">금액(원)</th>
+                <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[20%] whitespace-nowrap">이용일</th>
+                <th className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 w-[20%] whitespace-nowrap">금액(원)</th>
                 <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500">사용내역</th>
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[140px]">
+                <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[16%]">
                   비고 <span className="text-gray-400 font-normal">(선택)</span>
                 </th>
-                <th className="w-[36px]" />
+                <th className="w-[4%]" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
