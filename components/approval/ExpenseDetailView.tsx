@@ -111,9 +111,9 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
       <div className="print-area">
         {/* Document header */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="bg-gray-50 border-b border-gray-200 px-6 py-5 text-center relative">
+          <div className="bg-gray-50 border-b border-gray-200 px-4 md:px-6 py-4 md:py-5 text-center relative">
             <h2 className="text-lg font-bold text-gray-900 tracking-[0.4em]">지  출  결  의  서</h2>
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 no-print">
+            <div className="flex items-center justify-center gap-2 mt-2 md:mt-0 md:absolute md:right-4 md:top-1/2 md:-translate-y-1/2 no-print">
               <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${statusCfg.cls}`}>
                 {statusCfg.label}
               </span>
