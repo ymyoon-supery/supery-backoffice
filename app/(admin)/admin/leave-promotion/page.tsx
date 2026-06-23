@@ -23,6 +23,8 @@ export default async function LeavePromotionPage({
   const params = await searchParams
   const year = parseInt(params.year ?? String(new Date().getFullYear()))
 
+  const yearStart = `${new Date().getFullYear()}-01-01`
+
   const [{ data: rawEmployees }, { data: notices }, { data: teams }, { data: groups }, { data: usedTotals }] = await Promise.all([
     supabase
       .from('employees')
@@ -38,7 +40,8 @@ export default async function LeavePromotionPage({
     admin.from('leave_requests')
       .select('employee_id, leave_type, days_used')
       .eq('status', 'APPROVED')
-      .in('leave_type', DEDUCTS),
+      .in('leave_type', DEDUCTS)
+      .gte('start_date', yearStart),
   ])
 
   const today = new Date()

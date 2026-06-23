@@ -28,6 +28,8 @@ export default async function LeavePage() {
 
   if (!employee) redirect('/login')
 
+  const yearStart = `${new Date().getFullYear()}-01-01`
+
   const [{ data: records }, { data: usedRows }] = await Promise.all([
     supabase
       .from('leave_requests')
@@ -40,7 +42,8 @@ export default async function LeavePage() {
       .select('days_used')
       .eq('employee_id', employee.id)
       .eq('status', 'APPROVED')
-      .in('leave_type', [...DEDUCTS]),
+      .in('leave_type', [...DEDUCTS])
+      .gte('start_date', yearStart),
   ])
 
   const today = new Date()

@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import LeaveForm from '@/components/approval/LeaveForm'
 import { calcAnnualLeave } from '@/lib/annualLeave'
 
-const DEDUCTS = new Set(['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF', 'GROUP'])
+const DEDUCTS = ['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF', 'GROUP']
 
 export default async function NewLeavePage() {
   const supabase = await createClient()
@@ -18,19 +18,22 @@ export default async function NewLeavePage() {
 
   if (!employee) redirect('/login')
 
+  const yearStart = `${new Date().getFullYear()}-01-01`
+
   const { data: usedRows } = await supabase
     .from('leave_requests')
     .select('days_used')
     .eq('employee_id', employee.id)
     .eq('status', 'APPROVED')
-    .in('leave_type', [...DEDUCTS])
+    .in('leave_type', DEDUCTS)
+    .gte('start_date', yearStart)
 
   const today = new Date()
   const entitlement = employee.hired_at
     ? calcAnnualLeave(new Date(employee.hired_at), today)
     : (employee.annual_leave_days ?? 15)
 
-  const used = Math.round(((usedRows ?? []).reduce((s: number, r: { days_used: number }) => s + Number(r.days_used), 0)) * 10) / 10
+  const used = Math.round(((usedRows ?? []).reduce((s, r) => s + Number(r.days_used), 0)) * 10) / 10
   const remaining = Math.max(Math.round((entitlement - used) * 10) / 10, 0)
 
   return (

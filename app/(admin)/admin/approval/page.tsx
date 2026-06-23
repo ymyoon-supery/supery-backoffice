@@ -2,8 +2,10 @@ import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import AdminApprovalClient from '@/components/admin/AdminApprovalClient'
+import { calcAnnualLeave } from '@/lib/annualLeave'
 
 const PAGE_SIZE = 20
+const DEDUCTS_LEAVE = ['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF', 'GROUP']
 
 const LEAVE_LABELS: Record<string, string> = {
   ANNUAL: '연차', HALF_DAY: '반차', AM_HALF: '오전반차', PM_HALF: '오후반차',
@@ -93,6 +95,10 @@ export default async function AdminApprovalPage({
 
   const statusFilter = tab === 'pending' ? ['PENDING'] : ['APPROVED', 'REJECTED']
 
+  const empInfoMap: Record<string, { hiredAt: string | null; annualLeaveDays: number }> = {}
+  const leaveItemEmpIds: (string | null)[] = []
+  const fullApproveItemEmpIds: (string | null)[] = []
+
   // ── Leave steps ──────────────────────────────────────────────
   let leaveItems: ApprovalItem[] = []
   if (type !== 'expense' && type !== 'home_location') {
@@ -102,7 +108,7 @@ export default async function AdminApprovalPage({
         id, status, comment,
         leave_requests (
           id, leave_type, start_date, end_date, days_used, reason, created_at,
-          employees ( name, annual_leave_days, remaining_leaves )
+          employees ( id, name, hired_at, annual_leave_days )
         )
       `)
       .eq('approver_id', employee.id)
@@ -110,10 +116,15 @@ export default async function AdminApprovalPage({
     if (fromDate) q = q.gte('created_at', fromDate)
 
     const { data } = await q
-    leaveItems = (data ?? []).flatMap((s: any) => {
+    for (const s of (data ?? []) as any[]) {
       const req = s.leave_requests
-      if (!req) return []
-      return [{
+      if (!req) continue
+      const empId: string | null = req.employees?.id ?? null
+      if (empId && req.employees) {
+        empInfoMap[empId] = { hiredAt: req.employees.hired_at ?? null, annualLeaveDays: req.employees.annual_leave_days ?? 15 }
+      }
+      leaveItemEmpIds.push(empId)
+      leaveItems.push({
         stepId:          s.id,
         kind:            'leave' as const,
         requestId:       req.id,
@@ -124,10 +135,10 @@ export default async function AdminApprovalPage({
         status:          s.status,
         comment:         s.comment,
         reason:          req.reason ?? null,
-        totalLeaves:     req.employees?.annual_leave_days ?? null,
-        remainingLeaves: req.employees?.remaining_leaves ?? null,
-      }]
-    })
+        totalLeaves:     null,
+        remainingLeaves: null,
+      })
+    }
   }
 
   // ── Expense steps ─────────────────────────────────────────────
@@ -214,7 +225,7 @@ export default async function AdminApprovalPage({
     if (type !== 'expense' && type !== 'home_location') {
       const { data: waitingLeave } = await admin
         .from('leave_approval_steps')
-        .select(`id, leave_request_id, leave_requests ( id, leave_type, start_date, end_date, days_used, reason, created_at, employees ( name, annual_leave_days, remaining_leaves ) )`)
+        .select(`id, leave_request_id, leave_requests ( id, leave_type, start_date, end_date, days_used, reason, created_at, employees ( id, name, hired_at, annual_leave_days ) )`)
         .eq('approver_id', employee.id)
         .eq('status', 'WAITING')
         .eq('step_order', 2)
@@ -231,26 +242,29 @@ export default async function AdminApprovalPage({
         const managerByReqId = Object.fromEntries(
           (step1s ?? []).map((s: any) => [s.leave_request_id, s.employees?.name ?? '—'])
         )
-        fullApproveLeaveItems = waitingLeave
-          .filter((s: any) => managerByReqId[s.leave_request_id])
-          .flatMap((s: any) => {
-            const req = s.leave_requests
-            if (!req) return []
-            return [{
-              stepId:          s.id,
-              kind:            'leave' as const,
-              requestId:       req.id,
-              employeeName:    req.employees?.name ?? '—',
-              managerName:     managerByReqId[s.leave_request_id],
-              typeLabel:       LEAVE_LABELS[req.leave_type] ?? req.leave_type,
-              detail:          `${req.days_used}일 · ${req.start_date}${req.start_date !== req.end_date ? ` ~ ${req.end_date}` : ''}`,
-              requestDate:     req.created_at,
-              status:          'PENDING' as const,
-              reason:          req.reason ?? null,
-              totalLeaves:     req.employees?.annual_leave_days ?? null,
-              remainingLeaves: req.employees?.remaining_leaves ?? null,
-            }]
+        for (const s of waitingLeave.filter((s: any) => managerByReqId[s.leave_request_id])) {
+          const req = (s as any).leave_requests
+          if (!req) continue
+          const empId: string | null = req.employees?.id ?? null
+          if (empId && req.employees) {
+            empInfoMap[empId] = { hiredAt: req.employees.hired_at ?? null, annualLeaveDays: req.employees.annual_leave_days ?? 15 }
+          }
+          fullApproveItemEmpIds.push(empId)
+          fullApproveLeaveItems.push({
+            stepId:          (s as any).id,
+            kind:            'leave' as const,
+            requestId:       req.id,
+            employeeName:    req.employees?.name ?? '—',
+            managerName:     managerByReqId[(s as any).leave_request_id],
+            typeLabel:       LEAVE_LABELS[req.leave_type] ?? req.leave_type,
+            detail:          `${req.days_used}일 · ${req.start_date}${req.start_date !== req.end_date ? ` ~ ${req.end_date}` : ''}`,
+            requestDate:     req.created_at,
+            status:          'PENDING' as const,
+            reason:          req.reason ?? null,
+            totalLeaves:     null,
+            remainingLeaves: null,
           })
+        }
       }
     }
 
@@ -308,6 +322,39 @@ export default async function AdminApprovalPage({
           })
       }
     }
+  }
+
+  // ── 연차 잔여 동적 계산 (입사일 기준, 올해 승인 사용량 기준) ──────
+  const allLeaveEmpIds = [...new Set([...leaveItemEmpIds, ...fullApproveItemEmpIds].filter((id): id is string => !!id))]
+  if (allLeaveEmpIds.length > 0) {
+    const yearStart = `${new Date().getFullYear()}-01-01`
+    const { data: usedTotals } = await admin
+      .from('leave_requests')
+      .select('employee_id, days_used')
+      .eq('status', 'APPROVED')
+      .in('leave_type', DEDUCTS_LEAVE)
+      .gte('start_date', yearStart)
+      .in('employee_id', allLeaveEmpIds)
+
+    const usedByEmp: Record<string, number> = {}
+    for (const r of usedTotals ?? []) {
+      usedByEmp[r.employee_id] = (usedByEmp[r.employee_id] ?? 0) + Number(r.days_used)
+    }
+
+    const today = new Date()
+    const patchLeave = (items: ApprovalItem[], empIds: (string | null)[]) => {
+      items.forEach((item, idx) => {
+        const empId = empIds[idx]
+        if (!empId) return
+        const info = empInfoMap[empId]
+        if (!info) return
+        const entitlement = info.hiredAt ? calcAnnualLeave(new Date(info.hiredAt), today) : (info.annualLeaveDays ?? 15)
+        item.totalLeaves = entitlement
+        item.remainingLeaves = Math.max(Math.round((entitlement - (usedByEmp[empId] ?? 0)) * 10) / 10, 0)
+      })
+    }
+    patchLeave(leaveItems, leaveItemEmpIds)
+    patchLeave(fullApproveLeaveItems, fullApproveItemEmpIds)
   }
 
   // ── Merge, sort, paginate ─────────────────────────────────────

@@ -17,6 +17,8 @@ export default async function LeaveManualPage() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   )
 
+  const yearStart = `${new Date().getFullYear()}-01-01`
+
   const [{ data: rawEmployees }, { data: leaveRecords, error: leaveError }, { data: usedTotals }] = await Promise.all([
     admin.from('employees').select('id, name, email, hired_at, annual_leave_days, remaining_leaves').eq('is_active', true).order('name'),
     admin.from('leave_requests')
@@ -27,7 +29,8 @@ export default async function LeaveManualPage() {
     admin.from('leave_requests')
       .select('employee_id, leave_type, days_used')
       .eq('status', 'APPROVED')
-      .in('leave_type', DEDUCTS),
+      .in('leave_type', DEDUCTS)
+      .gte('start_date', yearStart),
   ])
 
   const today = new Date()
