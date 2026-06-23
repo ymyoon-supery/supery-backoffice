@@ -22,21 +22,25 @@ export default async function DashboardLayout({
 
   if (!employee) redirect('/login')
 
+  const { data: settings } = await supabase
+    .from('company_settings')
+    .select('supply_manager_id')
+    .single()
+
+  const isSupplyManager = settings?.supply_manager_id === employee.id
+  const isTeamLead = employee.position === '팀장'
+
   let pendingCount = 0
-  if (employee.position === '팀장' && employee.role !== 'ADMIN') {
-    const [{ count: leaveCount }, { count: expenseCount }] = await Promise.all([
-      supabase
-        .from('leave_approval_steps')
-        .select('*', { count: 'exact', head: true })
-        .eq('approver_id', employee.id)
-        .eq('status', 'PENDING'),
-      supabase
-        .from('expense_approval_steps')
-        .select('*', { count: 'exact', head: true })
-        .eq('approver_id', employee.id)
-        .eq('status', 'PENDING'),
+  if ((isTeamLead || isSupplyManager) && employee.role !== 'ADMIN') {
+    const pending = await Promise.all([
+      supabase.from('leave_approval_steps').select('*', { count: 'exact', head: true })
+        .eq('approver_id', employee.id).eq('status', 'PENDING'),
+      supabase.from('expense_approval_steps').select('*', { count: 'exact', head: true })
+        .eq('approver_id', employee.id).eq('status', 'PENDING'),
+      supabase.from('supply_approval_steps').select('*', { count: 'exact', head: true })
+        .eq('approver_id', employee.id).eq('status', 'PENDING'),
     ])
-    pendingCount = (leaveCount ?? 0) + (expenseCount ?? 0)
+    pendingCount = pending.reduce((sum, { count }) => sum + (count ?? 0), 0)
   }
 
   return (
@@ -46,6 +50,7 @@ export default async function DashboardLayout({
           role={employee.role}
           position={employee.position ?? null}
           pendingCount={pendingCount}
+          isSupplyManager={isSupplyManager}
         />
         <div className="flex flex-col flex-1 overflow-hidden min-w-0">
           <Header employee={employee} leftSlot={<MobileMenuButton />} />

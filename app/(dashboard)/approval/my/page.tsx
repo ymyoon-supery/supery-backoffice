@@ -7,6 +7,18 @@ const LEAVE_LABELS: Record<string, string> = {
   SICK: '병가(무급)', GROUP: '공동연차', COMP: '보상휴가', OTHER: '기타',
 }
 
+function getPendingApproverLabel(
+  steps: Array<{ step_order: number; status: string; employees?: { position?: string | null; name?: string | null } | null }> | null | undefined
+): string | null {
+  if (!steps?.length) return null
+  const pending = [...steps]
+    .filter(s => s.status === 'PENDING')
+    .sort((a, b) => a.step_order - b.step_order)[0]
+  if (!pending) return null
+  const label = pending.employees?.position || pending.employees?.name || '담당자'
+  return `${label} 승인 대기중`
+}
+
 export default async function MyRequestsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -40,14 +52,14 @@ export default async function MyRequestsPage() {
   ] = await Promise.all([
     supabase
       .from('leave_requests')
-      .select('id, leave_type, start_date, end_date, days_used, reason, status, created_at, leave_approval_steps(comment, status)')
+      .select('id, leave_type, start_date, end_date, days_used, reason, status, created_at, leave_approval_steps(step_order, comment, status, employees(position, name))')
       .eq('employee_id', employee.id)
       .in('status', ['PENDING', 'APPROVED', 'REJECTED'])
       .order('created_at', { ascending: false })
       .limit(20),
     supabase
       .from('expense_reports')
-      .select('id, title, amount, category, status, created_at, tax_type, evidence_type, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls')
+      .select('id, title, amount, category, status, created_at, tax_type, evidence_type, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls, expense_approval_steps(step_order, status, employees(position, name))')
       .eq('employee_id', employee.id)
       .in('status', ['PENDING', 'APPROVED', 'REJECTED'])
       .order('created_at', { ascending: false })
@@ -60,27 +72,37 @@ export default async function MyRequestsPage() {
       .limit(20),
     supabase
       .from('supply_requests')
-      .select('id, status, created_at, supply_request_items ( id, category, description, estimated_amount, note, sort_order )')
+      .select('id, status, created_at, supply_request_items(id, category, description, estimated_amount, note, sort_order), supply_approval_steps(step_order, status, employees(position, name))')
       .eq('employee_id', employee.id)
       .order('created_at', { ascending: false })
       .limit(20),
   ])
 
-  const leaveItems = (myLeave ?? []).map(r => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const leaveItems = (myLeave ?? []).map((r: any) => ({
     ...r,
     kind: 'leave' as const,
     displayLabel: `${LEAVE_LABELS[r.leave_type] ?? r.leave_type} ${r.days_used}일`,
+    pendingApproverLabel: r.status === 'PENDING' ? getPendingApproverLabel(r.leave_approval_steps) : null,
   }))
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const expenseItems = (myExpense ?? []).map((r: any) => ({
     ...r,
     kind: 'expense' as const,
     displayLabel: `${r.title} — ${Number(r.amount).toLocaleString()}원`,
+    pendingApproverLabel: r.status === 'PENDING' ? getPendingApproverLabel(r.expense_approval_steps) : null,
   }))
 
   const items = [...leaveItems, ...expenseItems].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   )
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supplyRequests = (mySupply ?? []).map((r: any) => ({
+    ...r,
+    pendingApproverLabel: r.status === 'PENDING' ? getPendingApproverLabel(r.supply_approval_steps) : null,
+  }))
 
   return (
     <MyRequestsClient
@@ -89,7 +111,7 @@ export default async function MyRequestsPage() {
       employeePosition={employeePosition}
       departmentName={departmentName}
       documentRequests={myDocuments ?? []}
-      supplyRequests={(mySupply ?? []) as any[]}
+      supplyRequests={supplyRequests as any[]}
     />
   )
 }

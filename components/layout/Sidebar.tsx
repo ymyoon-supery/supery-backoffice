@@ -66,10 +66,12 @@ export default function Sidebar({
   role,
   position,
   pendingCount,
+  isSupplyManager = false,
 }: {
   role: string
   position: string | null
   pendingCount: number
+  isSupplyManager?: boolean
 }) {
   const pathname = usePathname()
   const [pendingHref, setPendingHref] = useState<string | null>(null)
@@ -114,7 +116,7 @@ export default function Sidebar({
         { href: '/approval/expense/new', label: '지출결의', icon: FileText, exact: true },
         { href: '/documents', label: '서류/비품 신청', icon: Package, exact: false },
         { href: '/approval/my', label: '내 신청 내역', icon: Inbox, exact: false },
-        ...(isTeamLead && !isAdmin
+        ...((isTeamLead || isSupplyManager) && !isAdmin
           ? [{ href: '/approval/pending', label: '결재 대기', icon: ClipboardList, exact: false, badge: pendingCount }]
           : []),
       ],
@@ -123,6 +125,10 @@ export default function Sidebar({
       label: '급여',
       items: [{ href: '/payslip', label: '급여명세서', icon: Receipt, exact: false }],
     },
+    ...(isSupplyManager && !isAdmin ? [{
+      label: '관리',
+      items: [{ href: '/supply-manage', label: '비품/소모품 관리', icon: Package, exact: false }],
+    }] : []),
     {
       label: '공지',
       items: [{ href: '/notices', label: '공지사항', icon: Megaphone, exact: false }],

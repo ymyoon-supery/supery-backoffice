@@ -44,6 +44,7 @@ interface LeaveItem {
   created_at: string
   displayLabel: string
   leave_approval_steps?: Array<{ status: string; comment: string | null }>
+  pendingApproverLabel?: string | null
 }
 
 interface ExpenseItem {
@@ -66,6 +67,7 @@ interface ExpenseItem {
   settlement_date?: string | null
   line_items?: Array<{ item: string; date: string; amount?: number; note?: string; count?: number; userName?: string }> | null
   attachment_urls?: string[] | null
+  pendingApproverLabel?: string | null
 }
 
 interface DocumentRequest {
@@ -90,6 +92,7 @@ interface SupplyRequest {
   status: string
   created_at: string
   supply_request_items: SupplyRequestItem[]
+  pendingApproverLabel?: string | null
 }
 
 type AnyItem = LeaveItem | ExpenseItem
@@ -192,6 +195,12 @@ export default function MyRequestsClient({
                       <span className="ml-2 text-primary">· 클릭하여 상세보기</span>
                     </p>
                   )}
+                  {item.pendingApproverLabel && (
+                    <span className="inline-flex items-center gap-1 mt-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                      {item.pendingApproverLabel}
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span className={`text-xs px-2 py-1 rounded-full font-medium ${status.className}`}>
@@ -291,6 +300,12 @@ export default function MyRequestsClient({
                       {format(new Date(req.created_at), 'yyyy.MM.dd')}
                       <span className="ml-2 text-primary">· {isExpanded ? '접기' : '상세보기'}</span>
                     </p>
+                    {req.pendingApproverLabel && (
+                      <span className="inline-flex items-center gap-1 mt-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                        {req.pendingApproverLabel}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <span className={`text-xs px-2 py-1 rounded-full font-medium ${status.className}`}>
@@ -311,7 +326,13 @@ export default function MyRequestsClient({
 
                 {isExpanded && (
                   <div className="rounded-lg border border-gray-100 overflow-hidden">
-                    <table className="w-full text-xs">
+                    <table className="w-full text-xs table-fixed">
+                      <colgroup>
+                        <col style={{ width: '12%' }} />
+                        <col style={{ width: '40%' }} />
+                        <col style={{ width: '20%' }} />
+                        <col style={{ width: '28%' }} />
+                      </colgroup>
                       <thead className="bg-gray-50">
                         <tr>
                           <th className="text-left px-3 py-2 text-gray-500 font-medium">구분</th>
@@ -324,11 +345,11 @@ export default function MyRequestsClient({
                         {sortedItems.map(item => (
                           <tr key={item.id}>
                             <td className="px-3 py-2 text-gray-600">{CATEGORY_LABELS[item.category] ?? item.category}</td>
-                            <td className="px-3 py-2 text-gray-800">{item.description}</td>
+                            <td className="px-3 py-2 text-gray-800 break-words">{item.description}</td>
                             <td className="px-3 py-2 text-gray-600">
                               {item.estimated_amount != null ? `${Number(item.estimated_amount).toLocaleString()}원` : '—'}
                             </td>
-                            <td className="px-3 py-2 text-gray-400">{item.note ?? '—'}</td>
+                            <td className="px-3 py-2 text-gray-400 break-words">{item.note ?? '—'}</td>
                           </tr>
                         ))}
                       </tbody>

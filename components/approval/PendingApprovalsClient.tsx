@@ -282,7 +282,13 @@ export default function PendingApprovalsClient({ leaveSteps, expenseSteps, fullA
                 </div>
 
                 <div className="rounded-lg border border-gray-100 overflow-hidden">
-                  <table className="w-full text-xs">
+                  <table className="w-full text-xs table-fixed">
+                    <colgroup>
+                      <col style={{ width: '12%' }} />
+                      <col style={{ width: '40%' }} />
+                      <col style={{ width: '20%' }} />
+                      <col style={{ width: '28%' }} />
+                    </colgroup>
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="text-left px-3 py-2 text-gray-500 font-medium">구분</th>
@@ -295,11 +301,11 @@ export default function PendingApprovalsClient({ leaveSteps, expenseSteps, fullA
                       {sortedItems.map((item: any) => (
                         <tr key={item.id}>
                           <td className="px-3 py-2 text-gray-600">{CATEGORY_LABELS[item.category] ?? item.category}</td>
-                          <td className="px-3 py-2 text-gray-800">{item.description}</td>
+                          <td className="px-3 py-2 text-gray-800 break-words">{item.description}</td>
                           <td className="px-3 py-2 text-gray-600">
                             {item.estimated_amount != null ? `${Number(item.estimated_amount).toLocaleString()}원` : '—'}
                           </td>
-                          <td className="px-3 py-2 text-gray-400">{item.note ?? '—'}</td>
+                          <td className="px-3 py-2 text-gray-400 break-words">{item.note ?? '—'}</td>
                         </tr>
                       ))}
                     </tbody>
