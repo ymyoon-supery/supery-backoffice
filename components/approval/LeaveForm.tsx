@@ -27,13 +27,6 @@ const FIXED_DAYS: Partial<Record<LeaveType, number>> = {
 
 const DEDUCTS_LEAVE = new Set<LeaveType>(['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF', 'GROUP'])
 
-const DAY_KO = ['일', '월', '화', '수', '목', '금', '토']
-
-function getDayLabel(dateStr: string): string {
-  if (!dateStr) return ''
-  const d = new Date(dateStr + 'T00:00:00')
-  return DAY_KO[d.getDay()] + '요일'
-}
 
 export default function LeaveForm({ remainingLeaves, annualLeaveDays }: { remainingLeaves: number; annualLeaveDays: number }) {
   const router = useRouter()
@@ -135,9 +128,7 @@ export default function LeaveForm({ remainingLeaves, annualLeaveDays }: { remain
       {/* 날짜 */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
-          <label className="text-sm font-medium text-gray-700">
-            시작일{startDate && <span className="ml-1 text-xs font-normal text-primary">({getDayLabel(startDate)})</span>}
-          </label>
+          <label className="text-sm font-medium text-gray-700">시작일</label>
           <input
             type="date"
             value={startDate}
@@ -149,7 +140,7 @@ export default function LeaveForm({ remainingLeaves, annualLeaveDays }: { remain
         {!isHalfDay && (
           <div className="space-y-1">
             <label className="text-sm font-medium text-gray-700">
-              종료일{endDate && <span className="ml-1 text-xs font-normal text-primary">({getDayLabel(endDate)})</span>}
+              종료일
             </label>
             <input
               type="date"
