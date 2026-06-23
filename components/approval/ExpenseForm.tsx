@@ -3,7 +3,12 @@
 import { useState, useTransition, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { submitExpense, type LineItem } from '@/app/(dashboard)/approval/expense/actions'
+import {
+  submitExpense,
+  submitBusinessIncomeExpense,
+  submitPrizeExpense,
+  type LineItem,
+} from '@/app/(dashboard)/approval/expense/actions'
 import { createClient } from '@/lib/supabase/client'
 import { format } from 'date-fns'
 import { Plus, Trash2, Paperclip, X, FileSpreadsheet } from 'lucide-react'
@@ -30,20 +35,13 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
   { value: 'CASH', label: '현금' },
 ]
 
-const TAX_TYPE_OPTIONS = [
-  { value: 'TAXABLE', label: '과세' },
-  { value: 'EXEMPT', label: '면세 (면세사업자 또는 해외 인보이스)' },
-  { value: 'WITHHOLDING_BUSINESS', label: '원천징수 (사업소득)' },
-  { value: 'WITHHOLDING_OTHER_WITH', label: '원천징수 (기타소득 - 제세공과금 포함)' },
-  { value: 'WITHHOLDING_OTHER_WITHOUT', label: '원천징수 (기타소득 - 제세공과금 불포함)' },
-]
-
 const EVIDENCE_TYPE_OPTIONS = [
-  { value: 'TAX_INVOICE', label: '세금계산서 (또는 인보이스)' },
-  { value: 'BUSINESS_RECEIPT', label: '사업자 지출증빙' },
-  { value: 'CORPORATE_CARD', label: '법인카드' },
-  { value: 'PERSONAL_CARD', label: '개인카드' },
-  { value: 'OTHER_RECEIPT', label: '기타 - 개별 영수증' },
+  { value: 'TAX_INVOICE',        label: '세금계산서' },
+  { value: 'ELECTRONIC_INVOICE', label: '전자계산서(또는 인보이스)' },
+  { value: 'BUSINESS_RECEIPT',   label: '사업자지출증빙' },
+  { value: 'CORPORATE_CARD',     label: '법인카드영수증' },
+  { value: 'PERSONAL_CARD',      label: '개인카드영수증' },
+  { value: 'OTHER_RECEIPT',      label: '기타-개별영수증' },
 ]
 
 const today = format(new Date(), 'yyyy-MM-dd')
@@ -279,7 +277,6 @@ function ExpenseTab({
 }: Props & { onSuccess: () => void }) {
   const [isPending, startTransition] = useTransition()
   const [title, setTitle] = useState('')
-  const [taxType, setTaxType] = useState('')
   const [evidenceType, setEvidenceType] = useState('')
   const [payee, setPayee] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('TRANSFER')
@@ -299,7 +296,6 @@ function ExpenseTab({
 
   const canSubmit =
     title.trim() &&
-    taxType &&
     evidenceType &&
     payee.trim() &&
     paymentRequestDate &&
@@ -341,7 +337,7 @@ function ExpenseTab({
         settlementDate: settlementDate || null,
         lineItems: items,
         attachmentUrls,
-        taxType: taxType || null,
+        taxType: null,
         evidenceType: evidenceType || null,
         category: 'OTHER',
       })
@@ -364,33 +360,6 @@ function ExpenseTab({
           placeholder="예: 인스타그램 홍보비 지급"
           className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
         />
-      </div>
-
-      {/* 구분 (세목) */}
-      <div className="space-y-2">
-        <SectionLabel>구분 (세목)</SectionLabel>
-        <div className="flex flex-col gap-2">
-          {TAX_TYPE_OPTIONS.map(opt => (
-            <label
-              key={opt.value}
-              className={`flex items-center gap-3 px-4 py-2.5 rounded-lg border cursor-pointer transition-colors ${
-                taxType === opt.value
-                  ? 'border-primary bg-primary/5 text-primary'
-                  : 'border-gray-200 text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <input
-                type="radio"
-                name="taxType"
-                value={opt.value}
-                checked={taxType === opt.value}
-                onChange={() => setTaxType(opt.value)}
-                className="accent-primary"
-              />
-              <span className="text-sm">{opt.label}</span>
-            </label>
-          ))}
-        </div>
       </div>
 
       {/* 증빙 */}
