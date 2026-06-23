@@ -952,6 +952,229 @@ function TransportationTab({
   )
 }
 
+// ─── 공통 헬퍼 ────────────────────────────────────────────────────────────────
+
+function formatSSN(value: string) {
+  const digits = value.replace(/[^0-9]/g, '').slice(0, 13)
+  if (digits.length > 6) return `${digits.slice(0, 6)}-${digits.slice(6)}`
+  return digits
+}
+
+// ─── Tab 4: 사업소득(원천징수) 지급요청서 ─────────────────────────────────────
+
+type BusinessIncomeFields = {
+  recipientName: string
+  ssn: string
+  grossAmountRaw: string
+  description: string
+  bankName: string
+  accountNumber: string
+  note: string
+}
+
+function BusinessIncomeTab({
+  employeeId,
+  employeeName,
+  employeePosition,
+  departmentName,
+  onSuccess,
+}: Props & { onSuccess: () => void }) {
+  const [isPending, startTransition] = useTransition()
+  const [fields, setFields] = useState<BusinessIncomeFields>({
+    recipientName: '',
+    ssn: '',
+    grossAmountRaw: '',
+    description: '',
+    bankName: '',
+    accountNumber: '',
+    note: '',
+  })
+  const [paymentRequestDate, setPaymentRequestDate] = useState(today)
+  const [attachments, setAttachments] = useState<File[]>([])
+  const [uploading, setUploading] = useState(false)
+
+  function setField(key: keyof BusinessIncomeFields, value: string) {
+    setFields(prev => ({ ...prev, [key]: value }))
+  }
+
+  const grossAmount = Number(fields.grossAmountRaw.replace(/[^0-9]/g, '')) || 0
+  const withholding = Math.floor(grossAmount * 0.033)
+  const netAmount = grossAmount - withholding
+  const ssnClean = fields.ssn.replace(/-/g, '')
+
+  const canSubmit =
+    fields.recipientName.trim() !== '' &&
+    ssnClean.length === 13 &&
+    grossAmount > 0 &&
+    fields.description.trim() !== '' &&
+    fields.bankName.trim() !== '' &&
+    fields.accountNumber.trim() !== '' &&
+    !uploading
+
+  function handleSubmit() {
+    startTransition(async () => {
+      let attachmentUrls: string[] = []
+      if (attachments.length > 0) {
+        setUploading(true)
+        const supabase = createClient()
+        attachmentUrls = await uploadFiles(supabase, employeeId, attachments)
+        setUploading(false)
+        if (attachmentUrls.length !== attachments.length) return
+      }
+
+      const result = await submitBusinessIncomeExpense({
+        recipientName: fields.recipientName.trim(),
+        ssn: ssnClean,
+        grossAmount,
+        description: fields.description.trim(),
+        bankName: fields.bankName.trim(),
+        accountNumber: fields.accountNumber.trim(),
+        note: fields.note.trim(),
+        attachmentUrls,
+        paymentRequestDate,
+      })
+
+      if (result.error) { toast.error(result.error); return }
+      toast.success('사업소득 지급요청서가 제출되었습니다.')
+      onSuccess()
+    })
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <SectionLabel>이름</SectionLabel>
+          <input
+            type="text"
+            value={fields.recipientName}
+            onChange={e => setField('recipientName', e.target.value)}
+            placeholder="홍길동"
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <SectionLabel>주민번호</SectionLabel>
+          <input
+            type="text"
+            value={fields.ssn}
+            onChange={e => setField('ssn', formatSSN(e.target.value))}
+            placeholder="000000-0000000"
+            maxLength={14}
+            autoComplete="off"
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 font-mono tracking-wider"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <SectionLabel>지급 금액 (세전)</SectionLabel>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={fields.grossAmountRaw}
+          onChange={e => setField('grossAmountRaw', formatKRWInput(e.target.value))}
+          placeholder="0"
+          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 text-right"
+        />
+      </div>
+
+      {grossAmount > 0 && (
+        <div className="rounded-lg bg-gray-50 border border-gray-200 divide-y divide-gray-200">
+          <div className="flex justify-between px-4 py-2.5 text-sm">
+            <span className="text-gray-500">원천징수액 (3.3%)</span>
+            <span className="text-gray-700 tabular-nums">- {withholding.toLocaleString('ko-KR')}원</span>
+          </div>
+          <div className="flex justify-between px-4 py-2.5">
+            <span className="text-sm font-semibold text-gray-700">실지급액</span>
+            <span className="text-base font-bold text-primary tabular-nums">{netAmount.toLocaleString('ko-KR')}원</span>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-1.5">
+        <SectionLabel>내역</SectionLabel>
+        <input
+          type="text"
+          value={fields.description}
+          onChange={e => setField('description', e.target.value)}
+          placeholder="예: 2026년 6월 영상 편집 용역"
+          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <SectionLabel>은행</SectionLabel>
+          <input
+            type="text"
+            value={fields.bankName}
+            onChange={e => setField('bankName', e.target.value)}
+            placeholder="국민은행"
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <SectionLabel>계좌번호</SectionLabel>
+          <input
+            type="text"
+            value={fields.accountNumber}
+            onChange={e => setField('accountNumber', e.target.value)}
+            placeholder="000-0000-0000"
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <SectionLabel>지급요청일</SectionLabel>
+        <input
+          type="date"
+          value={paymentRequestDate}
+          onChange={e => setPaymentRequestDate(e.target.value)}
+          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          비고 <span className="text-gray-400 font-normal">(선택)</span>
+        </label>
+        <input
+          type="text"
+          value={fields.note}
+          onChange={e => setField('note', e.target.value)}
+          placeholder="기타 참고사항"
+          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <SectionLabel>첨부파일</SectionLabel>
+        <AttachmentSection
+          attachments={attachments}
+          onAdd={files => setAttachments(prev => [...prev, ...files])}
+          onRemove={idx => setAttachments(prev => prev.filter((_, i) => i !== idx))}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <SectionLabel>신청인</SectionLabel>
+        <ApplicantBox departmentName={departmentName} employeePosition={employeePosition} employeeName={employeeName} />
+      </div>
+
+      <button
+        type="button"
+        onClick={handleSubmit}
+        disabled={!canSubmit || isPending || uploading}
+        className="w-full py-3 bg-primary text-white text-sm font-semibold rounded-lg disabled:opacity-40 hover:bg-primary/90 transition-colors"
+      >
+        {uploading ? '파일 업로드 중...' : isPending ? '제출 중...' : '사업소득 지급요청서 제출'}
+      </button>
+    </div>
+  )
+}
+
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 const TAB_TITLES: Record<ActiveTab, string> = {
