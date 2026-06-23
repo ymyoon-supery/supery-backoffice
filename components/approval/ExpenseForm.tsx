@@ -13,7 +13,7 @@ import { createClient } from '@/lib/supabase/client'
 import { format } from 'date-fns'
 import { Plus, Trash2, Paperclip, X, FileSpreadsheet } from 'lucide-react'
 
-type ActiveTab = 'EXPENSE' | 'CORPORATE_CARD' | 'TRANSPORTATION'
+type ActiveTab = 'EXPENSE' | 'CORPORATE_CARD' | 'TRANSPORTATION' | 'BUSINESS_INCOME' | 'PRIZE'
 type PaymentMethod = 'CASH' | 'CARD' | 'TRANSFER'
 
 interface Props {
@@ -24,9 +24,11 @@ interface Props {
 }
 
 const TABS: { id: ActiveTab; label: string }[] = [
-  { id: 'EXPENSE', label: '지출결의서' },
-  { id: 'CORPORATE_CARD', label: '법인카드사용 내역서' },
-  { id: 'TRANSPORTATION', label: '교통비 사용내역서' },
+  { id: 'EXPENSE',         label: '지출결의서' },
+  { id: 'CORPORATE_CARD',  label: '법인카드' },
+  { id: 'TRANSPORTATION',  label: '교통비' },
+  { id: 'BUSINESS_INCOME', label: '사업소득' },
+  { id: 'PRIZE',           label: '경품비' },
 ]
 
 const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
@@ -1504,9 +1506,11 @@ function PrizeTab({
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 const TAB_TITLES: Record<ActiveTab, string> = {
-  EXPENSE: '지 출 결 의 서',
-  CORPORATE_CARD: '법인카드 사용 내역서',
-  TRANSPORTATION: '교통비 사용내역서',
+  EXPENSE:         '지 출 결 의 서',
+  CORPORATE_CARD:  '법인카드 사용 내역서',
+  TRANSPORTATION:  '교통비 사용내역서',
+  BUSINESS_INCOME: '사업소득(원천징수) 지급요청서',
+  PRIZE:           '현금성 경품비(기타소득) 지급요청서',
 }
 
 export default function ExpenseForm(props: Props) {
@@ -1558,6 +1562,8 @@ export default function ExpenseForm(props: Props) {
       {activeTab === 'EXPENSE' && <ExpenseTab {...props} onSuccess={onSuccess} />}
       {activeTab === 'CORPORATE_CARD' && <CorporateCardTab {...props} onSuccess={onSuccess} />}
       {activeTab === 'TRANSPORTATION' && <TransportationTab {...props} onSuccess={onSuccess} />}
+      {activeTab === 'BUSINESS_INCOME' && <BusinessIncomeTab {...props} onSuccess={onSuccess} />}
+      {activeTab === 'PRIZE' && <PrizeTab {...props} onSuccess={onSuccess} />}
     </div>
   )
 }
