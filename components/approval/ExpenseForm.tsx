@@ -1227,9 +1227,12 @@ function PrizeTab({
     : 0
   const ssnClean = fields.ssn.replace(/-/g, '')
 
+  const amountExceeds50k = !isOver50k && prizeAmount > 50000
+
   const canSubmit =
     fields.recipientName.trim() !== '' &&
     prizeAmount > 0 &&
+    !amountExceeds50k &&
     (!isOver50k || ssnClean.length === 13) &&
     (fields.paymentType === 'GIFT_CARD' || (fields.bankName.trim() !== '' && fields.accountNumber.trim() !== '')) &&
     !uploading
@@ -1329,8 +1332,17 @@ function PrizeTab({
           value={fields.prizeAmountRaw}
           onChange={e => setField('prizeAmountRaw', formatKRWInput(e.target.value))}
           placeholder="0"
-          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 text-right"
+          className={`w-full text-sm border rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 text-right ${
+            amountExceeds50k
+              ? 'border-red-400 focus:ring-red-300 bg-red-50'
+              : 'border-gray-200 focus:ring-primary/30'
+          }`}
         />
+        {amountExceeds50k && (
+          <p className="text-xs text-red-500">
+            5만원 이하 항목입니다. 금액이 초과되었습니다. 위에서 <strong>5만원 이상</strong>을 선택해 주세요.
+          </p>
+        )}
       </div>
 
       {/* 제세공과금 (5만원 이상) */}
