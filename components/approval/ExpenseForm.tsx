@@ -1175,6 +1175,332 @@ function BusinessIncomeTab({
   )
 }
 
+// ─── Tab 5: 현금성 경품비(기타소득) 지급요청서 ───────────────────────────────
+
+type PrizeFields = {
+  recipientName: string
+  ssn: string
+  prizeAmountRaw: string
+  taxPaymentType: 'SELF' | 'COMPANY'
+  paymentType: 'GIFT_CARD' | 'CASH'
+  giftCardEvidence: 'CORPORATE_CARD' | 'PERSONAL_CARD'
+  bankName: string
+  accountNumber: string
+  note: string
+}
+
+function PrizeTab({
+  employeeId,
+  employeeName,
+  employeePosition,
+  departmentName,
+  onSuccess,
+}: Props & { onSuccess: () => void }) {
+  const [isPending, startTransition] = useTransition()
+  const [isOver50k, setIsOver50k] = useState(false)
+  const [fields, setFields] = useState<PrizeFields>({
+    recipientName: '',
+    ssn: '',
+    prizeAmountRaw: '',
+    taxPaymentType: 'SELF',
+    paymentType: 'CASH',
+    giftCardEvidence: 'CORPORATE_CARD',
+    bankName: '',
+    accountNumber: '',
+    note: '',
+  })
+  const [paymentRequestDate, setPaymentRequestDate] = useState(today)
+  const [attachments, setAttachments] = useState<File[]>([])
+  const [uploading, setUploading] = useState(false)
+
+  function setField(key: keyof PrizeFields, value: string) {
+    setFields(prev => ({ ...prev, [key]: value }))
+  }
+
+  const prizeAmount = Number(fields.prizeAmountRaw.replace(/[^0-9]/g, '')) || 0
+  const taxAmount = isOver50k
+    ? fields.taxPaymentType === 'SELF'
+      ? Math.floor(prizeAmount * 0.22)
+      : Math.floor(prizeAmount * 0.22 / 0.78)
+    : 0
+  const ssnClean = fields.ssn.replace(/-/g, '')
+
+  const canSubmit =
+    fields.recipientName.trim() !== '' &&
+    prizeAmount > 0 &&
+    (!isOver50k || ssnClean.length === 13) &&
+    (fields.paymentType === 'GIFT_CARD' || (fields.bankName.trim() !== '' && fields.accountNumber.trim() !== '')) &&
+    !uploading
+
+  function handleSubmit() {
+    startTransition(async () => {
+      let attachmentUrls: string[] = []
+      if (attachments.length > 0) {
+        setUploading(true)
+        const supabase = createClient()
+        attachmentUrls = await uploadFiles(supabase, employeeId, attachments)
+        setUploading(false)
+        if (attachmentUrls.length !== attachments.length) return
+      }
+
+      const result = await submitPrizeExpense({
+        recipientName: fields.recipientName.trim(),
+        ssn: isOver50k ? ssnClean : null,
+        prizeAmount,
+        taxPaymentType: isOver50k ? fields.taxPaymentType : null,
+        paymentMethod: fields.paymentType,
+        giftCardEvidence: fields.paymentType === 'GIFT_CARD' ? fields.giftCardEvidence : null,
+        bankName: fields.paymentType === 'CASH' ? fields.bankName.trim() : null,
+        accountNumber: fields.paymentType === 'CASH' ? fields.accountNumber.trim() : null,
+        note: fields.note.trim(),
+        attachmentUrls,
+        paymentRequestDate,
+        isOver50k,
+      })
+
+      if (result.error) { toast.error(result.error); return }
+      toast.success('경품비 지급요청서가 제출되었습니다.')
+      onSuccess()
+    })
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* 금액 구분 토글 */}
+      <div className="space-y-2">
+        <SectionLabel>경품 금액 구분</SectionLabel>
+        <div className="flex gap-2">
+          {([
+            { value: false, label: '5만원 이하' },
+            { value: true, label: '5만원 이상 (기타소득 신고)' },
+          ] as const).map(opt => (
+            <button
+              key={String(opt.value)}
+              type="button"
+              onClick={() => setIsOver50k(opt.value)}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                isOver50k === opt.value
+                  ? 'bg-primary text-white border-primary'
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 이름 + 주민번호 */}
+      <div className={`grid gap-4 ${isOver50k ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+        <div className="space-y-1.5">
+          <SectionLabel>이름</SectionLabel>
+          <input
+            type="text"
+            value={fields.recipientName}
+            onChange={e => setField('recipientName', e.target.value)}
+            placeholder="홍길동"
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        </div>
+        {isOver50k && (
+          <div className="space-y-1.5">
+            <SectionLabel>주민번호</SectionLabel>
+            <input
+              type="text"
+              value={fields.ssn}
+              onChange={e => setField('ssn', formatSSN(e.target.value))}
+              placeholder="000000-0000000"
+              maxLength={14}
+              autoComplete="off"
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 font-mono tracking-wider"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* 경품 금액 */}
+      <div className="space-y-1.5">
+        <SectionLabel>경품 금액</SectionLabel>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={fields.prizeAmountRaw}
+          onChange={e => setField('prizeAmountRaw', formatKRWInput(e.target.value))}
+          placeholder="0"
+          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 text-right"
+        />
+      </div>
+
+      {/* 제세공과금 (5만원 이상) */}
+      {isOver50k && (
+        <div className="space-y-3">
+          <SectionLabel>제세공과금 방식</SectionLabel>
+          <div className="flex gap-2">
+            {([
+              { value: 'SELF' as const, label: '본인 납부' },
+              { value: 'COMPANY' as const, label: '대납 (회사 부담)' },
+            ]).map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setField('taxPaymentType', opt.value)}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                  fields.taxPaymentType === opt.value
+                    ? 'bg-primary text-white border-primary'
+                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          {prizeAmount > 0 && (
+            <div className="rounded-lg bg-gray-50 border border-gray-200 divide-y divide-gray-200">
+              <div className="flex justify-between px-4 py-2.5 text-sm">
+                <span className="text-gray-500">
+                  제세공과금 ({fields.taxPaymentType === 'SELF' ? '22%' : '역산 22%/78%'})
+                </span>
+                <span className="text-gray-700 tabular-nums font-semibold">
+                  {taxAmount.toLocaleString('ko-KR')}원
+                </span>
+              </div>
+              <div className="px-4 py-2 text-xs text-gray-400">
+                {fields.taxPaymentType === 'SELF'
+                  ? '수령자가 제세공과금을 별도 자진 납부합니다.'
+                  : '회사가 경품금액 외 제세공과금을 추가 납부합니다.'}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 지급방식 */}
+      <div className="space-y-3">
+        <SectionLabel>지급방식</SectionLabel>
+        <div className="flex gap-2">
+          {([
+            { value: 'CASH' as const, label: '현금 지급' },
+            { value: 'GIFT_CARD' as const, label: '상품권' },
+          ]).map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setField('paymentType', opt.value)}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                fields.paymentType === opt.value
+                  ? 'bg-primary text-white border-primary'
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        {fields.paymentType === 'CASH' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <div className="space-y-1.5">
+              <label className="text-xs text-gray-500">은행</label>
+              <input
+                type="text"
+                value={fields.bankName}
+                onChange={e => setField('bankName', e.target.value)}
+                placeholder="국민은행"
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs text-gray-500">계좌번호</label>
+              <input
+                type="text"
+                value={fields.accountNumber}
+                onChange={e => setField('accountNumber', e.target.value)}
+                placeholder="000-0000-0000"
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+          </div>
+        )}
+
+        {fields.paymentType === 'GIFT_CARD' && (
+          <div className="space-y-2 pt-1">
+            <label className="text-xs text-gray-500">상품권 구매 증빙</label>
+            <div className="flex gap-2">
+              {([
+                { value: 'CORPORATE_CARD' as const, label: '법인카드' },
+                { value: 'PERSONAL_CARD' as const, label: '개인카드' },
+              ]).map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setField('giftCardEvidence', opt.value)}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                    fields.giftCardEvidence === opt.value
+                      ? 'bg-primary text-white border-primary'
+                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 지급요청일 */}
+      <div className="space-y-1.5">
+        <SectionLabel>지급요청일</SectionLabel>
+        <input
+          type="date"
+          value={paymentRequestDate}
+          onChange={e => setPaymentRequestDate(e.target.value)}
+          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
+        />
+      </div>
+
+      {/* 비고 */}
+      <div className="space-y-1.5">
+        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          비고 <span className="text-gray-400 font-normal">(선택)</span>
+        </label>
+        <input
+          type="text"
+          value={fields.note}
+          onChange={e => setField('note', e.target.value)}
+          placeholder="기타 참고사항"
+          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
+        />
+      </div>
+
+      {/* 첨부파일 */}
+      <div className="space-y-2">
+        <SectionLabel>첨부파일</SectionLabel>
+        <AttachmentSection
+          attachments={attachments}
+          onAdd={files => setAttachments(prev => [...prev, ...files])}
+          onRemove={idx => setAttachments(prev => prev.filter((_, i) => i !== idx))}
+        />
+      </div>
+
+      {/* 신청인 */}
+      <div className="space-y-2">
+        <SectionLabel>신청인</SectionLabel>
+        <ApplicantBox departmentName={departmentName} employeePosition={employeePosition} employeeName={employeeName} />
+      </div>
+
+      <button
+        type="button"
+        onClick={handleSubmit}
+        disabled={!canSubmit || isPending || uploading}
+        className="w-full py-3 bg-primary text-white text-sm font-semibold rounded-lg disabled:opacity-40 hover:bg-primary/90 transition-colors"
+      >
+        {uploading ? '파일 업로드 중...' : isPending ? '제출 중...' : '경품비 지급요청서 제출'}
+      </button>
+    </div>
+  )
+}
+
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 const TAB_TITLES: Record<ActiveTab, string> = {
