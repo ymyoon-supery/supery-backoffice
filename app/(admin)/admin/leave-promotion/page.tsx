@@ -3,13 +3,14 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import { calcAnnualLeave } from '@/lib/annualLeave'
 import LeavePromotionClient from './LeavePromotionClient'
+import EmploymentTabs from '@/components/admin/EmploymentTabs'
 
 const DEDUCTS = ['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF', 'GROUP']
 
 export default async function LeavePromotionPage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string }>
+  searchParams: Promise<{ year?: string; employment?: string }>
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -22,14 +23,20 @@ export default async function LeavePromotionPage({
 
   const params = await searchParams
   const year = parseInt(params.year ?? String(new Date().getFullYear()))
+  const employment = params.employment === 'resigned' ? 'resigned' : 'active'
 
   const yearStart = `${new Date().getFullYear()}-01-01`
+
+  function tabHref(status: string) {
+    const p = new URLSearchParams({ year: String(year), employment: status })
+    return `/admin/leave-promotion?${p.toString()}`
+  }
 
   const [{ data: rawEmployees }, { data: notices }, { data: teams }, { data: groups }, { data: usedTotals }] = await Promise.all([
     supabase
       .from('employees')
       .select('id, name, email, department_id, annual_leave_days, remaining_leaves, hired_at')
-      .eq('is_active', true)
+      .eq('is_active', employment === 'active')
       .order('name'),
     supabase
       .from('leave_promotion_notices')
@@ -62,12 +69,19 @@ export default async function LeavePromotionPage({
   })
 
   return (
-    <LeavePromotionClient
-      employees={employees}
-      notices={notices ?? []}
-      teams={teams ?? []}
-      groups={groups ?? []}
-      year={year}
-    />
+    <div className="space-y-4">
+      <EmploymentTabs
+        current={employment}
+        activeHref={tabHref('active')}
+        resignedHref={tabHref('resigned')}
+      />
+      <LeavePromotionClient
+        employees={employees}
+        notices={notices ?? []}
+        teams={teams ?? []}
+        groups={groups ?? []}
+        year={year}
+      />
+    </div>
   )
 }

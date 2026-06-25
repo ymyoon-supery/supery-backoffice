@@ -3,15 +3,22 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import { calcAnnualLeave } from '@/lib/annualLeave'
 import LeaveManualClient from './LeaveManualClient'
+import EmploymentTabs from '@/components/admin/EmploymentTabs'
 
 const DEDUCTS = ['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF', 'GROUP']
 
-export default async function LeaveManualPage() {
+export default async function LeaveManualPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ employment?: string }>
+}) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // service role로 RLS 우회 — 어드민 전용 페이지
+  const params = await searchParams
+  const employment = params.employment === 'resigned' ? 'resigned' : 'active'
+
   const admin = createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -20,7 +27,7 @@ export default async function LeaveManualPage() {
   const yearStart = `${new Date().getFullYear()}-01-01`
 
   const [{ data: rawEmployees }, { data: leaveRecords, error: leaveError }, { data: usedTotals }] = await Promise.all([
-    admin.from('employees').select('id, name, email, hired_at, annual_leave_days, remaining_leaves').eq('is_active', true).order('name'),
+    admin.from('employees').select('id, name, email, hired_at, annual_leave_days, remaining_leaves').eq('is_active', employment === 'active').order('name'),
     admin.from('leave_requests')
       .select('id, employee_id, leave_type, start_date, end_date, days_used, reason, is_manual')
       .eq('status', 'APPROVED')
@@ -57,13 +64,20 @@ export default async function LeaveManualPage() {
       <div className="mb-1">
         <h1 className="text-xl font-semibold text-gray-900">연차 관리</h1>
       </div>
-      <p className="text-sm text-gray-500 mb-6">수동 등록 및 결재 승인된 연차를 조회·수정·삭제합니다.</p>
+      <p className="text-sm text-gray-500 mb-4">수동 등록 및 결재 승인된 연차를 조회·수정·삭제합니다.</p>
+      <EmploymentTabs
+        current={employment}
+        activeHref="/admin/leave-manual?employment=active"
+        resignedHref="/admin/leave-manual?employment=resigned"
+      />
       {leaveError && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600 font-mono">
+        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600 font-mono">
           쿼리 오류: {leaveError.message}
         </div>
       )}
-      <LeaveManualClient employees={employees} leaveRecords={records} />
+      <div className="mt-4">
+        <LeaveManualClient employees={employees} leaveRecords={records} />
+      </div>
     </div>
   )
 }

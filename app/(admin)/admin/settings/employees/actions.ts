@@ -117,3 +117,32 @@ export async function deactivateEmployee(id: string) {
   revalidatePath('/admin/settings/employees')
   return { error: null }
 }
+
+export async function resignEmployee(id: string, resignedAt: string) {
+  const { error: authError } = await requireAdmin()
+  if (authError) return { error: authError }
+
+  const client = adminClient()
+
+  const { data: emp } = await client
+    .from('employees')
+    .select('auth_user_id')
+    .eq('id', id)
+    .single()
+
+  const { error } = await client
+    .from('employees')
+    .update({ is_active: false, resigned_at: resignedAt || null })
+    .eq('id', id)
+
+  if (error) return { error: error.message }
+
+  if (emp?.auth_user_id) {
+    await client.auth.admin.updateUserById(emp.auth_user_id, {
+      ban_duration: '87600h',
+    })
+  }
+
+  revalidatePath('/admin/settings/employees')
+  return { error: null }
+}

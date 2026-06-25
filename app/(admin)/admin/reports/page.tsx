@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { format, startOfWeek, endOfWeek, parseISO, addWeeks } from 'date-fns'
 import Link from 'next/link'
 import { Download } from 'lucide-react'
+import EmploymentTabs from '@/components/admin/EmploymentTabs'
 import { calcDaySummary, toKSTDate, WorkSchedule } from '@/lib/attendance/calc'
 
 function fmtHM(minutes: number) {
@@ -14,7 +15,7 @@ function fmtHM(minutes: number) {
 export default async function AdminReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ team?: string; group?: string; weekStart?: string }>
+  searchParams: Promise<{ team?: string; group?: string; weekStart?: string; employment?: string }>
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -23,6 +24,7 @@ export default async function AdminReportsPage({
   const params = await searchParams
   const selectedTeam = params.team ?? ''
   const selectedGroup = params.group ?? ''
+  const employment = params.employment === 'resigned' ? 'resigned' : 'active'
 
   const weekStartDate = params.weekStart
     ? parseISO(params.weekStart)
@@ -37,7 +39,7 @@ export default async function AdminReportsPage({
     supabase.from('departments').select('id, name, group_id').order('name'),
     supabase
       .from('attendance_records')
-      .select('employee_id, type, recorded_at, employees(id, name, email, department_id)')
+      .select('employee_id, type, recorded_at, employees(id, name, email, department_id, is_active)')
       .gte('recorded_at', `${weekStart}T00:00:00+09:00`)
       .lte('recorded_at', `${weekEnd}T23:59:59+09:00`)
       .order('recorded_at', { ascending: true }),
@@ -71,8 +73,10 @@ export default async function AdminReportsPage({
   }>()
 
   for (const r of records ?? []) {
-    const emp = r.employees as unknown as { id: string; name: string; email: string; department_id: string | null } | null
+    const emp = r.employees as unknown as { id: string; name: string; email: string; department_id: string | null; is_active: boolean } | null
     if (!emp) continue
+    if (employment === 'active' && !emp.is_active) continue
+    if (employment === 'resigned' && emp.is_active) continue
     if (selectedTeam && emp.department_id !== selectedTeam) continue
     if (selectedGroup && !teams.some(t => t.id === emp.department_id)) continue
     if (!hoursMap.has(r.employee_id)) {
@@ -82,8 +86,10 @@ export default async function AdminReportsPage({
 
   const byEmployeeDay = new Map<string, RecordRow[]>()
   for (const r of records ?? []) {
-    const emp = r.employees as unknown as { id: string; name: string; email: string; department_id: string | null } | null
+    const emp = r.employees as unknown as { id: string; name: string; email: string; department_id: string | null; is_active: boolean } | null
     if (!emp) continue
+    if (employment === 'active' && !emp.is_active) continue
+    if (employment === 'resigned' && emp.is_active) continue
     if (selectedTeam && emp.department_id !== selectedTeam) continue
     if (selectedGroup && !teams.some(t => t.id === emp.department_id)) continue
     const kstDate = toKSTDate(r.recorded_at)
@@ -111,9 +117,16 @@ export default async function AdminReportsPage({
   const overLimit = sorted.filter(([, v]) => v.workMinutes > 52 * 60)
 
   function buildUrl(team: string, group: string, ws = weekStart) {
-    const p = new URLSearchParams({ weekStart: ws })
+    const p = new URLSearchParams({ weekStart: ws, employment })
     if (team) p.set('team', team)
     if (group) p.set('group', group)
+    return `/admin/reports?${p.toString()}`
+  }
+
+  function tabHref(status: string) {
+    const p = new URLSearchParams({ weekStart, employment: status })
+    if (selectedTeam) p.set('team', selectedTeam)
+    if (selectedGroup) p.set('group', selectedGroup)
     return `/admin/reports?${p.toString()}`
   }
 
@@ -128,6 +141,12 @@ export default async function AdminReportsPage({
           <Download size={15} /> Excel 다운로드
         </Link>
       </div>
+
+      <EmploymentTabs
+        current={employment}
+        activeHref={tabHref('active')}
+        resignedHref={tabHref('resigned')}
+      />
 
       {/* Week navigation */}
       <div className="flex items-center gap-3">

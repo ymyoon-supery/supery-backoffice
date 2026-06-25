@@ -1,12 +1,20 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import StatusBoard from '@/components/admin/StatusBoard'
+import EmploymentTabs from '@/components/admin/EmploymentTabs'
 import { format } from 'date-fns'
 
-export default async function AdminEmployeesPage() {
+export default async function AdminEmployeesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ employment?: string }>
+}) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  const params = await searchParams
+  const employment = params.employment === 'resigned' ? 'resigned' : 'active'
 
   const today = format(new Date(new Date().getTime() + 9 * 60 * 60 * 1000), 'yyyy-MM-dd')
 
@@ -14,7 +22,7 @@ export default async function AdminEmployeesPage() {
     supabase
       .from('employees')
       .select('id, name, email, avatar_url')
-      .eq('is_active', true)
+      .eq('is_active', employment === 'active')
       .order('name'),
     supabase
       .from('attendance_records')
@@ -50,8 +58,13 @@ export default async function AdminEmployeesPage() {
   }))
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <h1 className="text-xl font-semibold text-gray-900">실시간 현황판</h1>
+      <EmploymentTabs
+        current={employment}
+        activeHref="/admin/employees?employment=active"
+        resignedHref="/admin/employees?employment=resigned"
+      />
       <StatusBoard initial={initial} onLeaveMap={onLeaveMap} />
     </div>
   )

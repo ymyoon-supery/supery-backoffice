@@ -5,12 +5,13 @@ import {
   parseISO, eachDayOfInterval,
 } from 'date-fns'
 import AttendanceSummaryView from '@/components/admin/AttendanceSummaryView'
+import EmploymentTabs from '@/components/admin/EmploymentTabs'
 import { calcDaySummary, toKSTDate, WorkSchedule } from '@/lib/attendance/calc'
 
 export default async function AdminAttendancePage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; date?: string; empId?: string }>
+  searchParams: Promise<{ view?: string; date?: string; empId?: string; employment?: string }>
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -20,6 +21,7 @@ export default async function AdminAttendancePage({
   const view = (['day', 'week', 'month'].includes(params.view ?? '') ? params.view : 'week') as 'day' | 'week' | 'month'
   const baseDate = params.date ? parseISO(params.date) : new Date()
   const selectedEmpId = params.empId ?? ''
+  const employment = params.employment === 'resigned' ? 'resigned' : 'active'
 
   let rangeStart: Date, rangeEnd: Date
   if (view === 'day') {
@@ -35,6 +37,13 @@ export default async function AdminAttendancePage({
   const fromStr = format(rangeStart, 'yyyy-MM-dd')
   const toStr = format(rangeEnd, 'yyyy-MM-dd')
 
+  function tabHref(status: string) {
+    const p = new URLSearchParams({ view, employment: status })
+    if (params.date) p.set('date', params.date)
+    if (params.empId) p.set('empId', params.empId)
+    return `/admin/attendance?${p.toString()}`
+  }
+
   const [{ data: records }, { data: employees }, { data: leaveRecords }, { data: settingsData }] = await Promise.all([
     supabase
       .from('attendance_records')
@@ -45,7 +54,7 @@ export default async function AdminAttendancePage({
     supabase
       .from('employees')
       .select('id, name, email, department_id')
-      .eq('is_active', true)
+      .eq('is_active', employment === 'active')
       .order('name'),
     supabase
       .from('leave_requests')
@@ -94,6 +103,11 @@ export default async function AdminAttendancePage({
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold text-gray-900">근태 현황</h1>
+      <EmploymentTabs
+        current={employment}
+        activeHref={tabHref('active')}
+        resignedHref={tabHref('resigned')}
+      />
       <AttendanceSummaryView
         view={view}
         baseDate={format(baseDate, 'yyyy-MM-dd')}

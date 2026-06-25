@@ -16,11 +16,11 @@ export default async function DashboardLayout({
 
   const { data: employee } = await supabase
     .from('employees')
-    .select('id, name, email, role, position, avatar_url, department_id')
+    .select('id, name, email, role, position, avatar_url, department_id, is_active')
     .eq('auth_user_id', user.id)
     .single()
 
-  if (!employee) redirect('/login')
+  if (!employee || !employee.is_active) redirect('/login')
 
   const { data: settings } = await supabase
     .from('company_settings')

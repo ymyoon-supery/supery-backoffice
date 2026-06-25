@@ -17,11 +17,11 @@ export default async function AdminLayout({
 
   const { data: employee } = await supabase
     .from('employees')
-    .select('id, name, email, role, avatar_url, department_id')
+    .select('id, name, email, role, avatar_url, department_id, is_active')
     .eq('auth_user_id', user.id)
     .single()
 
-  if (!employee || employee.role !== 'ADMIN') {
+  if (!employee || employee.role !== 'ADMIN' || !employee.is_active) {
     redirect('/')
   }
 
