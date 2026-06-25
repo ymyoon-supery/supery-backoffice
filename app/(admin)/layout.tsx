@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Sidebar from '@/components/layout/Sidebar'
 import Header from '@/components/layout/Header'
+import { MobileSidebarProvider } from '@/components/layout/MobileSidebarContext'
+import MobileMenuButton from '@/components/layout/MobileMenuButton'
 
 export default async function AdminLayout({
   children,
@@ -24,12 +26,14 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar role={employee.role} position={null} pendingCount={0} />
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <Header employee={employee} />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+    <MobileSidebarProvider>
+      <div className="flex h-screen bg-gray-50">
+        <Sidebar role={employee.role} position={null} pendingCount={0} />
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <Header employee={employee} leftSlot={<MobileMenuButton />} />
+          <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        </div>
       </div>
-    </div>
+    </MobileSidebarProvider>
   )
 }
