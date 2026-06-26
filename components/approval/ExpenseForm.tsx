@@ -270,6 +270,19 @@ async function uploadFiles(
 
 // ─── Tab 1: 지출결의서 ────────────────────────────────────────────────────────
 
+type ExpenseRow = { item: string; date: string; amountRaw: string; vatType: 'INCLUSIVE' | 'EXCLUSIVE'; note: string }
+
+function calcVat(amountRaw: string, vatType: 'INCLUSIVE' | 'EXCLUSIVE') {
+  const raw = Number(amountRaw.replace(/[^0-9]/g, '')) || 0
+  if (!raw) return { supply: 0, vat: 0, total: 0 }
+  if (vatType === 'EXCLUSIVE') {
+    const vat = Math.round(raw * 0.1)
+    return { supply: raw, vat, total: raw + vat }
+  }
+  const supply = Math.round(raw * 100 / 110)
+  return { supply, vat: raw - supply, total: raw }
+}
+
 function ExpenseTab({
   employeeId,
   employeeName,
@@ -287,14 +300,14 @@ function ExpenseTab({
   const [accountHolder, setAccountHolder] = useState('')
   const [paymentRequestDate, setPaymentRequestDate] = useState(today)
   const [settlementDate, setSettlementDate] = useState('')
-  const [lineItems, setLineItems] = useState([{ item: '', date: today, amountRaw: '', note: '' }])
+  const [lineItems, setLineItems] = useState<ExpenseRow[]>([{ item: '', date: today, amountRaw: '', vatType: 'EXCLUSIVE', note: '' }])
   const [attachments, setAttachments] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
 
-  const totalAmount = lineItems.reduce(
-    (sum, r) => sum + (Number(r.amountRaw.replace(/[^0-9]/g, '')) || 0),
-    0,
-  )
+  const rowCalcs = lineItems.map(r => calcVat(r.amountRaw, r.vatType))
+  const totalSupply = rowCalcs.reduce((s, r) => s + r.supply, 0)
+  const totalVat = rowCalcs.reduce((s, r) => s + r.vat, 0)
+  const totalAmount = rowCalcs.reduce((s, r) => s + r.total, 0)
 
   const canSubmit =
     title.trim() &&
@@ -321,12 +334,18 @@ function ExpenseTab({
         if (attachmentUrls.length !== attachments.length) return
       }
 
-      const items: LineItem[] = lineItems.map(r => ({
-        item: r.item.trim(),
-        date: r.date,
-        amount: Number(r.amountRaw.replace(/[^0-9]/g, '')) || 0,
-        note: r.note.trim() || undefined,
-      }))
+      const items: LineItem[] = lineItems.map((r, idx) => {
+        const calc = rowCalcs[idx]
+        const vatNote = r.vatType === 'EXCLUSIVE'
+          ? `공급가액 ${calc.supply.toLocaleString('ko-KR')}원 + 부가세 ${calc.vat.toLocaleString('ko-KR')}원`
+          : `부가세포함 (공급가액 ${calc.supply.toLocaleString('ko-KR')}원)`
+        return {
+          item: r.item.trim(),
+          date: r.date,
+          amount: calc.total,
+          note: [vatNote, r.note.trim() || null].filter(Boolean).join(' / ') || undefined,
+        }
+      })
 
       const result = await submitExpense({
         title: title.trim(),
@@ -466,45 +485,86 @@ function ExpenseTab({
       <div className="space-y-2">
         <SectionLabel>지출 내역</SectionLabel>
         <div className="rounded-lg border border-gray-200 overflow-hidden overflow-x-auto">
-          <table className="w-full text-sm" style={{ minWidth: 480 }}>
+          <table className="w-full text-sm" style={{ minWidth: 680 }}>
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[18%] whitespace-nowrap">지출일</th>
+                <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[14%] whitespace-nowrap">지출일</th>
                 <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500">지출항목</th>
-                <th className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 w-[20%] whitespace-nowrap">금액(원)</th>
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[16%]">비고</th>
+                <th className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 w-[16%] whitespace-nowrap">금액(원)</th>
+                <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500 w-[16%]">부가세</th>
+                <th className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 w-[14%] whitespace-nowrap">합계(원)</th>
+                <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[12%]">비고</th>
                 <th className="w-[4%]" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {lineItems.map((row, idx) => (
-                <tr key={idx}>
-                  <td className="px-2 py-1.5">
-                    <input type="date" value={row.date} onChange={e => updateRow(idx, 'date', e.target.value)} className="w-full text-sm px-2 py-1.5 rounded border border-transparent focus:border-gray-300 focus:outline-none bg-transparent hover:bg-gray-50 focus:bg-white" />
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <input type="text" value={row.item} onChange={e => updateRow(idx, 'item', e.target.value)} placeholder="항목 입력" className="w-full text-sm px-2 py-1.5 rounded border border-transparent focus:border-gray-300 focus:outline-none bg-transparent hover:bg-gray-50 focus:bg-white" />
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <input type="text" inputMode="numeric" value={row.amountRaw} onChange={e => updateRow(idx, 'amountRaw', formatKRWInput(e.target.value))} placeholder="0" className="w-full text-sm px-2 py-1.5 rounded border border-transparent focus:border-gray-300 focus:outline-none bg-transparent hover:bg-gray-50 focus:bg-white text-right" />
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <input type="text" value={row.note} onChange={e => updateRow(idx, 'note', e.target.value)} placeholder="비고" className="w-full text-sm px-2 py-1.5 rounded border border-transparent focus:border-gray-300 focus:outline-none bg-transparent hover:bg-gray-50 focus:bg-white" />
-                  </td>
-                  <td className="px-2 py-1.5 text-center">
-                    {lineItems.length > 1 && (
-                      <button type="button" onClick={() => setLineItems(prev => prev.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-red-400 transition-colors">
-                        <Trash2 size={14} />
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {lineItems.map((row, idx) => {
+                const calc = rowCalcs[idx]
+                return (
+                  <tr key={idx}>
+                    <td className="px-2 py-1.5">
+                      <input type="date" value={row.date} onChange={e => updateRow(idx, 'date', e.target.value)} className="w-full text-sm px-2 py-1.5 rounded border border-transparent focus:border-gray-300 focus:outline-none bg-transparent hover:bg-gray-50 focus:bg-white" />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <input type="text" value={row.item} onChange={e => updateRow(idx, 'item', e.target.value)} placeholder="항목 입력" className="w-full text-sm px-2 py-1.5 rounded border border-transparent focus:border-gray-300 focus:outline-none bg-transparent hover:bg-gray-50 focus:bg-white" />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <input type="text" inputMode="numeric" value={row.amountRaw} onChange={e => updateRow(idx, 'amountRaw', formatKRWInput(e.target.value))} placeholder="0" className="w-full text-sm px-2 py-1.5 rounded border border-transparent focus:border-gray-300 focus:outline-none bg-transparent hover:bg-gray-50 focus:bg-white text-right" />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <div className="flex gap-1 justify-center">
+                        <button type="button" onClick={() => updateRow(idx, 'vatType', 'EXCLUSIVE')}
+                          className={`px-2 py-1 rounded text-xs font-medium border transition-colors ${row.vatType === 'EXCLUSIVE' ? 'bg-primary text-white border-primary' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
+                          별도
+                        </button>
+                        <button type="button" onClick={() => updateRow(idx, 'vatType', 'INCLUSIVE')}
+                          className={`px-2 py-1 rounded text-xs font-medium border transition-colors ${row.vatType === 'INCLUSIVE' ? 'bg-primary text-white border-primary' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
+                          포함
+                        </button>
+                      </div>
+                      {calc.vat > 0 && (
+                        <p className="text-center text-xs text-gray-400 mt-0.5 tabular-nums">
+                          {calc.vat.toLocaleString('ko-KR')}원
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-2 py-1.5 text-right">
+                      <span className={`text-sm tabular-nums ${calc.total > 0 ? 'font-semibold text-gray-900' : 'text-gray-300'}`}>
+                        {calc.total > 0 ? calc.total.toLocaleString('ko-KR') : '—'}
+                      </span>
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <input type="text" value={row.note} onChange={e => updateRow(idx, 'note', e.target.value)} placeholder="비고" className="w-full text-sm px-2 py-1.5 rounded border border-transparent focus:border-gray-300 focus:outline-none bg-transparent hover:bg-gray-50 focus:bg-white" />
+                    </td>
+                    <td className="px-2 py-1.5 text-center">
+                      {lineItems.length > 1 && (
+                        <button type="button" onClick={() => setLineItems(prev => prev.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-red-400 transition-colors">
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
-            <tfoot className="border-t border-gray-200 bg-gray-50">
+            <tfoot className="border-t border-gray-200 bg-gray-50 divide-y divide-gray-100">
               <tr>
-                <td colSpan={2} className="px-3 py-2 text-xs font-semibold text-gray-600">지출합계</td>
-                <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums">
+                <td colSpan={2} className="px-3 py-1.5 text-xs text-gray-500">공급가액 합계</td>
+                <td colSpan={3} className="px-3 py-1.5 text-right text-xs text-gray-600 tabular-nums">
+                  {totalSupply > 0 ? totalSupply.toLocaleString('ko-KR') + '원' : '—'}
+                </td>
+                <td colSpan={2} />
+              </tr>
+              <tr>
+                <td colSpan={2} className="px-3 py-1.5 text-xs text-gray-500">부가세 합계</td>
+                <td colSpan={3} className="px-3 py-1.5 text-right text-xs text-gray-600 tabular-nums">
+                  {totalVat > 0 ? totalVat.toLocaleString('ko-KR') + '원' : '—'}
+                </td>
+                <td colSpan={2} />
+              </tr>
+              <tr className="border-t border-gray-200">
+                <td colSpan={2} className="px-3 py-2 text-xs font-semibold text-gray-700">최종합계 (부가세포함)</td>
+                <td colSpan={3} className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums">
                   {totalAmount > 0 ? totalAmount.toLocaleString('ko-KR') + '원' : '—'}
                 </td>
                 <td colSpan={2} />
@@ -512,7 +572,7 @@ function ExpenseTab({
             </tfoot>
           </table>
         </div>
-        <button type="button" onClick={() => setLineItems(prev => [...prev, { item: '', date: today, amountRaw: '', note: '' }])} className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors">
+        <button type="button" onClick={() => setLineItems(prev => [...prev, { item: '', date: today, amountRaw: '', vatType: 'EXCLUSIVE', note: '' }])} className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors">
           <Plus size={13} /> 항목 추가
         </button>
       </div>
