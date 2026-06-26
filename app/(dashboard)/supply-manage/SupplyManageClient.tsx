@@ -1,45 +1,33 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useTransition } from 'react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { useRouter } from 'next/navigation'
-import { approveSupplyAction } from '@/app/(dashboard)/documents/actions'
+import { completeSupplyAction } from './actions'
 
 const CATEGORY_LABELS: Record<string, string> = {
   EQUIPMENT: '비품', CONSUMABLE: '소모품', SOFTWARE: '소프트웨어', OTHER: '기타',
 }
 
 const SUPPLY_STATUS: Record<string, { label: string; className: string }> = {
-  PENDING:   { label: '대기중',   className: 'bg-amber-50 text-amber-700' },
-  APPROVED:  { label: '승인완료', className: 'bg-green-50 text-green-700' },
+  PENDING:   { label: '결재대기', className: 'bg-amber-50 text-amber-700' },
+  APPROVED:  { label: '결재완료', className: 'bg-green-50 text-green-700' },
   REJECTED:  { label: '반려',     className: 'bg-red-50 text-red-600' },
   COMPLETED: { label: '처리완료', className: 'bg-blue-50 text-blue-700' },
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export default function SupplyManageClient({ supplyRequests, currentEmployeeId }: { supplyRequests: any[]; currentEmployeeId: string }) {
+export default function SupplyManageClient({ supplyRequests }: { supplyRequests: any[] }) {
   const [isPending, startTransition] = useTransition()
-  const [rejectingId, setRejectingId] = useState<string | null>(null)
-  const [rejectComment, setRejectComment] = useState('')
   const router = useRouter()
 
-  function handleApprove(requestId: string) {
+  function handleComplete(requestId: string) {
+    if (!confirm('처리 완료로 변경하시겠습니까?')) return
     startTransition(async () => {
-      const res = await approveSupplyAction(requestId, true)
+      const res = await completeSupplyAction(requestId)
       if (res.error) { toast.error(res.error); return }
-      toast.success('승인되었습니다.')
-      router.refresh()
-    })
-  }
-
-  function handleReject(requestId: string) {
-    startTransition(async () => {
-      const res = await approveSupplyAction(requestId, false, rejectComment || undefined)
-      if (res.error) { toast.error(res.error); return }
-      toast.success('반려되었습니다.')
-      setRejectingId(null)
-      setRejectComment('')
+      toast.success('처리 완료되었습니다.')
       router.refresh()
     })
   }
@@ -59,10 +47,7 @@ export default function SupplyManageClient({ supplyRequests, currentEmployeeId }
             const emp = req.employees
             const empLabel = [emp?.position, emp?.name].filter(Boolean).join(' ')
             const statusInfo = SUPPLY_STATUS[req.status] ?? SUPPLY_STATUS.PENDING
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const myStep = (req.supply_approval_steps ?? []).find((s: any) => s.approver_id === currentEmployeeId && s.status === 'PENDING')
-            const canAct = !!myStep
-            const isRejecting = rejectingId === req.id
+            const canComplete = req.status === 'APPROVED'
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const sortedItems = [...(req.supply_request_items ?? [])].sort((a: any, b: any) => a.sort_order - b.sort_order)
 
@@ -110,40 +95,15 @@ export default function SupplyManageClient({ supplyRequests, currentEmployeeId }
                   </table>
                 </div>
 
-                {canAct && (
-                  isRejecting ? (
-                    <div className="space-y-2">
-                      <input
-                        type="text"
-                        value={rejectComment}
-                        onChange={e => setRejectComment(e.target.value)}
-                        placeholder="반려 사유 (선택)"
-                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-200"
-                        autoFocus
-                      />
-                      <div className="flex gap-2">
-                        <button type="button" onClick={() => handleReject(req.id)} disabled={isPending}
-                          className="flex-1 py-2 text-sm font-medium bg-red-600 text-white rounded-lg disabled:opacity-50 hover:bg-red-700">
-                          반려 확인
-                        </button>
-                        <button type="button" onClick={() => { setRejectingId(null); setRejectComment('') }}
-                          className="flex-1 py-2 text-sm font-medium border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50">
-                          취소
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <button type="button" onClick={() => handleApprove(req.id)} disabled={isPending}
-                        className="flex-1 py-2 text-sm font-medium bg-primary text-white rounded-lg disabled:opacity-50 hover:bg-primary/90">
-                        승인
-                      </button>
-                      <button type="button" onClick={() => setRejectingId(req.id)} disabled={isPending}
-                        className="flex-1 py-2 text-sm font-medium border border-red-200 text-red-600 rounded-lg disabled:opacity-50 hover:bg-red-50">
-                        반려
-                      </button>
-                    </div>
-                  )
+                {canComplete && (
+                  <button
+                    type="button"
+                    onClick={() => handleComplete(req.id)}
+                    disabled={isPending}
+                    className="w-full py-2 text-sm font-medium bg-blue-600 text-white rounded-lg disabled:opacity-50 hover:bg-blue-700"
+                  >
+                    처리 완료
+                  </button>
                 )}
               </div>
             )

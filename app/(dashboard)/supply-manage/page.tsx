@@ -28,16 +28,12 @@ export default async function SupplyManagePage() {
     .select(`
       id, status, created_at,
       employees ( name, position ),
-      supply_request_items ( id, category, description, estimated_amount, note, sort_order ),
-      supply_approval_steps ( id, approver_id, step_order, status, comment, acted_at )
+      supply_request_items ( id, category, description, estimated_amount, note, sort_order )
     `)
     .order('created_at', { ascending: false })
     .limit(100)
 
   return (
-    <SupplyManageClient
-      supplyRequests={supplyRequests ?? []}
-      currentEmployeeId={employee.id}
-    />
+    <SupplyManageClient supplyRequests={supplyRequests ?? []} />
   )
 }
