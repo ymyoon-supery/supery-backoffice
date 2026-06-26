@@ -155,6 +155,8 @@ export default function EmployeesClient({ employees: init, groups, teams }: {
     })
   }
 
+  const [tab, setTab] = useState<'active' | 'resigned'>('active')
+
   const active = employees.filter(e => e.is_active)
   const inactive = employees.filter(e => !e.is_active)
   const editingEmployee = editId ? employees.find(e => e.id === editId) : null
@@ -162,13 +164,26 @@ export default function EmployeesClient({ employees: init, groups, teams }: {
   return (
     <div className="space-y-4 max-w-5xl">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500">
-          직원을 사전 등록하면 해당 이메일로 Google 로그인 시 자동 연결됩니다.
-        </p>
-        <button onClick={openAdd} disabled={isPending}
-          className="flex items-center gap-1.5 text-sm px-3 py-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50">
-          <Plus size={14} /> 직원 추가
-        </button>
+        <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
+          <button
+            onClick={() => setTab('active')}
+            className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-colors ${tab === 'active' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            재직자 {active.length > 0 && <span className="ml-1 text-gray-400">{active.length}</span>}
+          </button>
+          <button
+            onClick={() => setTab('resigned')}
+            className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-colors ${tab === 'resigned' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            퇴사자 {inactive.length > 0 && <span className="ml-1 text-gray-400">{inactive.length}</span>}
+          </button>
+        </div>
+        {tab === 'active' && (
+          <button onClick={openAdd} disabled={isPending}
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50">
+            <Plus size={14} /> 직원 추가
+          </button>
+        )}
       </div>
 
       {showForm && (
@@ -293,109 +308,113 @@ export default function EmployeesClient({ employees: init, groups, teams }: {
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-50 text-xs text-gray-400 font-medium text-left">
-              <th className="px-4 py-3">이름</th>
-              <th className="px-4 py-3">이메일</th>
-              <th className="px-4 py-3">그룹/팀</th>
-              <th className="px-4 py-3">직급</th>
-              <th className="px-4 py-3">직위</th>
-              <th className="px-4 py-3">입사일</th>
-              <th className="px-4 py-3 text-right">부여연차</th>
-              <th className="px-4 py-3 text-right">잔여연차</th>
-              <th className="px-4 py-3">권한</th>
-              <th className="px-4 py-3">연결</th>
-              <th className="px-4 py-3 w-10"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {active.map(emp => {
-              const team = teams.find(t => t.id === emp.department_id)
-              const group = team ? groups.find(g => g.id === team.group_id) : null
-              const displayAnnual = calcDisplay(emp.hired_at) ?? emp.annual_leave_days
-              return (
-                <tr key={emp.id} className="hover:bg-gray-50/50">
-                  <td className="px-4 py-3 font-medium text-gray-900">{emp.name}</td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{emp.email}</td>
-                  <td className="px-4 py-3 text-gray-500">
-                    {group && <span className="text-xs text-gray-400 mr-1">{group.name}</span>}
-                    {team?.name ?? <span className="text-gray-300">—</span>}
-                  </td>
-                  <td className="px-4 py-3 text-gray-500">{emp.rank ?? <span className="text-gray-300">—</span>}</td>
-                  <td className="px-4 py-3">
-                    {emp.position
-                      ? <span className={`text-xs px-2 py-0.5 rounded-full ${emp.position === '팀장' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>{emp.position}</span>
-                      : <span className="text-gray-300">—</span>}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-gray-500">
-                    {emp.hired_at ? emp.hired_at.slice(0, 10) : <span className="text-gray-300">—</span>}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <span className="text-sm font-medium tabular-nums text-gray-700">{displayAnnual}일</span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <span className={`text-sm font-medium tabular-nums ${emp.remaining_leaves <= 3 ? 'text-red-500' : 'text-gray-700'}`}>
-                      {emp.remaining_leaves}일
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${emp.role === 'ADMIN' ? 'bg-red-50 text-red-600' : emp.role === 'MANAGER' ? 'bg-purple-50 text-purple-600' : 'bg-gray-100 text-gray-500'}`}>
-                      {ROLES.find(r => r.value === emp.role)?.label ?? emp.role}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs ${emp.auth_user_id ? 'text-green-600' : 'text-gray-300'}`}>
-                      {emp.auth_user_id ? '연결됨' : '대기 중'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <button onClick={() => openEdit(emp)} className="text-gray-400 hover:text-gray-600"><Pencil size={13} /></button>
-                  </td>
-                </tr>
-              )
-            })}
-            {active.length === 0 && (
-              <tr><td colSpan={11} className="px-4 py-10 text-center text-gray-400">등록된 직원이 없습니다.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {inactive.length > 0 && (
-        <details className="text-sm">
-          <summary className="cursor-pointer py-2 text-gray-400 hover:text-gray-600 select-none">
-            퇴사자 {inactive.length}명
-          </summary>
-          <div className="mt-2 bg-white rounded-xl border border-gray-100 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-50 text-xs text-gray-400 font-medium text-left">
-                  <th className="px-4 py-2">이름</th>
-                  <th className="px-4 py-2">이메일</th>
-                  <th className="px-4 py-2">팀</th>
-                  <th className="px-4 py-2">입사일</th>
-                  <th className="px-4 py-2">퇴사일</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {inactive.map(e => {
-                  const team = teams.find(t => t.id === e.department_id)
-                  return (
-                    <tr key={e.id} className="text-gray-400">
-                      <td className="px-4 py-2">{e.name}</td>
-                      <td className="px-4 py-2 text-xs">{e.email}</td>
-                      <td className="px-4 py-2 text-xs">{team?.name ?? '—'}</td>
-                      <td className="px-4 py-2 text-xs">{e.hired_at ? e.hired_at.slice(0, 10) : '—'}</td>
-                      <td className="px-4 py-2 text-xs">{e.resigned_at ? e.resigned_at.slice(0, 10) : '—'}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </details>
+      {tab === 'active' ? (
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-50 text-xs text-gray-400 font-medium text-left">
+                <th className="px-4 py-3">이름</th>
+                <th className="px-4 py-3">이메일</th>
+                <th className="px-4 py-3">그룹/팀</th>
+                <th className="px-4 py-3">직급</th>
+                <th className="px-4 py-3">직위</th>
+                <th className="px-4 py-3">입사일</th>
+                <th className="px-4 py-3 text-right">부여연차</th>
+                <th className="px-4 py-3 text-right">잔여연차</th>
+                <th className="px-4 py-3">권한</th>
+                <th className="px-4 py-3">연결</th>
+                <th className="px-4 py-3 w-10"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {active.map(emp => {
+                const team = teams.find(t => t.id === emp.department_id)
+                const group = team ? groups.find(g => g.id === team.group_id) : null
+                const displayAnnual = calcDisplay(emp.hired_at) ?? emp.annual_leave_days
+                return (
+                  <tr key={emp.id} className="hover:bg-gray-50/50">
+                    <td className="px-4 py-3 font-medium text-gray-900">{emp.name}</td>
+                    <td className="px-4 py-3 text-gray-500 text-xs">{emp.email}</td>
+                    <td className="px-4 py-3 text-gray-500">
+                      {group && <span className="text-xs text-gray-400 mr-1">{group.name}</span>}
+                      {team?.name ?? <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500">{emp.rank ?? <span className="text-gray-300">—</span>}</td>
+                    <td className="px-4 py-3">
+                      {emp.position
+                        ? <span className={`text-xs px-2 py-0.5 rounded-full ${emp.position === '팀장' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>{emp.position}</span>
+                        : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-500">
+                      {emp.hired_at ? emp.hired_at.slice(0, 10) : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className="text-sm font-medium tabular-nums text-gray-700">{displayAnnual}일</span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className={`text-sm font-medium tabular-nums ${emp.remaining_leaves <= 3 ? 'text-red-500' : 'text-gray-700'}`}>
+                        {emp.remaining_leaves}일
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${emp.role === 'ADMIN' ? 'bg-red-50 text-red-600' : emp.role === 'MANAGER' ? 'bg-purple-50 text-purple-600' : 'bg-gray-100 text-gray-500'}`}>
+                        {ROLES.find(r => r.value === emp.role)?.label ?? emp.role}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs ${emp.auth_user_id ? 'text-green-600' : 'text-gray-300'}`}>
+                        {emp.auth_user_id ? '연결됨' : '대기 중'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <button onClick={() => openEdit(emp)} className="text-gray-400 hover:text-gray-600"><Pencil size={13} /></button>
+                    </td>
+                  </tr>
+                )
+              })}
+              {active.length === 0 && (
+                <tr><td colSpan={11} className="px-4 py-10 text-center text-gray-400">등록된 재직자가 없습니다.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-50 text-xs text-gray-400 font-medium text-left">
+                <th className="px-4 py-3">이름</th>
+                <th className="px-4 py-3">이메일</th>
+                <th className="px-4 py-3">그룹/팀</th>
+                <th className="px-4 py-3">직급</th>
+                <th className="px-4 py-3">입사일</th>
+                <th className="px-4 py-3">퇴사일</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {inactive.map(e => {
+                const team = teams.find(t => t.id === e.department_id)
+                const group = team ? groups.find(g => g.id === team.group_id) : null
+                return (
+                  <tr key={e.id} className="text-gray-400 hover:bg-gray-50/50">
+                    <td className="px-4 py-3 font-medium text-gray-700">{e.name}</td>
+                    <td className="px-4 py-3 text-xs">{e.email}</td>
+                    <td className="px-4 py-3 text-xs">
+                      {group && <span className="text-gray-300 mr-1">{group.name}</span>}
+                      {team?.name ?? '—'}
+                    </td>
+                    <td className="px-4 py-3 text-xs">{e.rank ?? '—'}</td>
+                    <td className="px-4 py-3 text-xs">{e.hired_at ? e.hired_at.slice(0, 10) : '—'}</td>
+                    <td className="px-4 py-3 text-xs text-red-400">{e.resigned_at ? e.resigned_at.slice(0, 10) : '—'}</td>
+                  </tr>
+                )
+              })}
+              {inactive.length === 0 && (
+                <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-400">퇴사자가 없습니다.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   )
