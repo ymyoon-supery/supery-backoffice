@@ -4,7 +4,8 @@ import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { useRouter } from 'next/navigation'
-import { completeDocumentRequest, approveSupplyRequest, confirmSupplyPurchase } from './actions'
+import { completeDocumentRequest, approveSupplyRequest } from './actions'
+import { completeSupplyAction } from '@/app/(dashboard)/supply-manage/actions'
 
 type Tab = 'documents' | 'supply'
 
@@ -65,10 +66,11 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests,
   }
 
   function handlePurchaseConfirm(requestId: string) {
+    if (!confirm('처리 완료로 변경하시겠습니까?')) return
     startTransition(async () => {
-      const res = await confirmSupplyPurchase(requestId)
+      const res = await completeSupplyAction(requestId)
       if (res.error) { toast.error(res.error); return }
-      toast.success('구매 확인 처리되었습니다.')
+      toast.success('처리 완료되었습니다.')
       router.refresh()
     })
   }
@@ -284,7 +286,7 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests,
                       disabled={isPending}
                       className="w-full py-2 text-sm font-medium bg-blue-600 text-white rounded-lg disabled:opacity-50 hover:bg-blue-700 transition-colors"
                     >
-                      구매확인
+                      처리 완료
                     </button>
                   )}
                 </div>
