@@ -96,6 +96,7 @@ interface SupplyRequest {
 }
 
 type AnyItem = LeaveItem | ExpenseItem
+type Tab = 'all' | 'leave' | 'expense' | 'document' | 'supply'
 
 interface Props {
   items: AnyItem[]
@@ -116,8 +117,31 @@ export default function MyRequestsClient({
 }: Props) {
   const [selectedExpense, setSelectedExpense] = useState<ExpenseViewData | null>(null)
   const [expandedSupplyId, setExpandedSupplyId] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<Tab>('all')
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
+
+  const leaveItems  = items.filter(i => i.kind === 'leave')
+  const expenseItems = items.filter(i => i.kind === 'expense')
+
+  const TABS: { id: Tab; label: string; count: number }[] = [
+    { id: 'all',      label: '전체',    count: items.length + documentRequests.length + supplyRequests.length },
+    { id: 'leave',    label: '연차',    count: leaveItems.length },
+    { id: 'expense',  label: '지출결의', count: expenseItems.length },
+    { id: 'document', label: '서류신청', count: documentRequests.length },
+    { id: 'supply',   label: '비품신청', count: supplyRequests.length },
+  ]
+
+  const showLeave    = activeTab === 'all' || activeTab === 'leave'
+  const showExpense  = activeTab === 'all' || activeTab === 'expense'
+  const showDocument = activeTab === 'all' || activeTab === 'document'
+  const showSupply   = activeTab === 'all' || activeTab === 'supply'
+
+  const visibleItems   = activeTab === 'all'
+    ? items
+    : activeTab === 'leave'   ? leaveItems
+    : activeTab === 'expense' ? expenseItems as AnyItem[]
+    : []
 
   function openExpense(item: ExpenseItem) {
     const viewData: ExpenseViewData = {
@@ -157,12 +181,36 @@ export default function MyRequestsClient({
     <div className="max-w-2xl space-y-6">
       <h1 className="text-xl font-semibold text-gray-900">내 신청 내역</h1>
 
+      {/* Category tabs */}
+      <div className="flex gap-1 flex-wrap">
+        {TABS.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setActiveTab(t.id)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              activeTab === t.id
+                ? 'bg-primary text-white'
+                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+            }`}
+          >
+            {t.label}
+            {t.count > 0 && (
+              <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                activeTab === t.id ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-500'
+              }`}>
+                {t.count}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
       {/* Leave & Expense */}
       <div className="space-y-2">
-        {items.length > 0 && (
+        {visibleItems.length > 0 && activeTab === 'all' && (
           <p className="text-xs font-medium text-gray-400 uppercase tracking-wider px-1">연차 / 지출결의</p>
         )}
-        {items.map(item => {
+        {visibleItems.map(item => {
           const status = STATUS_LABELS[item.status] ?? STATUS_LABELS.PENDING
           const rejectionReason = item.kind === 'leave' && item.status === 'REJECTED'
             ? item.leave_approval_steps?.find(s => s.status === 'REJECTED')?.comment
@@ -232,15 +280,18 @@ export default function MyRequestsClient({
             </div>
           )
         })}
-        {items.length === 0 && documentRequests.length === 0 && supplyRequests.length === 0 && (
+        {visibleItems.length === 0 && !showDocument && !showSupply && (
+          <div className="py-12 text-center text-sm text-gray-400">신청 내역이 없습니다.</div>
+        )}
+        {visibleItems.length === 0 && (activeTab === 'leave' || activeTab === 'expense') && (
           <div className="py-12 text-center text-sm text-gray-400">신청 내역이 없습니다.</div>
         )}
       </div>
 
       {/* Document Requests */}
-      {documentRequests.length > 0 && (
+      {showDocument && documentRequests.length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wider px-1">서류 신청</p>
+          {activeTab === 'all' && <p className="text-xs font-medium text-gray-400 uppercase tracking-wider px-1">서류 신청</p>}
           {documentRequests.map(doc => {
             const status = STATUS_LABELS[doc.status] ?? STATUS_LABELS.PENDING
             return (
@@ -277,10 +328,18 @@ export default function MyRequestsClient({
         </div>
       )}
 
+      {showDocument && documentRequests.length === 0 && activeTab === 'document' && (
+        <div className="py-12 text-center text-sm text-gray-400">신청 내역이 없습니다.</div>
+      )}
+
+      {showSupply && supplyRequests.length === 0 && activeTab === 'supply' && (
+        <div className="py-12 text-center text-sm text-gray-400">신청 내역이 없습니다.</div>
+      )}
+
       {/* Supply Requests */}
-      {supplyRequests.length > 0 && (
+      {showSupply && supplyRequests.length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wider px-1">비품/소모품 신청</p>
+          {activeTab === 'all' && <p className="text-xs font-medium text-gray-400 uppercase tracking-wider px-1">비품/소모품 신청</p>}
           {supplyRequests.map(req => {
             const status = STATUS_LABELS[req.status] ?? STATUS_LABELS.PENDING
             const isExpanded = expandedSupplyId === req.id
