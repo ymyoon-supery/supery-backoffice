@@ -64,6 +64,30 @@ function formatKRW(n: number) {
   return n.toLocaleString('ko-KR') + '원'
 }
 
+function parseVatFromNote(note: string | undefined, total: number | undefined) {
+  const t = total ?? 0
+  if (!note) return { supply: t, vat: 0, total: t, vatLabel: null as string | null, userNote: '' }
+
+  const parts = note.split(' / ')
+  const vatPart = parts[0]
+  const userNote = parts.slice(1).join(' / ')
+
+  const excMatch = vatPart.match(/공급가액\s+([\d,]+)원\s*\+\s*부가세\s+([\d,]+)원/)
+  if (excMatch) {
+    const supply = Number(excMatch[1].replace(/,/g, ''))
+    const vat    = Number(excMatch[2].replace(/,/g, ''))
+    return { supply, vat, total: supply + vat, vatLabel: '별도', userNote }
+  }
+
+  const incMatch = vatPart.match(/부가세포함\s*\(공급가액\s+([\d,]+)원\)/)
+  if (incMatch) {
+    const supply = Number(incMatch[1].replace(/,/g, ''))
+    return { supply, vat: t - supply, total: t, vatLabel: '포함', userNote }
+  }
+
+  return { supply: t, vat: 0, total: t, vatLabel: null as string | null, userNote: note }
+}
+
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <tr className="border-b border-gray-200">
@@ -81,7 +105,11 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
   const [rejectReason, setRejectReason] = useState('')
   const [rejecting, setRejecting] = useState(false)
 
-  const totalAmount = data.lineItems.reduce((sum, li) => sum + (li.amount ?? 0), 0)
+  const rowVats = data.lineItems.map(li => parseVatFromNote(li.note, li.amount))
+  const totalSupply = rowVats.reduce((s, r) => s + r.supply, 0)
+  const totalVat    = rowVats.reduce((s, r) => s + r.vat, 0)
+  const totalAmount = rowVats.reduce((s, r) => s + r.total, 0)
+  const hasVat = rowVats.some(r => r.vatLabel !== null)
   const statusCfg = STATUS_CFG[data.status]
 
   const requestDateStr = data.requestDate
@@ -171,44 +199,74 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
             <div>
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">지출 내역</p>
               <div className="overflow-x-auto">
-              <table className="w-full border border-gray-200 rounded-lg overflow-hidden text-sm" style={{ minWidth: 400 }}>
+              <table className="w-full border border-gray-200 rounded-lg overflow-hidden text-sm" style={{ minWidth: hasVat ? 560 : 400 }}>
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[16%] whitespace-nowrap">지출일/이용자</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[15%] whitespace-nowrap">지출일/이용자</th>
                     <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500">지출항목</th>
-                    <th className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 w-[20%] whitespace-nowrap">금액</th>
-                    <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[14%]">비고</th>
+                    {hasVat && <>
+                      <th className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 w-[14%] whitespace-nowrap">공급가액</th>
+                      <th className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 w-[14%] whitespace-nowrap">부가세</th>
+                    </>}
+                    <th className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 w-[16%] whitespace-nowrap">{hasVat ? '합계' : '금액'}</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[12%]">비고</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {data.lineItems.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="px-4 py-4 text-center text-xs text-gray-400">내역 없음</td>
+                      <td colSpan={hasVat ? 6 : 4} className="px-4 py-4 text-center text-xs text-gray-400">내역 없음</td>
                     </tr>
                   )}
-                  {data.lineItems.map((li, i) => (
-                    <tr key={i} className="hover:bg-gray-50/50">
-                      <td className="px-3 py-2.5 text-gray-500 text-xs whitespace-nowrap">
-                        <span>{li.date}</span>
-                        {li.userName && (
-                          <span className="block text-gray-400 mt-0.5">{li.userName}</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5 text-gray-700">{li.item}</td>
-                      <td className="px-3 py-2.5 text-right text-gray-700 tabular-nums whitespace-nowrap">
-                        {li.amount !== undefined
-                          ? formatKRW(li.amount)
-                          : li.count !== undefined
-                          ? `${li.count}건`
-                          : '—'}
-                      </td>
-                      <td className="px-3 py-2.5 text-gray-500 text-xs">{li.note ?? ''}</td>
-                    </tr>
-                  ))}
+                  {data.lineItems.map((li, i) => {
+                    const v = rowVats[i]
+                    return (
+                      <tr key={i} className="hover:bg-gray-50/50">
+                        <td className="px-3 py-2.5 text-gray-500 text-xs whitespace-nowrap">
+                          <span>{li.date}</span>
+                          {li.userName && <span className="block text-gray-400 mt-0.5">{li.userName}</span>}
+                        </td>
+                        <td className="px-3 py-2.5 text-gray-700">
+                          <span>{li.item}</span>
+                          {v.vatLabel && (
+                            <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded font-medium ${v.vatLabel === '별도' ? 'bg-blue-50 text-blue-600' : 'bg-green-50 text-green-600'}`}>
+                              부가세 {v.vatLabel}
+                            </span>
+                          )}
+                        </td>
+                        {hasVat && <>
+                          <td className="px-3 py-2.5 text-right text-gray-600 tabular-nums whitespace-nowrap text-xs">
+                            {v.vatLabel ? formatKRW(v.supply) : '—'}
+                          </td>
+                          <td className="px-3 py-2.5 text-right text-gray-600 tabular-nums whitespace-nowrap text-xs">
+                            {v.vatLabel ? formatKRW(v.vat) : '—'}
+                          </td>
+                        </>}
+                        <td className="px-3 py-2.5 text-right text-gray-700 tabular-nums whitespace-nowrap">
+                          {li.amount !== undefined
+                            ? formatKRW(v.total)
+                            : li.count !== undefined
+                            ? `${li.count}건`
+                            : '—'}
+                        </td>
+                        <td className="px-3 py-2.5 text-gray-500 text-xs">{v.userNote || ''}</td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
                 <tfoot className="border-t border-gray-200 bg-gray-50">
+                  {hasVat && <>
+                    <tr>
+                      <td colSpan={2} className="px-4 py-2 text-xs text-gray-500">공급가액 합계</td>
+                      <td className="px-4 py-2 text-right text-xs text-gray-700 tabular-nums">{formatKRW(totalSupply)}</td>
+                      <td className="px-4 py-2 text-right text-xs text-gray-500 tabular-nums">{formatKRW(totalVat)}</td>
+                      <td colSpan={2} />
+                    </tr>
+                  </>}
                   <tr>
-                    <td colSpan={2} className="px-4 py-2.5 text-sm font-semibold text-gray-700">지출합계</td>
+                    <td colSpan={hasVat ? 4 : 2} className="px-4 py-2.5 text-sm font-semibold text-gray-700">
+                      {hasVat ? '최종합계 (부가세 포함)' : '지출합계'}
+                    </td>
                     <td className="px-4 py-2.5 text-right text-sm font-bold text-gray-900 tabular-nums">
                       {formatKRW(totalAmount)}
                     </td>
