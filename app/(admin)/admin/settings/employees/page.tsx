@@ -1,11 +1,14 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import EmployeesClient from './EmployeesClient'
 import { calcAnnualLeave } from '@/lib/annualLeave'
 
 const DEDUCTS = ['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF', 'GROUP']
 
 export default async function EmployeesSettingsPage() {
-  const supabase = await createClient()
+  const supabase = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
 
   const yearStart = `${new Date().getFullYear()}-01-01`
 
