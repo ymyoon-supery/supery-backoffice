@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import StatusBoard from '@/components/admin/StatusBoard'
 import EmploymentTabs from '@/components/admin/EmploymentTabs'
@@ -13,13 +14,18 @@ export default async function AdminEmployeesPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const admin = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+
   const params = await searchParams
   const employment = params.employment === 'resigned' ? 'resigned' : 'active'
 
   const today = format(new Date(new Date().getTime() + 9 * 60 * 60 * 1000), 'yyyy-MM-dd')
 
   const [{ data: employees }, { data: todayRecords }, { data: todayLeaves }] = await Promise.all([
-    supabase
+    admin
       .from('employees')
       .select('id, name, email, avatar_url')
       .eq('is_active', employment === 'active')

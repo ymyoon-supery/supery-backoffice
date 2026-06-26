@@ -1,5 +1,6 @@
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { MapPin, ExternalLink } from 'lucide-react'
+import EmploymentTabs from '@/components/admin/EmploymentTabs'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,7 +26,14 @@ async function fetchKoreanAddress(lat: number, lng: number): Promise<string> {
   }
 }
 
-export default async function HomeLocationsPage() {
+export default async function HomeLocationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ employment?: string }>
+}) {
+  const params = await searchParams
+  const employment = params.employment === 'resigned' ? 'resigned' : 'active'
+
   const admin = createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -34,7 +42,7 @@ export default async function HomeLocationsPage() {
   const [{ data: employees, error }, { data: depts }] = await Promise.all([
     admin.from('employees')
       .select('id, name, home_lat, home_lng, department_id')
-      .eq('is_active', true)
+      .eq('is_active', employment === 'active')
       .order('name'),
     admin.from('departments').select('id, name'),
   ])
@@ -66,6 +74,12 @@ export default async function HomeLocationsPage() {
           등록 {registered.length}명 / 미등록 {unregistered.length}명
         </span>
       </div>
+
+      <EmploymentTabs
+        current={employment}
+        activeHref="/admin/settings/home-locations?employment=active"
+        resignedHref="/admin/settings/home-locations?employment=resigned"
+      />
 
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600 font-mono">
