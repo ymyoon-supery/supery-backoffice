@@ -66,26 +66,39 @@ function formatKRW(n: number) {
 
 function parseVatFromNote(note: string | undefined, total: number | undefined) {
   const t = total ?? 0
-  if (!note) return { supply: t, vat: 0, total: t, vatLabel: null as string | null, userNote: '' }
+  let supply = t, vat = 0, vatLabel: string | null = null, userNote = note ?? ''
 
-  const parts = note.split(' / ')
-  const vatPart = parts[0]
-  const userNote = parts.slice(1).join(' / ')
+  if (note) {
+    const parts = note.split(' / ')
+    const vatPart = parts[0]
+    const rest = parts.slice(1).join(' / ')
 
-  const excMatch = vatPart.match(/공급가액\s+([\d,]+)원\s*\+\s*부가세\s+([\d,]+)원/)
-  if (excMatch) {
-    const supply = Number(excMatch[1].replace(/,/g, ''))
-    const vat    = Number(excMatch[2].replace(/,/g, ''))
-    return { supply, vat, total: supply + vat, vatLabel: '별도', userNote }
+    const excMatch = vatPart.match(/공급가액\s+([\d,]+)원\s*\+\s*부가세\s+([\d,]+)원/)
+    if (excMatch) {
+      supply = Number(excMatch[1].replace(/,/g, ''))
+      vat    = Number(excMatch[2].replace(/,/g, ''))
+      vatLabel = '별도'
+      userNote = rest
+    } else {
+      const incMatch = vatPart.match(/부가세포함\s*\(공급가액\s+([\d,]+)원\)/)
+      if (incMatch) {
+        supply   = Number(incMatch[1].replace(/,/g, ''))
+        vat      = t - supply
+        vatLabel = '포함'
+        userNote = rest
+      }
+      // else: no VAT pattern — userNote stays as full note
+    }
   }
 
-  const incMatch = vatPart.match(/부가세포함\s*\(공급가액\s+([\d,]+)원\)/)
-  if (incMatch) {
-    const supply = Number(incMatch[1].replace(/,/g, ''))
-    return { supply, vat: t - supply, total: t, vatLabel: '포함', userNote }
+  // 금액이 있는데 VAT 정보가 없으면 부가세 포함으로 기본 처리
+  if (vatLabel === null && t > 0) {
+    supply   = Math.round(t * 100 / 110)
+    vat      = t - supply
+    vatLabel = '포함'
   }
 
-  return { supply: t, vat: 0, total: t, vatLabel: null as string | null, userNote: note }
+  return { supply, vat, total: t, vatLabel, userNote }
 }
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
@@ -258,16 +271,16 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
                   {hasVat && <>
                     <tr>
                       <td colSpan={2} className="px-4 py-2 text-xs text-gray-500">공급가액 합계</td>
-                      <td className="px-4 py-2 text-right text-xs text-gray-700 tabular-nums">{formatKRW(totalSupply)}</td>
-                      <td className="px-4 py-2 text-right text-xs text-gray-500 tabular-nums">{formatKRW(totalVat)}</td>
+                      <td className="px-4 py-2 text-right text-xs text-gray-700 tabular-nums whitespace-nowrap">{formatKRW(totalSupply)}</td>
+                      <td className="px-4 py-2 text-right text-xs text-gray-500 tabular-nums whitespace-nowrap">{formatKRW(totalVat)}</td>
                       <td colSpan={2} />
                     </tr>
                   </>}
                   <tr>
-                    <td colSpan={hasVat ? 4 : 2} className="px-4 py-2.5 text-sm font-semibold text-gray-700">
+                    <td colSpan={hasVat ? 4 : 2} className="px-4 py-2.5 text-sm font-semibold text-gray-700 whitespace-nowrap">
                       {hasVat ? '최종합계 (부가세 포함)' : '지출합계'}
                     </td>
-                    <td className="px-4 py-2.5 text-right text-sm font-bold text-gray-900 tabular-nums">
+                    <td className="px-4 py-2.5 text-right text-sm font-bold text-gray-900 tabular-nums whitespace-nowrap">
                       {formatKRW(totalAmount)}
                     </td>
                     <td />
