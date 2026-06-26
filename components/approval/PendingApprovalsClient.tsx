@@ -111,7 +111,7 @@ export default function PendingApprovalsClient({ leaveSteps, expenseSteps, fullA
     })
   }
 
-  const totalPending = leaveSteps.length + expenseSteps.length
+  const totalPending = leaveSteps.length + expenseSteps.length + supplySteps.length
 
   return (
     <div className="max-w-2xl space-y-4">
