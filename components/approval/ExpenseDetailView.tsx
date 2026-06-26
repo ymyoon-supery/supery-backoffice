@@ -29,6 +29,7 @@ interface Props {
   onApprove?: () => void
   onReject?: (reason?: string) => void
   isPending?: boolean
+  approveLabel?: string
 }
 
 const TAX_TYPE_LABELS: Record<string, string> = {
@@ -76,7 +77,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 
 import { useState } from 'react'
 
-export default function ExpenseDetailView({ data, onApprove, onReject, isPending }: Props) {
+export default function ExpenseDetailView({ data, onApprove, onReject, isPending, approveLabel = '승인' }: Props) {
   const [rejectReason, setRejectReason] = useState('')
   const [rejecting, setRejecting] = useState(false)
 
@@ -314,7 +315,7 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
                         disabled={isPending}
                         className="flex-1 py-2.5 text-sm font-medium bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
                       >
-                        승인
+                        {approveLabel}
                       </button>
                     )}
                   </div>
