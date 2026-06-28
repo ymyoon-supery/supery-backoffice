@@ -28,6 +28,7 @@ type SubmitExpenseInput = {
   taxType: string | null
   evidenceType: string | null
   category?: string
+  expenseType?: string
 }
 
 export async function submitExpense(input: SubmitExpenseInput) {
@@ -55,6 +56,7 @@ export async function submitExpense(input: SubmitExpenseInput) {
     p_attachment_urls: input.attachmentUrls,
     p_tax_type: input.taxType,
     p_evidence_type: input.evidenceType,
+    p_expense_type: input.expenseType ?? 'EXPENSE',
   })
 
   if (error) return { error: error.message }
@@ -111,6 +113,7 @@ export async function submitBusinessIncomeExpense(input: BusinessIncomeInput) {
     taxType: 'WITHHOLDING_BUSINESS',
     evidenceType: null,
     category: 'BUSINESS_INCOME',
+    expenseType: 'BUSINESS_INCOME',
   })
 
   if (expenseResult.error || !expenseResult.id) return { error: expenseResult.error ?? '제출 실패' }
@@ -195,6 +198,7 @@ export async function submitPrizeExpense(input: PrizeInput) {
     taxType,
     evidenceType,
     category: 'PRIZE_INCOME',
+    expenseType: 'PRIZE',
   })
 
   if (expenseResult.error || !expenseResult.id) return { error: expenseResult.error ?? '제출 실패' }
