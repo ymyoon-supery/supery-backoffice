@@ -361,6 +361,7 @@ function ExpenseTab({
         taxType: null,
         evidenceType: evidenceType || null,
         category: 'OTHER',
+        expenseType: 'EXPENSE',
       })
 
       if (result.error) { toast.error(result.error); return }
@@ -705,6 +706,7 @@ function CorporateCardTab({
         taxType: null,
         evidenceType: 'CORPORATE_CARD',
         category: 'OTHER',
+        expenseType: 'CORPORATE_CARD',
       })
 
       if (result.error) { toast.error(result.error); return }
@@ -918,6 +920,7 @@ function TransportationTab({
         taxType: null,
         evidenceType: 'OTHER_RECEIPT',
         category: 'OTHER',
+        expenseType: 'TRANSPORTATION',
       })
 
       if (result.error) { toast.error(result.error); return }
