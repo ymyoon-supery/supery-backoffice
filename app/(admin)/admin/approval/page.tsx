@@ -34,6 +34,7 @@ export type ApprovalItem = {
   totalLeaves?: number | null
   remainingLeaves?: number | null
   // expense detail
+  expenseType?: string | null
   title?: string | null
   taxType?: string | null
   evidenceType?: string | null
@@ -51,7 +52,7 @@ export type ApprovalItem = {
 export default async function AdminApprovalPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; type?: string; period?: string; sort?: string; page?: string }>
+  searchParams: Promise<{ tab?: string; type?: string; period?: string; sort?: string; page?: string; expenseType?: string; month?: string; dateFrom?: string; dateTo?: string; keyword?: string; employeeName?: string }>
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -71,6 +72,12 @@ export default async function AdminApprovalPage({
   const period = ['day',   'week',  'month' ].includes(params.period ?? '') ? params.period! : 'all'
   const sort   = params.sort  === 'asc'  ? 'asc'  : 'desc'
   const page   = Math.max(1, parseInt(params.page ?? '1') || 1)
+  const expenseType  = params.expenseType ?? ''
+  const month        = params.month ?? ''
+  const dateFrom     = params.dateFrom ?? ''
+  const dateTo       = params.dateTo ?? ''
+  const keyword      = params.keyword ?? ''
+  const employeeName = params.employeeName ?? ''
 
   // Period → KST fromDate
   const kstMs  = Date.now() + 9 * 60 * 60 * 1000
@@ -149,7 +156,7 @@ export default async function AdminApprovalPage({
       .select(`
         id, status,
         expense_reports (
-          id, title, amount, category, created_at, payment_status,
+          id, title, amount, category, expense_type, created_at, payment_status,
           payee, payment_method, bank_name, account_number, account_holder,
           payment_request_date, settlement_date, line_items, attachment_urls,
           tax_type, evidence_type,
@@ -176,6 +183,7 @@ export default async function AdminApprovalPage({
         requestDate:        rep.created_at,
         status:             s.status,
         paymentStatus:      rep.payment_status ?? null,
+        expenseType:        rep.expense_type ?? null,
         title:              rep.title ?? null,
         taxType:            rep.tax_type ?? null,
         evidenceType:       rep.evidence_type ?? null,
@@ -190,6 +198,23 @@ export default async function AdminApprovalPage({
         attachmentUrls:     rep.attachment_urls ?? null,
       }]
     })
+  }
+
+  // ── Expense JS 필터 ──────────────────────────────────────────────
+  if (expenseType) expenseItems = expenseItems.filter(e => e.expenseType === expenseType)
+  if (month) {
+    expenseItems = expenseItems.filter(e => e.requestDate.startsWith(month))
+  } else if (dateFrom || dateTo) {
+    if (dateFrom) expenseItems = expenseItems.filter(e => e.requestDate.slice(0, 10) >= dateFrom)
+    if (dateTo)   expenseItems = expenseItems.filter(e => e.requestDate.slice(0, 10) <= dateTo)
+  }
+  if (keyword) {
+    const kw = keyword.toLowerCase()
+    expenseItems = expenseItems.filter(e => JSON.stringify(e.lineItems ?? []).toLowerCase().includes(kw))
+  }
+  if (employeeName) {
+    const en = employeeName.toLowerCase()
+    expenseItems = expenseItems.filter(e => e.employeeName.toLowerCase().includes(en))
   }
 
   // ── Home location requests ────────────────────────────────────
@@ -271,7 +296,7 @@ export default async function AdminApprovalPage({
     if (type !== 'leave' && type !== 'home_location') {
       const { data: waitingExpense } = await admin
         .from('expense_approval_steps')
-        .select(`id, expense_report_id, expense_reports ( id, title, amount, category, created_at, payment_status, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls, tax_type, evidence_type, employees ( name, position ) )`)
+        .select(`id, expense_report_id, expense_reports ( id, title, amount, category, expense_type, created_at, payment_status, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls, tax_type, evidence_type, employees ( name, position ) )`)
         .eq('approver_id', employee.id)
         .eq('status', 'WAITING')
         .eq('step_order', 2)
@@ -306,6 +331,7 @@ export default async function AdminApprovalPage({
               requestDate:        rep.created_at,
               status:             'PENDING' as const,
               paymentStatus:      rep.payment_status ?? null,
+              expenseType:        rep.expense_type ?? null,
               title:              rep.title ?? null,
               taxType:            rep.tax_type ?? null,
               evidenceType:       rep.evidence_type ?? null,
@@ -322,6 +348,23 @@ export default async function AdminApprovalPage({
           })
       }
     }
+  }
+
+  // ── fullApprove Expense JS 필터 ──────────────────────────────────
+  if (expenseType) fullApproveExpenseItems = fullApproveExpenseItems.filter(e => e.expenseType === expenseType)
+  if (month) {
+    fullApproveExpenseItems = fullApproveExpenseItems.filter(e => e.requestDate.startsWith(month))
+  } else if (dateFrom || dateTo) {
+    if (dateFrom) fullApproveExpenseItems = fullApproveExpenseItems.filter(e => e.requestDate.slice(0, 10) >= dateFrom)
+    if (dateTo)   fullApproveExpenseItems = fullApproveExpenseItems.filter(e => e.requestDate.slice(0, 10) <= dateTo)
+  }
+  if (keyword) {
+    const kw = keyword.toLowerCase()
+    fullApproveExpenseItems = fullApproveExpenseItems.filter(e => JSON.stringify(e.lineItems ?? []).toLowerCase().includes(kw))
+  }
+  if (employeeName) {
+    const en = employeeName.toLowerCase()
+    fullApproveExpenseItems = fullApproveExpenseItems.filter(e => e.employeeName.toLowerCase().includes(en))
   }
 
   // ── 연차 잔여 동적 계산 (입사일 기준, 올해 승인 사용량 기준) ──────
@@ -379,6 +422,12 @@ export default async function AdminApprovalPage({
       period={period}
       sort={sort}
       fullApproveItems={[...fullApproveLeaveItems, ...fullApproveExpenseItems]}
+      expenseType={expenseType}
+      month={month}
+      dateFrom={dateFrom}
+      dateTo={dateTo}
+      keyword={keyword}
+      employeeName={employeeName}
     />
   )
 }

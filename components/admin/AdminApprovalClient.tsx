@@ -10,6 +10,7 @@ import { approveExpense } from '@/app/(dashboard)/approval/expense/actions'
 import { approveHomeLocationRequest, updateExpensePaymentStatus, fullApproveLeave, fullApproveExpense, fullRejectLeave, fullRejectExpense } from '@/app/(admin)/admin/approval/actions'
 import type { ApprovalItem } from '@/app/(admin)/admin/approval/page'
 import ExpenseDetailSheet from '@/components/admin/ExpenseDetailSheet'
+import ExpenseSearchFilter from '@/components/approval/ExpenseSearchFilter'
 
 const STATUS_CFG = {
   PENDING:  { label: '미결재', cls: 'bg-amber-100 text-amber-700' },
@@ -40,6 +41,7 @@ function getPageNums(cur: number, total: number): number[] {
 
 export default function AdminApprovalClient({
   items, total, page, totalPages, tab, type, period, sort, fullApproveItems = [],
+  expenseType = '', month = '', dateFrom = '', dateTo = '', keyword = '', employeeName = '',
 }: {
   items: ApprovalItem[]
   total: number
@@ -50,6 +52,12 @@ export default function AdminApprovalClient({
   period: string
   sort: string
   fullApproveItems?: ApprovalItem[]
+  expenseType: string
+  month: string
+  dateFrom: string
+  dateTo: string
+  keyword: string
+  employeeName: string
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -68,7 +76,14 @@ export default function AdminApprovalClient({
   }, [paymentDropdownId])
 
   function buildUrl(overrides: Record<string, string>) {
-    const p = new URLSearchParams({ tab, type, period, sort, page: String(page), ...overrides })
+    const base: Record<string, string> = { tab, type, period, sort, page: String(page) }
+    if (expenseType)  base.expenseType  = expenseType
+    if (month)        base.month        = month
+    if (dateFrom)     base.dateFrom     = dateFrom
+    if (dateTo)       base.dateTo       = dateTo
+    if (keyword)      base.keyword      = keyword
+    if (employeeName) base.employeeName = employeeName
+    const p = new URLSearchParams({ ...base, ...overrides })
     return `/admin/approval?${p}`
   }
   const nav = (o: Record<string, string>) => startNavTransition(() => router.push(buildUrl(o)))
@@ -195,6 +210,20 @@ export default function AdminApprovalClient({
           <span className="ml-auto text-xs text-gray-400">전체 {total}건</span>
         )}
       </div>
+
+      {/* Expense Search Filter */}
+      {(type === 'expense' || type === 'all') && (
+        <ExpenseSearchFilter
+          expenseType={expenseType}
+          month={month}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          keyword={keyword}
+          employeeName={employeeName}
+          showAdminFilters
+          baseParams={{ tab, type, period, sort }}
+        />
+      )}
 
       {/* List container */}
       <div className="relative bg-white rounded-xl border border-gray-100 overflow-hidden">
