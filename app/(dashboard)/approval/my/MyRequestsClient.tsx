@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import ExpenseDetailModal from '@/components/approval/ExpenseDetailModal'
 import type { ExpenseViewData } from '@/components/approval/ExpenseDetailView'
+import ExpenseSearchFilter from '@/components/approval/ExpenseSearchFilter'
 import {
   cancelLeaveRequest,
   cancelExpenseRequest,
@@ -105,6 +106,11 @@ interface Props {
   departmentName: string | null
   documentRequests: DocumentRequest[]
   supplyRequests: SupplyRequest[]
+  expenseType: string
+  month: string
+  dateFrom: string
+  dateTo: string
+  keyword: string
 }
 
 export default function MyRequestsClient({
@@ -114,10 +120,18 @@ export default function MyRequestsClient({
   departmentName,
   documentRequests,
   supplyRequests,
+  expenseType,
+  month,
+  dateFrom,
+  dateTo,
+  keyword,
 }: Props) {
   const [selectedExpense, setSelectedExpense] = useState<ExpenseViewData | null>(null)
   const [expandedSupplyId, setExpandedSupplyId] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<Tab>('all')
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    if (expenseType || month || dateFrom || dateTo || keyword) return 'expense'
+    return 'all'
+  })
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
@@ -204,6 +218,17 @@ export default function MyRequestsClient({
           </button>
         ))}
       </div>
+
+      {/* Expense Search Filter */}
+      {activeTab === 'expense' && (
+        <ExpenseSearchFilter
+          expenseType={expenseType}
+          month={month}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          keyword={keyword}
+        />
+      )}
 
       {/* Leave & Expense */}
       <div className="space-y-2">

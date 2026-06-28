@@ -19,10 +19,27 @@ function getPendingApproverLabel(
   return `${label} 승인 대기중`
 }
 
-export default async function MyRequestsPage() {
+export default async function MyRequestsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    expenseType?: string
+    month?: string
+    dateFrom?: string
+    dateTo?: string
+    keyword?: string
+  }>
+}) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  const params = await searchParams
+  const expenseType = params.expenseType ?? ''
+  const month       = params.month ?? ''
+  const dateFrom    = params.dateFrom ?? ''
+  const dateTo      = params.dateTo ?? ''
+  const keyword     = params.keyword ?? ''
 
   const { data: employee } = await supabase
     .from('employees')
@@ -57,13 +74,26 @@ export default async function MyRequestsPage() {
       .in('status', ['PENDING', 'APPROVED', 'REJECTED'])
       .order('created_at', { ascending: false })
       .limit(20),
-    supabase
-      .from('expense_reports')
-      .select('id, title, amount, category, status, created_at, tax_type, evidence_type, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls, expense_approval_steps(step_order, status, employees(position, name))')
-      .eq('employee_id', employee.id)
-      .in('status', ['PENDING', 'APPROVED', 'REJECTED'])
-      .order('created_at', { ascending: false })
-      .limit(20),
+    (() => {
+      let q = supabase
+        .from('expense_reports')
+        .select('id, title, amount, category, expense_type, status, created_at, tax_type, evidence_type, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls, expense_approval_steps(step_order, status, employees(position, name))')
+        .eq('employee_id', employee.id)
+        .in('status', ['PENDING', 'APPROVED', 'REJECTED'])
+        .order('created_at', { ascending: false })
+      if (expenseType) q = q.eq('expense_type', expenseType)
+      if (month) {
+        const [y, m] = month.split('-').map(Number)
+        const nextM = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`
+        q = q.gte('created_at', `${month}-01T00:00:00`).lt('created_at', `${nextM}-01T00:00:00`)
+      } else if (dateFrom || dateTo) {
+        if (dateFrom) q = q.gte('created_at', `${dateFrom}T00:00:00`)
+        if (dateTo)   q = q.lte('created_at', `${dateTo}T23:59:59`)
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (keyword) q = (q as any).filter('line_items::text', 'ilike', `%${keyword}%`)
+      return q
+    })(),
     supabase
       .from('document_requests')
       .select('id, doc_type, status, purpose, created_at')
@@ -112,6 +142,11 @@ export default async function MyRequestsPage() {
       departmentName={departmentName}
       documentRequests={myDocuments ?? []}
       supplyRequests={supplyRequests as any[]}
+      expenseType={expenseType}
+      month={month}
+      dateFrom={dateFrom}
+      dateTo={dateTo}
+      keyword={keyword}
     />
   )
 }
