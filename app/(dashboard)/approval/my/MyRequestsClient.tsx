@@ -112,6 +112,12 @@ interface Props {
   dateFrom: string
   dateTo: string
   keyword: string
+  catTab: string
+  catPage: number
+  leaveTotalPages: number
+  expenseTotalPages: number
+  documentTotalPages: number
+  supplyTotalPages: number
 }
 
 export default function MyRequestsClient({
@@ -126,15 +132,35 @@ export default function MyRequestsClient({
   dateFrom,
   dateTo,
   keyword,
+  catTab,
+  catPage,
+  leaveTotalPages,
+  expenseTotalPages,
+  documentTotalPages,
+  supplyTotalPages,
 }: Props) {
   const [selectedExpense, setSelectedExpense] = useState<ExpenseViewData | null>(null)
   const [expandedSupplyId, setExpandedSupplyId] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<Tab>(() => {
+  const [activeTab] = useState<Tab>(() => {
+    const validTabs: Tab[] = ['all', 'leave', 'expense', 'document', 'supply']
+    if (validTabs.includes(catTab as Tab) && catTab !== 'all') return catTab as Tab
     if (expenseType || month || dateFrom || dateTo || keyword) return 'expense'
     return 'all'
   })
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
+
+  function buildTabUrl(tab: Tab, page = 1) {
+    const p = new URLSearchParams()
+    p.set('catTab', tab)
+    p.set('catPage', String(page))
+    if (expenseType) p.set('expenseType', expenseType)
+    if (month) p.set('month', month)
+    if (dateFrom) p.set('dateFrom', dateFrom)
+    if (dateTo) p.set('dateTo', dateTo)
+    if (keyword) p.set('keyword', keyword)
+    return `/approval/my?${p.toString()}`
+  }
 
   const leaveItems  = items.filter(i => i.kind === 'leave')
   const expenseItems = items.filter(i => i.kind === 'expense')
@@ -201,7 +227,7 @@ export default function MyRequestsClient({
         {TABS.map(t => (
           <button
             key={t.id}
-            onClick={() => setActiveTab(t.id)}
+            onClick={() => router.push(buildTabUrl(t.id))}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
               activeTab === t.id
                 ? 'bg-primary text-white'
@@ -312,6 +338,20 @@ export default function MyRequestsClient({
         {visibleItems.length === 0 && (activeTab === 'leave' || activeTab === 'expense') && (
           <div className="py-12 text-center text-sm text-gray-400">신청 내역이 없습니다.</div>
         )}
+        {activeTab === 'leave' && leaveTotalPages > 1 && (
+          <div className="flex items-center justify-center gap-3 pt-2">
+            <button onClick={() => router.push(buildTabUrl('leave', catPage - 1))} disabled={catPage <= 1} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">이전</button>
+            <span className="text-xs text-gray-500">{catPage} / {leaveTotalPages}</span>
+            <button onClick={() => router.push(buildTabUrl('leave', catPage + 1))} disabled={catPage >= leaveTotalPages} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">다음</button>
+          </div>
+        )}
+        {activeTab === 'expense' && expenseTotalPages > 1 && (
+          <div className="flex items-center justify-center gap-3 pt-2">
+            <button onClick={() => router.push(buildTabUrl('expense', catPage - 1))} disabled={catPage <= 1} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">이전</button>
+            <span className="text-xs text-gray-500">{catPage} / {expenseTotalPages}</span>
+            <button onClick={() => router.push(buildTabUrl('expense', catPage + 1))} disabled={catPage >= expenseTotalPages} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">다음</button>
+          </div>
+        )}
       </div>
 
       {/* Document Requests */}
@@ -357,9 +397,23 @@ export default function MyRequestsClient({
       {showDocument && documentRequests.length === 0 && activeTab === 'document' && (
         <div className="py-12 text-center text-sm text-gray-400">신청 내역이 없습니다.</div>
       )}
+      {activeTab === 'document' && documentTotalPages > 1 && (
+        <div className="flex items-center justify-center gap-3 pt-2">
+          <button onClick={() => router.push(buildTabUrl('document', catPage - 1))} disabled={catPage <= 1} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">이전</button>
+          <span className="text-xs text-gray-500">{catPage} / {documentTotalPages}</span>
+          <button onClick={() => router.push(buildTabUrl('document', catPage + 1))} disabled={catPage >= documentTotalPages} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">다음</button>
+        </div>
+      )}
 
       {showSupply && supplyRequests.length === 0 && activeTab === 'supply' && (
         <div className="py-12 text-center text-sm text-gray-400">신청 내역이 없습니다.</div>
+      )}
+      {activeTab === 'supply' && supplyTotalPages > 1 && (
+        <div className="flex items-center justify-center gap-3 pt-2">
+          <button onClick={() => router.push(buildTabUrl('supply', catPage - 1))} disabled={catPage <= 1} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">이전</button>
+          <span className="text-xs text-gray-500">{catPage} / {supplyTotalPages}</span>
+          <button onClick={() => router.push(buildTabUrl('supply', catPage + 1))} disabled={catPage >= supplyTotalPages} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">다음</button>
+        </div>
       )}
 
       {/* Supply Requests */}
