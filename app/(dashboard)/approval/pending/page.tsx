@@ -4,166 +4,257 @@ import PendingApprovalsClient from '@/components/approval/PendingApprovalsClient
 import { calcAnnualLeave } from '@/lib/annualLeave'
 
 const DEDUCTS = ['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF', 'GROUP']
+const PAGE_SIZE = 10
 
-export default async function PendingApprovalsPage() {
+const LEAVE_LABELS: Record<string, string> = {
+  ANNUAL: '연차', HALF_DAY: '반차', AM_HALF: '오전반차', PM_HALF: '오후반차',
+  SICK: '병가(무급)', GROUP: '공동연차', COMP: '보상휴가', OTHER: '기타',
+}
+
+export type PendingItem = { kind: 'leave' | 'expense' | 'supply'; step: unknown }
+
+export type DoneItem = {
+  id: string
+  kind: 'leave' | 'expense' | 'supply'
+  employeeName: string
+  typeLabel: string
+  detail: string
+  requestDate: string
+  actedAt: string | null
+  status: 'APPROVED' | 'REJECTED'
+  isJeongyeol: boolean
+}
+
+export default async function PendingApprovalsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    viewTab?: string; type?: string; page?: string
+    expenseType?: string; month?: string; dateFrom?: string; dateTo?: string
+    keyword?: string; employeeName?: string
+  }>
+}) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
   const { data: employee } = await supabase
-    .from('employees')
-    .select('id, position')
-    .eq('auth_user_id', user.id)
-    .single()
+    .from('employees').select('id, position').eq('auth_user_id', user.id).single()
   if (!employee) redirect('/login')
 
   const { data: settings } = await supabase
-    .from('company_settings')
-    .select('supply_manager_id')
-    .single()
+    .from('company_settings').select('supply_manager_id').single()
 
   const isSupplyManager = settings?.supply_manager_id === employee.id
   const isTeamLead = employee.position === '팀장'
-
   if (!isTeamLead && !isSupplyManager) redirect('/approval/my')
 
-  // Run all queries in parallel; use empty fallbacks for non-applicable roles
-  const [
-    leaveRes,
-    expenseRes,
-    fullApprovedLeaveRes,
-    fullApprovedExpenseRes,
-    supplyRes,
-  ] = await Promise.all([
-    isTeamLead
-      ? supabase
-          .from('leave_approval_steps')
-          .select(`
-            id, step_order, status,
-            leave_requests (
-              id, leave_type, start_date, end_date, days_used, reason, status, created_at,
-              employees ( id, name, email, department_id, hired_at, annual_leave_days )
-            )
-          `)
-          .eq('approver_id', employee.id)
-          .eq('status', 'PENDING')
-          .order('created_at', { ascending: false })
-      : Promise.resolve({ data: [] as unknown[] }),
+  const params = await searchParams
+  const viewTab      = params.viewTab === 'done' ? 'done' : 'pending'
+  const type         = ['all', 'leave', 'expense', 'supply'].includes(params.type ?? '') ? params.type! : 'all'
+  const page         = Math.max(1, parseInt(params.page ?? '1') || 1)
+  const expenseType  = params.expenseType ?? ''
+  const month        = params.month ?? ''
+  const dateFrom     = params.dateFrom ?? ''
+  const dateTo       = params.dateTo ?? ''
+  const keyword      = params.keyword ?? ''
+  const employeeName = params.employeeName ?? ''
 
-    isTeamLead
-      ? supabase
-          .from('expense_approval_steps')
-          .select(`
-            id, step_order, status,
-            expense_reports (
-              id, title, amount, category, expense_date, status, created_at,
-              payee, payment_method, bank_name, account_number, account_holder,
-              payment_request_date, settlement_date, line_items, attachment_urls,
-              tax_type, evidence_type,
-              employees ( name, email, position )
-            )
-          `)
-          .eq('approver_id', employee.id)
-          .eq('status', 'PENDING')
-          .order('created_at', { ascending: false })
-      : Promise.resolve({ data: [] as unknown[] }),
+  const wantLeave   = isTeamLead && (type === 'all' || type === 'leave')
+  const wantExpense = isTeamLead && (type === 'all' || type === 'expense')
+  const wantSupply  = (isTeamLead || isSupplyManager) && (type === 'all' || type === 'supply')
 
-    isTeamLead
-      ? supabase
-          .from('leave_approval_steps')
-          .select(`
-            id, acted_at,
-            leave_requests (
-              id, leave_type, start_date, end_date, days_used, created_at,
-              employees ( name )
-            )
-          `)
-          .eq('approver_id', employee.id)
-          .eq('status', 'APPROVED')
-          .eq('comment', '전결')
-          .order('acted_at', { ascending: false })
-          .limit(10)
-      : Promise.resolve({ data: [] as unknown[] }),
+  if (viewTab === 'pending') {
+    const [leaveRes, expenseRes, supplyRes] = await Promise.all([
+      wantLeave
+        ? supabase.from('leave_approval_steps')
+            .select('id, step_order, status, leave_requests(id, leave_type, start_date, end_date, days_used, reason, status, created_at, employees(id, name, hired_at, annual_leave_days))')
+            .eq('approver_id', employee.id).eq('status', 'PENDING').order('created_at', { ascending: false })
+        : Promise.resolve({ data: [] as unknown[] }),
+      wantExpense
+        ? supabase.from('expense_approval_steps')
+            .select('id, step_order, status, expense_reports(id, title, amount, category, expense_type, status, created_at, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls, tax_type, evidence_type, employees(name, position))')
+            .eq('approver_id', employee.id).eq('status', 'PENDING').order('created_at', { ascending: false })
+        : Promise.resolve({ data: [] as unknown[] }),
+      wantSupply
+        ? supabase.from('supply_approval_steps')
+            .select('id, step_order, status, supply_requests(id, status, created_at, employees(name, position), supply_request_items(id, category, description, estimated_amount, note, sort_order))')
+            .eq('approver_id', employee.id).eq('status', 'PENDING').order('created_at', { ascending: false })
+        : Promise.resolve({ data: [] as unknown[] }),
+    ])
 
-    isTeamLead
-      ? supabase
-          .from('expense_approval_steps')
-          .select(`
-            id, acted_at,
-            expense_reports (
-              id, title, amount, category, created_at,
-              employees ( name )
-            )
-          `)
-          .eq('approver_id', employee.id)
-          .eq('status', 'APPROVED')
-          .eq('comment', '전결')
-          .order('acted_at', { ascending: false })
-          .limit(10)
-      : Promise.resolve({ data: [] as unknown[] }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let leaveSteps   = (leaveRes.data   ?? []) as any[]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let expenseSteps = (expenseRes.data ?? []) as any[]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let supplySteps  = (supplyRes.data  ?? []) as any[]
 
-    isTeamLead || isSupplyManager
-      ? supabase
-          .from('supply_approval_steps')
-          .select(`
-            id, step_order, status,
-            supply_requests (
-              id, status, created_at,
-              employees ( name, position ),
-              supply_request_items ( id, category, description, estimated_amount, note, sort_order )
-            )
-          `)
-          .eq('approver_id', employee.id)
-          .eq('status', 'PENDING')
-          .order('created_at', { ascending: false })
+    // Annual leave remaining calculation
+    const empInfoMap: Record<string, { hiredAt: string | null; annualLeaveDays: number }> = {}
+    for (const step of leaveSteps) {
+      const emp = step.leave_requests?.employees
+      if (emp?.id) empInfoMap[emp.id] = { hiredAt: emp.hired_at ?? null, annualLeaveDays: emp.annual_leave_days ?? 15 }
+    }
+    const empIds = Object.keys(empInfoMap)
+    const usedByEmp: Record<string, number> = {}
+    if (empIds.length > 0) {
+      const yearStart = `${new Date().getFullYear()}-01-01`
+      const { data: usedTotals } = await supabase.from('leave_requests').select('employee_id, days_used').eq('status', 'APPROVED').in('leave_type', DEDUCTS).gte('start_date', yearStart).in('employee_id', empIds)
+      for (const r of usedTotals ?? []) usedByEmp[r.employee_id] = (usedByEmp[r.employee_id] ?? 0) + Number(r.days_used)
+    }
+    const today = new Date()
+    leaveSteps = leaveSteps.map(step => {
+      const emp = step.leave_requests?.employees
+      if (!emp?.id || !empInfoMap[emp.id]) return step
+      const { hiredAt, annualLeaveDays } = empInfoMap[emp.id]
+      const entitlement = hiredAt ? calcAnnualLeave(new Date(hiredAt), today) : (annualLeaveDays ?? 15)
+      const used = usedByEmp[emp.id] ?? 0
+      return { ...step, leave_requests: { ...step.leave_requests, employees: { ...emp, annual_leave_days: entitlement, remaining_leaves: Math.max(Math.round((entitlement - used) * 10) / 10, 0) } } }
+    })
+
+    // JS-side filters
+    if (employeeName) {
+      leaveSteps   = leaveSteps.filter(  (s: any) => s.leave_requests?.employees?.name?.includes(employeeName))
+      expenseSteps = expenseSteps.filter((s: any) => s.expense_reports?.employees?.name?.includes(employeeName))
+      supplySteps  = supplySteps.filter( (s: any) => s.supply_requests?.employees?.name?.includes(employeeName))
+    }
+    if (expenseType) expenseSteps = expenseSteps.filter((s: any) => s.expense_reports?.expense_type === expenseType)
+    if (keyword)     expenseSteps = expenseSteps.filter((s: any) => JSON.stringify(s.expense_reports?.line_items ?? []).toLowerCase().includes(keyword.toLowerCase()))
+    if (month) {
+      const [y, m] = month.split('-').map(Number)
+      expenseSteps = expenseSteps.filter((s: any) => { const d = new Date(s.expense_reports?.created_at ?? ''); return d.getFullYear() === y && d.getMonth() + 1 === m })
+    } else if (dateFrom || dateTo) {
+      expenseSteps = expenseSteps.filter((s: any) => {
+        const d = new Date(s.expense_reports?.created_at ?? '')
+        if (dateFrom && d < new Date(dateFrom)) return false
+        if (dateTo && d > new Date(`${dateTo}T23:59:59`)) return false
+        return true
+      })
+    }
+
+    // Combine, sort by created_at desc, paginate
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const combined: { kind: 'leave' | 'expense' | 'supply'; step: any }[] = [
+      ...leaveSteps.map(  (s: any) => ({ kind: 'leave'   as const, step: s })),
+      ...expenseSteps.map((s: any) => ({ kind: 'expense' as const, step: s })),
+      ...supplySteps.map( (s: any) => ({ kind: 'supply'  as const, step: s })),
+    ]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const getDate = (item: { kind: string; step: any }) => {
+      if (item.kind === 'leave')   return item.step.leave_requests?.created_at ?? ''
+      if (item.kind === 'expense') return item.step.expense_reports?.created_at ?? ''
+      return item.step.supply_requests?.created_at ?? ''
+    }
+    combined.sort((a, b) => new Date(getDate(b)).getTime() - new Date(getDate(a)).getTime())
+
+    const totalPages = Math.max(1, Math.ceil(combined.length / PAGE_SIZE))
+    const offset = (page - 1) * PAGE_SIZE
+    const pagedItems = combined.slice(offset, offset + PAGE_SIZE)
+
+    return (
+      <PendingApprovalsClient
+        viewTab={viewTab} type={type} page={page} totalPages={totalPages}
+        pendingItems={pagedItems as PendingItem[]} doneItems={[]}
+        expenseType={expenseType} month={month} dateFrom={dateFrom} dateTo={dateTo}
+        keyword={keyword} employeeName={employeeName}
+      />
+    )
+  }
+
+  // Done tab: all APPROVED/REJECTED steps this approver acted on
+  const [doneLeaveRes, doneExpenseRes, doneSupplyRes] = await Promise.all([
+    wantLeave
+      ? supabase.from('leave_approval_steps')
+          .select('id, acted_at, status, comment, leave_requests(id, leave_type, start_date, end_date, days_used, created_at, employees(name))')
+          .eq('approver_id', employee.id).in('status', ['APPROVED', 'REJECTED']).order('acted_at', { ascending: false })
+      : Promise.resolve({ data: [] as unknown[] }),
+    wantExpense
+      ? supabase.from('expense_approval_steps')
+          .select('id, acted_at, status, comment, expense_reports(id, title, amount, expense_type, created_at, line_items, employees(name))')
+          .eq('approver_id', employee.id).in('status', ['APPROVED', 'REJECTED']).order('acted_at', { ascending: false })
+      : Promise.resolve({ data: [] as unknown[] }),
+    wantSupply
+      ? supabase.from('supply_approval_steps')
+          .select('id, acted_at, status, comment, supply_requests(id, created_at, employees(name), supply_request_items(id))')
+          .eq('approver_id', employee.id).in('status', ['APPROVED', 'REJECTED']).order('acted_at', { ascending: false })
       : Promise.resolve({ data: [] as unknown[] }),
   ])
 
-  // 연차 잔여 동적 계산 (입사일 기준, 올해 승인 사용량)
-  const rawLeaveSteps = (leaveRes.data ?? []) as any[]
-  const empInfoMap: Record<string, { hiredAt: string | null; annualLeaveDays: number }> = {}
-  for (const step of rawLeaveSteps) {
-    const emp = step.leave_requests?.employees
-    if (emp?.id) empInfoMap[emp.id] = { hiredAt: emp.hired_at ?? null, annualLeaveDays: emp.annual_leave_days ?? 15 }
+  let doneItems: DoneItem[] = []
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const step of (doneLeaveRes.data ?? []) as any[]) {
+    const req = step.leave_requests
+    if (!req) continue
+    if (employeeName && !req.employees?.name?.includes(employeeName)) continue
+    doneItems.push({
+      id: step.id, kind: 'leave',
+      employeeName: req.employees?.name ?? '—',
+      typeLabel: `${LEAVE_LABELS[req.leave_type] ?? req.leave_type} ${req.days_used}일`,
+      detail: `${req.start_date}${req.start_date !== req.end_date ? ` ~ ${req.end_date}` : ''}`,
+      requestDate: req.created_at, actedAt: step.acted_at,
+      status: step.status, isJeongyeol: step.comment === '전결',
+    })
   }
-  const empIds = Object.keys(empInfoMap)
-  const usedByEmp: Record<string, number> = {}
-  if (empIds.length > 0) {
-    const yearStart = `${new Date().getFullYear()}-01-01`
-    const { data: usedTotals } = await supabase
-      .from('leave_requests')
-      .select('employee_id, days_used')
-      .eq('status', 'APPROVED')
-      .in('leave_type', DEDUCTS)
-      .gte('start_date', yearStart)
-      .in('employee_id', empIds)
-    for (const r of usedTotals ?? []) {
-      usedByEmp[r.employee_id] = (usedByEmp[r.employee_id] ?? 0) + Number(r.days_used)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const step of (doneExpenseRes.data ?? []) as any[]) {
+    const rep = step.expense_reports
+    if (!rep) continue
+    if (employeeName && !rep.employees?.name?.includes(employeeName)) continue
+    if (expenseType && rep.expense_type !== expenseType) continue
+    if (keyword && !JSON.stringify(rep.line_items ?? []).toLowerCase().includes(keyword.toLowerCase())) continue
+    if (month) {
+      const [y, m] = month.split('-').map(Number)
+      const d = new Date(rep.created_at)
+      if (d.getFullYear() !== y || d.getMonth() + 1 !== m) continue
+    } else if (dateFrom || dateTo) {
+      const d = new Date(rep.created_at)
+      if (dateFrom && d < new Date(dateFrom)) continue
+      if (dateTo && d > new Date(`${dateTo}T23:59:59`)) continue
     }
+    doneItems.push({
+      id: step.id, kind: 'expense',
+      employeeName: rep.employees?.name ?? '—',
+      typeLabel: rep.title ?? '지출결의',
+      detail: `${Number(rep.amount ?? 0).toLocaleString()}원`,
+      requestDate: rep.created_at, actedAt: step.acted_at,
+      status: step.status, isJeongyeol: step.comment === '전결',
+    })
   }
-  const today = new Date()
-  const patchedLeaveSteps = rawLeaveSteps.map(step => {
-    const emp = step.leave_requests?.employees
-    if (!emp?.id || !empInfoMap[emp.id]) return step
-    const { hiredAt, annualLeaveDays } = empInfoMap[emp.id]
-    const entitlement = hiredAt ? calcAnnualLeave(new Date(hiredAt), today) : (annualLeaveDays ?? 15)
-    const used = usedByEmp[emp.id] ?? 0
-    return {
-      ...step,
-      leave_requests: {
-        ...step.leave_requests,
-        employees: { ...emp, annual_leave_days: entitlement, remaining_leaves: Math.max(Math.round((entitlement - used) * 10) / 10, 0) },
-      },
-    }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const step of (doneSupplyRes.data ?? []) as any[]) {
+    const req = step.supply_requests
+    if (!req) continue
+    if (employeeName && !req.employees?.name?.includes(employeeName)) continue
+    doneItems.push({
+      id: step.id, kind: 'supply',
+      employeeName: req.employees?.name ?? '—',
+      typeLabel: '비품/소모품',
+      detail: `${req.supply_request_items?.length ?? 0}개 항목`,
+      requestDate: req.created_at, actedAt: step.acted_at,
+      status: step.status, isJeongyeol: step.comment === '전결',
+    })
+  }
+
+  doneItems.sort((a, b) => {
+    const da = a.actedAt ? new Date(a.actedAt).getTime() : 0
+    const db = b.actedAt ? new Date(b.actedAt).getTime() : 0
+    return db - da
   })
+
+  const totalPages = Math.max(1, Math.ceil(doneItems.length / PAGE_SIZE))
+  const offset = (page - 1) * PAGE_SIZE
+  doneItems = doneItems.slice(offset, offset + PAGE_SIZE)
 
   return (
     <PendingApprovalsClient
-      leaveSteps={patchedLeaveSteps as unknown[]}
-      expenseSteps={(expenseRes.data ?? []) as unknown[]}
-      fullApprovedLeaveSteps={(fullApprovedLeaveRes.data ?? []) as unknown[]}
-      fullApprovedExpenseSteps={(fullApprovedExpenseRes.data ?? []) as unknown[]}
-      supplySteps={(supplyRes.data ?? []) as unknown[]}
+      viewTab={viewTab} type={type} page={page} totalPages={totalPages}
+      pendingItems={[]} doneItems={doneItems}
+      expenseType={expenseType} month={month} dateFrom={dateFrom} dateTo={dateTo}
+      keyword={keyword} employeeName={employeeName}
     />
   )
 }

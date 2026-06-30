@@ -117,7 +117,7 @@ export default function Sidebar({
         { href: '/documents', label: '서류/비품 신청', icon: Package, exact: false },
         { href: '/approval/my', label: '내 신청 내역', icon: Inbox, exact: false },
         ...((isTeamLead || isSupplyManager) && !isAdmin
-          ? [{ href: '/approval/pending', label: '결재 대기', icon: ClipboardList, exact: false, badge: pendingCount }]
+          ? [{ href: '/approval/pending', label: '결재 관리', icon: ClipboardList, exact: false, badge: pendingCount }]
           : []),
       ],
     },
