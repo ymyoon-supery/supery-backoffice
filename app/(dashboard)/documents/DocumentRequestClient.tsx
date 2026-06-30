@@ -204,7 +204,7 @@ export default function DocumentRequestClient({
             {/* Header */}
             <span className="text-xs text-gray-400 text-center">구분</span>
             <span className="text-xs text-gray-400 text-center">내역 *</span>
-            <span className="text-xs text-gray-400 text-center">예상금액</span>
+            <span className="text-xs text-gray-400 text-center">예상금액 (선택)</span>
             <span className="text-xs text-gray-400 text-center">비고</span>
             <span />
             {/* Rows */}

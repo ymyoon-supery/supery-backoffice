@@ -10,14 +10,17 @@ const LEAVE_LABELS: Record<string, string> = {
 const PAGE_SIZE = 10
 
 function getPendingApproverLabel(
-  steps: Array<{ step_order: number; status: string; employees?: { position?: string | null; name?: string | null } | null }> | null | undefined
+  steps: Array<{ step_order: number; status: string; approver_id?: string | null; employees?: { position?: string | null; name?: string | null; role?: string | null } | null }> | null | undefined,
+  selfId?: string | null
 ): string | null {
   if (!steps?.length) return null
   const pending = [...steps]
-    .filter(s => s.status === 'PENDING')
+    .filter(s => s.status === 'PENDING' && (!selfId || s.approver_id !== selfId))
     .sort((a, b) => a.step_order - b.step_order)[0]
   if (!pending) return null
-  const label = pending.employees?.position || pending.employees?.name || '담당자'
+  const label = pending.employees?.role === 'ADMIN'
+    ? '관리자'
+    : (pending.employees?.position || pending.employees?.name || '담당자')
   return `${label} 승인 대기중`
 }
 
@@ -135,7 +138,7 @@ export default async function MyRequestsPage({
   ] = await Promise.all([
     supabase
       .from('leave_requests')
-      .select('id, leave_type, start_date, end_date, days_used, reason, status, created_at, leave_approval_steps(step_order, comment, status, employees(position, name))')
+      .select('id, leave_type, start_date, end_date, days_used, reason, status, created_at, leave_approval_steps(step_order, comment, status, approver_id, employees(position, name, role))')
       .eq('employee_id', employee.id)
       .in('status', ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'])
       .order('created_at', { ascending: false })
@@ -143,7 +146,7 @@ export default async function MyRequestsPage({
     (() => {
       let q = supabase
         .from('expense_reports')
-        .select('id, title, amount, category, expense_type, status, created_at, tax_type, evidence_type, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls, expense_approval_steps(step_order, status, employees(position, name))')
+        .select('id, title, amount, category, expense_type, status, created_at, tax_type, evidence_type, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls, expense_approval_steps(step_order, status, approver_id, employees(position, name, role))')
         .eq('employee_id', employee.id)
         .in('status', ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'])
         .order('created_at', { ascending: false })
@@ -170,7 +173,7 @@ export default async function MyRequestsPage({
       .range(documentRange[0], documentRange[1]),
     supabase
       .from('supply_requests')
-      .select('id, status, created_at, supply_request_items(id, category, description, estimated_amount, note, sort_order), supply_approval_steps(step_order, status, employees(position, name))')
+      .select('id, status, created_at, supply_request_items(id, category, description, estimated_amount, note, sort_order), supply_approval_steps(step_order, status, approver_id, employees(position, name, role))')
       .eq('employee_id', employee.id)
       .in('status', ['PENDING', 'APPROVED', 'REJECTED', 'COMPLETED', 'CANCELLED'])
       .order('created_at', { ascending: false })
@@ -182,7 +185,7 @@ export default async function MyRequestsPage({
     ...r,
     kind: 'leave' as const,
     displayLabel: `${LEAVE_LABELS[r.leave_type] ?? r.leave_type} ${r.days_used}일`,
-    pendingApproverLabel: r.status === 'PENDING' ? getPendingApproverLabel(r.leave_approval_steps) : null,
+    pendingApproverLabel: r.status === 'PENDING' ? getPendingApproverLabel(r.leave_approval_steps, employee.id) : null,
   }))
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -190,7 +193,7 @@ export default async function MyRequestsPage({
     ...r,
     kind: 'expense' as const,
     displayLabel: `${r.title} — ${Number(r.amount).toLocaleString()}원`,
-    pendingApproverLabel: r.status === 'PENDING' ? getPendingApproverLabel(r.expense_approval_steps) : null,
+    pendingApproverLabel: r.status === 'PENDING' ? getPendingApproverLabel(r.expense_approval_steps, employee.id) : null,
   }))
 
   const items = [...leaveItems, ...expenseItems].sort(
@@ -200,7 +203,7 @@ export default async function MyRequestsPage({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supplyRequests = (mySupply ?? []).map((r: any) => ({
     ...r,
-    pendingApproverLabel: r.status === 'PENDING' ? getPendingApproverLabel(r.supply_approval_steps) : null,
+    pendingApproverLabel: r.status === 'PENDING' ? getPendingApproverLabel(r.supply_approval_steps, employee.id) : null,
   }))
 
   return (
