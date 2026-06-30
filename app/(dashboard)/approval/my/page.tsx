@@ -7,6 +7,8 @@ const LEAVE_LABELS: Record<string, string> = {
   SICK: '병가(무급)', GROUP: '공동연차', COMP: '보상휴가', OTHER: '기타',
 }
 
+const PAGE_SIZE = 10
+
 function getPendingApproverLabel(
   steps: Array<{ step_order: number; status: string; employees?: { position?: string | null; name?: string | null } | null }> | null | undefined
 ): string | null {
@@ -23,6 +25,8 @@ export default async function MyRequestsPage({
   searchParams,
 }: {
   searchParams: Promise<{
+    catTab?: string
+    catPage?: string
     expenseType?: string
     month?: string
     dateFrom?: string
@@ -35,6 +39,9 @@ export default async function MyRequestsPage({
   if (!user) redirect('/login')
 
   const params = await searchParams
+  const catTab      = ['all', 'leave', 'expense', 'document', 'supply'].includes(params.catTab ?? '') ? params.catTab! : 'all'
+  const catPage     = Math.max(1, parseInt(params.catPage ?? '1') || 1)
+  const offset      = (catPage - 1) * PAGE_SIZE
   const expenseType = params.expenseType ?? ''
   const month       = params.month ?? ''
   const dateFrom    = params.dateFrom ?? ''
@@ -61,6 +68,65 @@ export default async function MyRequestsPage({
     departmentName = dept?.name ?? null
   }
 
+  // 활성 탭의 count 쿼리 (페이지네이션용)
+  let leaveTotalPages   = 1
+  let expenseTotalPages = 1
+  let documentTotalPages = 1
+  let supplyTotalPages  = 1
+
+  if (catTab === 'leave') {
+    const { count } = await supabase
+      .from('leave_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('employee_id', employee.id)
+      .in('status', ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'])
+    leaveTotalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE))
+  }
+
+  if (catTab === 'expense') {
+    let cq = supabase
+      .from('expense_reports')
+      .select('id', { count: 'exact', head: true })
+      .eq('employee_id', employee.id)
+      .in('status', ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'])
+    if (expenseType) cq = cq.eq('expense_type', expenseType)
+    if (month) {
+      const [y, m] = month.split('-').map(Number)
+      const nextM = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`
+      cq = cq.gte('created_at', `${month}-01T00:00:00`).lt('created_at', `${nextM}-01T00:00:00`)
+    } else if (dateFrom || dateTo) {
+      if (dateFrom) cq = cq.gte('created_at', `${dateFrom}T00:00:00`)
+      if (dateTo)   cq = cq.lte('created_at', `${dateTo}T23:59:59`)
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (keyword) cq = (cq as any).filter('line_items::text', 'ilike', `%${keyword}%`)
+    const { count } = await cq
+    expenseTotalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE))
+  }
+
+  if (catTab === 'document') {
+    const { count } = await supabase
+      .from('document_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('employee_id', employee.id)
+      .in('status', ['PENDING', 'COMPLETED', 'CANCELLED'])
+    documentTotalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE))
+  }
+
+  if (catTab === 'supply') {
+    const { count } = await supabase
+      .from('supply_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('employee_id', employee.id)
+      .in('status', ['PENDING', 'APPROVED', 'REJECTED', 'COMPLETED', 'CANCELLED'])
+    supplyTotalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE))
+  }
+
+  // 데이터 쿼리: 활성 탭은 range(), 전체 탭은 limit(10) 미리보기
+  const leaveRange   = catTab === 'leave'    ? [offset, offset + PAGE_SIZE - 1] as const : [0, PAGE_SIZE - 1] as const
+  const documentRange = catTab === 'document' ? [offset, offset + PAGE_SIZE - 1] as const : [0, PAGE_SIZE - 1] as const
+  const supplyRange  = catTab === 'supply'   ? [offset, offset + PAGE_SIZE - 1] as const : [0, PAGE_SIZE - 1] as const
+
   const [
     { data: myLeave },
     { data: myExpense },
@@ -73,7 +139,7 @@ export default async function MyRequestsPage({
       .eq('employee_id', employee.id)
       .in('status', ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'])
       .order('created_at', { ascending: false })
-      .limit(20),
+      .range(leaveRange[0], leaveRange[1]),
     (() => {
       let q = supabase
         .from('expense_reports')
@@ -92,7 +158,8 @@ export default async function MyRequestsPage({
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if (keyword) q = (q as any).filter('line_items::text', 'ilike', `%${keyword}%`)
-      return q
+      const expRange = catTab === 'expense' ? [offset, offset + PAGE_SIZE - 1] as const : [0, PAGE_SIZE - 1] as const
+      return q.range(expRange[0], expRange[1])
     })(),
     supabase
       .from('document_requests')
@@ -100,14 +167,14 @@ export default async function MyRequestsPage({
       .eq('employee_id', employee.id)
       .in('status', ['PENDING', 'COMPLETED', 'CANCELLED'])
       .order('created_at', { ascending: false })
-      .limit(20),
+      .range(documentRange[0], documentRange[1]),
     supabase
       .from('supply_requests')
       .select('id, status, created_at, supply_request_items(id, category, description, estimated_amount, note, sort_order), supply_approval_steps(step_order, status, employees(position, name))')
       .eq('employee_id', employee.id)
       .in('status', ['PENDING', 'APPROVED', 'REJECTED', 'COMPLETED', 'CANCELLED'])
       .order('created_at', { ascending: false })
-      .limit(20),
+      .range(supplyRange[0], supplyRange[1]),
   ])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -149,6 +216,12 @@ export default async function MyRequestsPage({
       dateFrom={dateFrom}
       dateTo={dateTo}
       keyword={keyword}
+      catTab={catTab}
+      catPage={catPage}
+      leaveTotalPages={leaveTotalPages}
+      expenseTotalPages={expenseTotalPages}
+      documentTotalPages={documentTotalPages}
+      supplyTotalPages={supplyTotalPages}
     />
   )
 }
