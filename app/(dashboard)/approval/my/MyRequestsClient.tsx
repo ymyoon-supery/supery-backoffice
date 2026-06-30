@@ -19,6 +19,7 @@ const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   APPROVED:  { label: '승인',   className: 'bg-green-50 text-green-700' },
   REJECTED:  { label: '반려',   className: 'bg-red-50 text-red-600' },
   COMPLETED: { label: '완료',   className: 'bg-blue-50 text-blue-700' },
+  CANCELLED: { label: '취소',   className: 'bg-gray-100 text-gray-400' },
 }
 
 const DOC_TYPE_LABELS: Record<string, string> = {

@@ -17,7 +17,7 @@ export async function cancelLeaveRequest(id: string) {
 
   const { error } = await supabase
     .from('leave_requests')
-    .delete()
+    .update({ status: 'CANCELLED' })
     .eq('id', id)
     .eq('employee_id', employeeId)
     .eq('status', 'PENDING')
@@ -33,7 +33,7 @@ export async function cancelExpenseRequest(id: string) {
 
   const { error } = await supabase
     .from('expense_reports')
-    .delete()
+    .update({ status: 'CANCELLED' })
     .eq('id', id)
     .eq('employee_id', employeeId)
     .eq('status', 'PENDING')
@@ -49,7 +49,7 @@ export async function cancelDocumentRequest(id: string) {
 
   const { error } = await supabase
     .from('document_requests')
-    .delete()
+    .update({ status: 'CANCELLED' })
     .eq('id', id)
     .eq('employee_id', employeeId)
     .eq('status', 'PENDING')
@@ -65,7 +65,7 @@ export async function cancelSupplyRequest(id: string) {
 
   const { error } = await supabase
     .from('supply_requests')
-    .delete()
+    .update({ status: 'CANCELLED' })
     .eq('id', id)
     .eq('employee_id', employeeId)
     .eq('status', 'PENDING')
