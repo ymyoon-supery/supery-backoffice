@@ -61,6 +61,9 @@ export default async function MyRequestsPage({
   const employeeName = employee.name ?? ''
   const employeePosition = employee.position ?? null
 
+  const { data: settings } = await supabase.from('company_settings').select('supply_manager_id').single()
+  const supplyManagerId = settings?.supply_manager_id ?? null
+
   let departmentName: string | null = null
   if (employee.department_id) {
     const { data: dept } = await supabase
@@ -201,10 +204,25 @@ export default async function MyRequestsPage({
   )
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const supplyRequests = (mySupply ?? []).map((r: any) => ({
-    ...r,
-    pendingApproverLabel: r.status === 'PENDING' ? getPendingApproverLabel(r.supply_approval_steps, employee.id) : null,
-  }))
+  const supplyRequests = (mySupply ?? []).map((r: any) => {
+    let pendingApproverLabel: string | null = null
+    if (r.status === 'PENDING') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const steps = (r.supply_approval_steps ?? []) as Array<{ step_order: number; status: string; approver_id?: string | null; employees?: { position?: string | null; name?: string | null; role?: string | null } | null }>
+      const pending = [...steps]
+        .filter(s => s.status === 'PENDING' && s.approver_id !== employee.id)
+        .sort((a, b) => a.step_order - b.step_order)[0]
+      if (pending) {
+        const label = supplyManagerId && pending.approver_id === supplyManagerId
+          ? '총무팀장'
+          : pending.employees?.role === 'ADMIN'
+            ? '관리자'
+            : (pending.employees?.position || pending.employees?.name || '담당자')
+        pendingApproverLabel = `${label} 승인 대기중`
+      }
+    }
+    return { ...r, pendingApproverLabel }
+  })
 
   return (
     <MyRequestsClient
