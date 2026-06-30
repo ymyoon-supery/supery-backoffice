@@ -12,6 +12,17 @@ const EXPENSE_TYPE_OPTIONS = [
   { value: 'PRIZE', label: '경품비' },
 ]
 
+const ALL_TYPE_OPTIONS = [
+  { value: '', label: '전체 유형' },
+  { value: 'LEAVE', label: '연차' },
+  { value: 'SUPPLY', label: '비품/소모품' },
+  { value: 'EXPENSE', label: '지출결의서' },
+  { value: 'CORPORATE_CARD', label: '법인카드' },
+  { value: 'TRANSPORTATION', label: '교통비' },
+  { value: 'BUSINESS_INCOME', label: '사업소득' },
+  { value: 'PRIZE', label: '경품비' },
+]
+
 interface Props {
   expenseType: string
   month: string
@@ -20,12 +31,13 @@ interface Props {
   keyword: string
   employeeName?: string
   showAdminFilters?: boolean
+  showAllTypes?: boolean
   baseParams?: Record<string, string>
 }
 
 export default function ExpenseSearchFilter({
   expenseType, month, dateFrom, dateTo, keyword,
-  employeeName = '', showAdminFilters = false, baseParams = {},
+  employeeName = '', showAdminFilters = false, showAllTypes = false, baseParams = {},
 }: Props) {
   const router = useRouter()
   const pathname = usePathname()
@@ -42,6 +54,18 @@ export default function ExpenseSearchFilter({
 
   function nav(overrides: Record<string, string>) {
     router.push(buildUrl({ ...overrides, page: '1' }))
+  }
+
+  function handleAllTypeChange(value: string) {
+    if (value === 'LEAVE') {
+      nav({ type: 'leave', expenseType: '' })
+    } else if (value === 'SUPPLY') {
+      nav({ type: 'supply', expenseType: '' })
+    } else if (value === '') {
+      nav({ type: 'all', expenseType: '' })
+    } else {
+      nav({ type: 'expense', expenseType: value })
+    }
   }
 
   function debounceNav(overrides: Record<string, string>) {
@@ -62,15 +86,27 @@ export default function ExpenseSearchFilter({
   return (
     <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 space-y-2">
       <div className="flex flex-wrap gap-2 items-center">
-        <select
-          value={expenseType}
-          onChange={e => nav({ expenseType: e.target.value })}
-          className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary"
-        >
-          {EXPENSE_TYPE_OPTIONS.map(o => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
+        {showAllTypes ? (
+          <select
+            value={expenseType}
+            onChange={e => handleAllTypeChange(e.target.value)}
+            className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            {ALL_TYPE_OPTIONS.map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        ) : (
+          <select
+            value={expenseType}
+            onChange={e => nav({ expenseType: e.target.value })}
+            className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            {EXPENSE_TYPE_OPTIONS.map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        )}
 
         <input
           type="month"

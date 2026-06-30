@@ -207,6 +207,7 @@ export default function PendingApprovalsClient({
           keyword={keyword}
           employeeName={employeeName}
           showAdminFilters={true}
+          showAllTypes={type === 'all'}
           baseParams={{ viewTab, type }}
         />
       )}
