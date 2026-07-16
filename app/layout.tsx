@@ -20,7 +20,7 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body className={inter.className}>
-        <NextTopLoader color="#6366f1" showSpinner={false} height={3} />
+        <NextTopLoader color="#6366f1" showSpinner={true} height={4} />
         <ReactQueryProvider>
           {children}
           <Toaster richColors position="top-right" />
