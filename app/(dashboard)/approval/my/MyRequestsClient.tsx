@@ -34,6 +34,27 @@ const CATEGORY_LABELS: Record<string, string> = {
   OTHER: '기타',
 }
 
+const STATUS_SORT: Record<string, number> = {
+  REJECTED: 0, PENDING: 1, APPROVED: 2, COMPLETED: 2, CANCELLED: 3,
+}
+
+type StatusFilter = 'all' | 'rejected' | 'pending' | 'done'
+type AlertCounts = { rejected: number; pending: number }
+
+const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
+  { id: 'all',      label: '전체' },
+  { id: 'rejected', label: '반려' },
+  { id: 'pending',  label: '대기' },
+  { id: 'done',     label: '승인·완료' },
+]
+
+function sortByStatusDate<T extends { status: string; created_at: string }>(arr: T[]): T[] {
+  return [...arr].sort((a, b) => {
+    const diff = (STATUS_SORT[a.status] ?? 99) - (STATUS_SORT[b.status] ?? 99)
+    return diff !== 0 ? diff : new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  })
+}
+
 interface LeaveItem {
   id: string
   kind: 'leave'
@@ -120,6 +141,11 @@ interface Props {
   expenseTotalPages: number
   documentTotalPages: number
   supplyTotalPages: number
+  statusFilter: string
+  leaveAlerts: AlertCounts
+  expenseAlerts: AlertCounts
+  documentAlerts: AlertCounts
+  supplyAlerts: AlertCounts
 }
 
 export default function MyRequestsClient({
@@ -140,20 +166,53 @@ export default function MyRequestsClient({
   expenseTotalPages,
   documentTotalPages,
   supplyTotalPages,
+  statusFilter: statusFilterProp,
+  leaveAlerts,
+  expenseAlerts,
+  documentAlerts,
+  supplyAlerts,
 }: Props) {
   const [selectedExpense, setSelectedExpense] = useState<ExpenseViewData | null>(null)
   const [expandedSupplyId, setExpandedSupplyId] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+  const router = useRouter()
+
   const validTabs: Tab[] = ['all', 'leave', 'expense', 'document', 'supply']
   const activeTab: Tab = validTabs.includes(catTab as Tab) && catTab !== 'all'
     ? catTab as Tab
     : (expenseType || month || dateFrom || dateTo || keyword) ? 'expense' : 'all'
-  const [isPending, startTransition] = useTransition()
-  const router = useRouter()
+
+  const statusFilter = (statusFilterProp as StatusFilter) ?? 'all'
+
+  const sortedItems     = sortByStatusDate(items)
+  const sortedDocuments = sortByStatusDate(documentRequests)
+  const sortedSupply    = sortByStatusDate(supplyRequests)
+
+  const leaveItems   = sortedItems.filter(i => i.kind === 'leave')
+  const expenseItems = sortedItems.filter(i => i.kind === 'expense') as ExpenseItem[]
+
+  const tabAlerts: Record<Tab, AlertCounts> = {
+    all:      { rejected: leaveAlerts.rejected + expenseAlerts.rejected + documentAlerts.rejected + supplyAlerts.rejected,
+                pending:  leaveAlerts.pending  + expenseAlerts.pending  + documentAlerts.pending  + supplyAlerts.pending },
+    leave:    leaveAlerts,
+    expense:  expenseAlerts,
+    document: documentAlerts,
+    supply:   supplyAlerts,
+  }
+
+  const TABS: { id: Tab; label: string }[] = [
+    { id: 'all',      label: '전체' },
+    { id: 'leave',    label: '연차' },
+    { id: 'expense',  label: '지출결의' },
+    { id: 'document', label: '서류신청' },
+    { id: 'supply',   label: '비품신청' },
+  ]
 
   function buildTabUrl(tab: Tab, page = 1) {
     const p = new URLSearchParams()
     p.set('catTab', tab)
     p.set('catPage', String(page))
+    if (statusFilter !== 'all') p.set('statusFilter', statusFilter)
     if (expenseType) p.set('expenseType', expenseType)
     if (month) p.set('month', month)
     if (dateFrom) p.set('dateFrom', dateFrom)
@@ -162,24 +221,26 @@ export default function MyRequestsClient({
     return `/approval/my?${p.toString()}`
   }
 
-  const leaveItems  = items.filter(i => i.kind === 'leave')
-  const expenseItems = items.filter(i => i.kind === 'expense')
-
-  const TABS: { id: Tab; label: string; count: number }[] = [
-    { id: 'all',      label: '전체',    count: items.length + documentRequests.length + supplyRequests.length },
-    { id: 'leave',    label: '연차',    count: leaveItems.length },
-    { id: 'expense',  label: '지출결의', count: expenseItems.length },
-    { id: 'document', label: '서류신청', count: documentRequests.length },
-    { id: 'supply',   label: '비품신청', count: supplyRequests.length },
-  ]
+  function buildStatusUrl(filter: StatusFilter) {
+    const p = new URLSearchParams()
+    p.set('catTab', activeTab)
+    p.set('catPage', '1')
+    if (filter !== 'all') p.set('statusFilter', filter)
+    if (expenseType) p.set('expenseType', expenseType)
+    if (month) p.set('month', month)
+    if (dateFrom) p.set('dateFrom', dateFrom)
+    if (dateTo) p.set('dateTo', dateTo)
+    if (keyword) p.set('keyword', keyword)
+    return `/approval/my?${p.toString()}`
+  }
 
   const showLeave    = activeTab === 'all' || activeTab === 'leave'
   const showExpense  = activeTab === 'all' || activeTab === 'expense'
   const showDocument = activeTab === 'all' || activeTab === 'document'
   const showSupply   = activeTab === 'all' || activeTab === 'supply'
 
-  const visibleItems   = activeTab === 'all'
-    ? items
+  const visibleItems = activeTab === 'all'
+    ? sortedItems
     : activeTab === 'leave'   ? leaveItems
     : activeTab === 'expense' ? expenseItems as AnyItem[]
     : []
@@ -222,31 +283,68 @@ export default function MyRequestsClient({
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-2xl space-y-4">
       <h1 className="text-xl font-semibold text-gray-900">내 신청 내역</h1>
 
       {/* Category tabs */}
       <div className="flex gap-1 flex-wrap">
-        {TABS.map(t => (
-          <button
-            key={t.id}
-            onClick={() => router.push(buildTabUrl(t.id))}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-              activeTab === t.id
-                ? 'bg-primary text-white'
-                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-            }`}
-          >
-            {t.label}
-            {t.count > 0 && (
-              <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                activeTab === t.id ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-500'
-              }`}>
-                {t.count}
-              </span>
-            )}
-          </button>
-        ))}
+        {TABS.map(t => {
+          const isActive = activeTab === t.id
+          const alerts = tabAlerts[t.id]
+          return (
+            <button
+              key={t.id}
+              onClick={() => router.push(buildTabUrl(t.id))}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                isActive
+                  ? 'bg-primary text-white'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
+            >
+              {t.label}
+              {alerts.rejected > 0 && (
+                <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                  isActive ? 'bg-white/25 text-white' : 'bg-red-100 text-red-600'
+                }`}>
+                  반려 {alerts.rejected}
+                </span>
+              )}
+              {alerts.pending > 0 && (
+                <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                  isActive ? 'bg-white/20 text-white' : 'bg-amber-50 text-amber-600'
+                }`}>
+                  대기 {alerts.pending}
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Status filter chips */}
+      <div className="flex gap-1.5 flex-wrap">
+        {STATUS_FILTERS.map(f => {
+          const isActive = statusFilter === f.id
+          return (
+            <button
+              key={f.id}
+              onClick={() => router.push(buildStatusUrl(f.id))}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                isActive
+                  ? f.id === 'rejected' ? 'bg-red-500 text-white'
+                    : f.id === 'pending' ? 'bg-amber-500 text-white'
+                    : f.id === 'done'    ? 'bg-green-600 text-white'
+                    : 'bg-gray-700 text-white'
+                  : f.id === 'rejected' ? 'bg-red-50 text-red-500 hover:bg-red-100'
+                    : f.id === 'pending' ? 'bg-amber-50 text-amber-600 hover:bg-amber-100'
+                    : f.id === 'done'    ? 'bg-green-50 text-green-600 hover:bg-green-100'
+                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
+            >
+              {f.label}
+            </button>
+          )
+        })}
       </div>
 
       {/* Expense Search Filter */}
@@ -358,10 +456,10 @@ export default function MyRequestsClient({
       </div>
 
       {/* Document Requests */}
-      {showDocument && documentRequests.length > 0 && (
+      {showDocument && sortedDocuments.length > 0 && (
         <div className="space-y-2">
           {activeTab === 'all' && <p className="text-xs font-medium text-gray-400 uppercase tracking-wider px-1">서류 신청</p>}
-          {documentRequests.map(doc => {
+          {sortedDocuments.map(doc => {
             const status = STATUS_LABELS[doc.status] ?? STATUS_LABELS.PENDING
             return (
               <div key={doc.id} className="bg-white rounded-xl border border-gray-100 px-5 py-4">
@@ -397,7 +495,7 @@ export default function MyRequestsClient({
         </div>
       )}
 
-      {showDocument && documentRequests.length === 0 && activeTab === 'document' && (
+      {showDocument && sortedDocuments.length === 0 && activeTab === 'document' && (
         <div className="py-12 text-center text-sm text-gray-400">신청 내역이 없습니다.</div>
       )}
       {activeTab === 'document' && documentTotalPages > 1 && (
@@ -408,7 +506,7 @@ export default function MyRequestsClient({
         </div>
       )}
 
-      {showSupply && supplyRequests.length === 0 && activeTab === 'supply' && (
+      {showSupply && sortedSupply.length === 0 && activeTab === 'supply' && (
         <div className="py-12 text-center text-sm text-gray-400">신청 내역이 없습니다.</div>
       )}
       {activeTab === 'supply' && supplyTotalPages > 1 && (
@@ -420,10 +518,10 @@ export default function MyRequestsClient({
       )}
 
       {/* Supply Requests */}
-      {showSupply && supplyRequests.length > 0 && (
+      {showSupply && sortedSupply.length > 0 && (
         <div className="space-y-2">
           {activeTab === 'all' && <p className="text-xs font-medium text-gray-400 uppercase tracking-wider px-1">비품/소모품 신청</p>}
-          {supplyRequests.map(req => {
+          {sortedSupply.map(req => {
             const status = STATUS_LABELS[req.status] ?? STATUS_LABELS.PENDING
             const isExpanded = expandedSupplyId === req.id
             const sortedItems = [...(req.supply_request_items ?? [])].sort((a, b) => a.sort_order - b.sort_order)

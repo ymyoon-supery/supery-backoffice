@@ -9,6 +9,8 @@ const LEAVE_LABELS: Record<string, string> = {
 
 const PAGE_SIZE = 10
 
+type AlertCounts = { rejected: number; pending: number }
+
 function getPendingApproverLabel(
   steps: Array<{ step_order: number; status: string; approver_id?: string | null; employees?: { position?: string | null; name?: string | null; role?: string | null } | null }> | null | undefined,
   selfId?: string | null
@@ -35,6 +37,7 @@ export default async function MyRequestsPage({
     dateFrom?: string
     dateTo?: string
     keyword?: string
+    statusFilter?: string
   }>
 }) {
   const supabase = await createClient()
@@ -50,6 +53,29 @@ export default async function MyRequestsPage({
   const dateFrom    = params.dateFrom ?? ''
   const dateTo      = params.dateTo ?? ''
   const keyword     = params.keyword ?? ''
+  const statusFilter = ['all', 'rejected', 'pending', 'done'].includes(params.statusFilter ?? '')
+    ? (params.statusFilter ?? 'all')
+    : 'all'
+
+  const leaveStatuses = statusFilter === 'rejected' ? ['REJECTED']
+    : statusFilter === 'pending' ? ['PENDING']
+    : statusFilter === 'done' ? ['APPROVED']
+    : ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED']
+
+  const expenseStatuses = statusFilter === 'rejected' ? ['REJECTED']
+    : statusFilter === 'pending' ? ['PENDING']
+    : statusFilter === 'done' ? ['APPROVED']
+    : ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED']
+
+  const documentStatuses: string[] = statusFilter === 'rejected' ? []
+    : statusFilter === 'pending' ? ['PENDING']
+    : statusFilter === 'done' ? ['COMPLETED']
+    : ['PENDING', 'COMPLETED', 'CANCELLED']
+
+  const supplyStatuses = statusFilter === 'rejected' ? ['REJECTED']
+    : statusFilter === 'pending' ? ['PENDING']
+    : statusFilter === 'done' ? ['APPROVED', 'COMPLETED']
+    : ['PENDING', 'APPROVED', 'REJECTED', 'COMPLETED', 'CANCELLED']
 
   const { data: employee } = await supabase
     .from('employees')
@@ -74,27 +100,26 @@ export default async function MyRequestsPage({
     departmentName = dept?.name ?? null
   }
 
-  // 활성 탭의 count 쿼리 (페이지네이션용)
   let leaveTotalPages   = 1
   let expenseTotalPages = 1
   let documentTotalPages = 1
   let supplyTotalPages  = 1
 
-  if (catTab === 'leave') {
+  if (catTab === 'leave' && leaveStatuses.length > 0) {
     const { count } = await supabase
       .from('leave_requests')
       .select('id', { count: 'exact', head: true })
       .eq('employee_id', employee.id)
-      .in('status', ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'])
+      .in('status', leaveStatuses)
     leaveTotalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE))
   }
 
-  if (catTab === 'expense') {
+  if (catTab === 'expense' && expenseStatuses.length > 0) {
     let cq = supabase
       .from('expense_reports')
       .select('id', { count: 'exact', head: true })
       .eq('employee_id', employee.id)
-      .in('status', ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'])
+      .in('status', expenseStatuses)
     if (expenseType) cq = cq.eq('expense_type', expenseType)
     if (month) {
       const [y, m] = month.split('-').map(Number)
@@ -110,81 +135,102 @@ export default async function MyRequestsPage({
     expenseTotalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE))
   }
 
-  if (catTab === 'document') {
+  if (catTab === 'document' && documentStatuses.length > 0) {
     const { count } = await supabase
       .from('document_requests')
       .select('id', { count: 'exact', head: true })
       .eq('employee_id', employee.id)
-      .in('status', ['PENDING', 'COMPLETED', 'CANCELLED'])
+      .in('status', documentStatuses)
     documentTotalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE))
   }
 
-  if (catTab === 'supply') {
+  if (catTab === 'supply' && supplyStatuses.length > 0) {
     const { count } = await supabase
       .from('supply_requests')
       .select('id', { count: 'exact', head: true })
       .eq('employee_id', employee.id)
-      .in('status', ['PENDING', 'APPROVED', 'REJECTED', 'COMPLETED', 'CANCELLED'])
+      .in('status', supplyStatuses)
     supplyTotalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE))
   }
 
-  // 데이터 쿼리: 활성 탭은 range(), 전체 탭은 limit(10) 미리보기
-  const leaveRange   = catTab === 'leave'    ? [offset, offset + PAGE_SIZE - 1] as const : [0, PAGE_SIZE - 1] as const
+  const leaveRange    = catTab === 'leave'    ? [offset, offset + PAGE_SIZE - 1] as const : [0, PAGE_SIZE - 1] as const
   const documentRange = catTab === 'document' ? [offset, offset + PAGE_SIZE - 1] as const : [0, PAGE_SIZE - 1] as const
-  const supplyRange  = catTab === 'supply'   ? [offset, offset + PAGE_SIZE - 1] as const : [0, PAGE_SIZE - 1] as const
+  const supplyRange   = catTab === 'supply'   ? [offset, offset + PAGE_SIZE - 1] as const : [0, PAGE_SIZE - 1] as const
 
-  const [
-    { data: myLeave },
-    { data: myExpense },
-    { data: myDocuments },
-    { data: mySupply },
-  ] = await Promise.all([
-    supabase
-      .from('leave_requests')
-      .select('id, leave_type, start_date, end_date, days_used, reason, status, created_at, leave_approval_steps(step_order, comment, status, approver_id, employees(position, name, role))')
-      .eq('employee_id', employee.id)
-      .in('status', ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'])
-      .order('created_at', { ascending: false })
-      .range(leaveRange[0], leaveRange[1]),
-    (() => {
-      let q = supabase
-        .from('expense_reports')
-        .select('id, title, amount, category, expense_type, status, created_at, tax_type, evidence_type, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls, expense_approval_steps(step_order, status, comment, approver_id, employees(position, name, role))')
-        .eq('employee_id', employee.id)
-        .in('status', ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'])
-        .order('created_at', { ascending: false })
-      if (expenseType) q = q.eq('expense_type', expenseType)
-      if (month) {
-        const [y, m] = month.split('-').map(Number)
-        const nextM = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`
-        q = q.gte('created_at', `${month}-01T00:00:00`).lt('created_at', `${nextM}-01T00:00:00`)
-      } else if (dateFrom || dateTo) {
-        if (dateFrom) q = q.gte('created_at', `${dateFrom}T00:00:00`)
-        if (dateTo)   q = q.lte('created_at', `${dateTo}T23:59:59`)
-      }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (keyword) q = (q as any).filter('line_items::text', 'ilike', `%${keyword}%`)
-      const expRange = catTab === 'expense' ? [offset, offset + PAGE_SIZE - 1] as const : [0, PAGE_SIZE - 1] as const
-      return q.range(expRange[0], expRange[1])
-    })(),
-    supabase
-      .from('document_requests')
-      .select('id, doc_type, status, purpose, created_at')
-      .eq('employee_id', employee.id)
-      .in('status', ['PENDING', 'COMPLETED', 'CANCELLED'])
-      .order('created_at', { ascending: false })
-      .range(documentRange[0], documentRange[1]),
-    supabase
-      .from('supply_requests')
-      .select('id, status, created_at, supply_request_items(id, category, description, estimated_amount, note, sort_order), supply_approval_steps(step_order, status, approver_id, employees(position, name, role))')
-      .eq('employee_id', employee.id)
-      .in('status', ['PENDING', 'APPROVED', 'REJECTED', 'COMPLETED', 'CANCELLED'])
-      .order('created_at', { ascending: false })
-      .range(supplyRange[0], supplyRange[1]),
+  const makeAlertCounter = (data: { status: string }[] | null): AlertCounts => ({
+    rejected: data?.filter(x => x.status === 'REJECTED').length ?? 0,
+    pending:  data?.filter(x => x.status === 'PENDING').length ?? 0,
+  })
+
+  const [dataResults, alertResults] = await Promise.all([
+    Promise.all([
+      leaveStatuses.length > 0
+        ? supabase
+            .from('leave_requests')
+            .select('id, leave_type, start_date, end_date, days_used, reason, status, created_at, leave_approval_steps(step_order, comment, status, approver_id, employees(position, name, role))')
+            .eq('employee_id', employee.id)
+            .in('status', leaveStatuses)
+            .order('created_at', { ascending: false })
+            .range(leaveRange[0], leaveRange[1])
+        : Promise.resolve({ data: [] as never[] }),
+      (() => {
+        if (expenseStatuses.length === 0) return Promise.resolve({ data: [] as never[] })
+        let q = supabase
+          .from('expense_reports')
+          .select('id, title, amount, category, expense_type, status, created_at, tax_type, evidence_type, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls, expense_approval_steps(step_order, status, comment, approver_id, employees(position, name, role))')
+          .eq('employee_id', employee.id)
+          .in('status', expenseStatuses)
+          .order('created_at', { ascending: false })
+        if (expenseType) q = q.eq('expense_type', expenseType)
+        if (month) {
+          const [y, m] = month.split('-').map(Number)
+          const nextM = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`
+          q = q.gte('created_at', `${month}-01T00:00:00`).lt('created_at', `${nextM}-01T00:00:00`)
+        } else if (dateFrom || dateTo) {
+          if (dateFrom) q = q.gte('created_at', `${dateFrom}T00:00:00`)
+          if (dateTo)   q = q.lte('created_at', `${dateTo}T23:59:59`)
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (keyword) q = (q as any).filter('line_items::text', 'ilike', `%${keyword}%`)
+        const expRange = catTab === 'expense' ? [offset, offset + PAGE_SIZE - 1] as const : [0, PAGE_SIZE - 1] as const
+        return q.range(expRange[0], expRange[1])
+      })(),
+      documentStatuses.length > 0
+        ? supabase
+            .from('document_requests')
+            .select('id, doc_type, status, purpose, created_at')
+            .eq('employee_id', employee.id)
+            .in('status', documentStatuses)
+            .order('created_at', { ascending: false })
+            .range(documentRange[0], documentRange[1])
+        : Promise.resolve({ data: [] as never[] }),
+      supplyStatuses.length > 0
+        ? supabase
+            .from('supply_requests')
+            .select('id, status, created_at, supply_request_items(id, category, description, estimated_amount, note, sort_order), supply_approval_steps(step_order, status, approver_id, employees(position, name, role))')
+            .eq('employee_id', employee.id)
+            .in('status', supplyStatuses)
+            .order('created_at', { ascending: false })
+            .range(supplyRange[0], supplyRange[1])
+        : Promise.resolve({ data: [] as never[] }),
+    ]),
+    Promise.all([
+      supabase.from('leave_requests').select('status').eq('employee_id', employee.id).in('status', ['PENDING', 'REJECTED'])
+        .then(r => makeAlertCounter(r.data)),
+      supabase.from('expense_reports').select('status').eq('employee_id', employee.id).in('status', ['PENDING', 'REJECTED'])
+        .then(r => makeAlertCounter(r.data)),
+      supabase.from('document_requests').select('status').eq('employee_id', employee.id).in('status', ['PENDING'])
+        .then(r => ({ rejected: 0, pending: r.data?.length ?? 0 })),
+      supabase.from('supply_requests').select('status').eq('employee_id', employee.id).in('status', ['PENDING', 'REJECTED'])
+        .then(r => makeAlertCounter(r.data)),
+    ]),
   ])
 
+  const [leaveResult, expenseResult, documentResult, supplyResult] = dataResults
+  const [leaveAlerts, expenseAlerts, documentAlerts, supplyAlerts] = alertResults
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const leaveItems = (myLeave ?? []).map((r: any) => ({
+  const leaveItems = (leaveResult.data ?? []).map((r: any) => ({
     ...r,
     kind: 'leave' as const,
     displayLabel: `${LEAVE_LABELS[r.leave_type] ?? r.leave_type} ${r.days_used}일`,
@@ -192,7 +238,7 @@ export default async function MyRequestsPage({
   }))
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const expenseItems = (myExpense ?? []).map((r: any) => ({
+  const expenseItems = (expenseResult.data ?? []).map((r: any) => ({
     ...r,
     kind: 'expense' as const,
     displayLabel: `${r.title} — ${Number(r.amount).toLocaleString()}원`,
@@ -204,7 +250,7 @@ export default async function MyRequestsPage({
   )
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const supplyRequests = (mySupply ?? []).map((r: any) => {
+  const supplyRequests = (supplyResult.data ?? []).map((r: any) => {
     let pendingApproverLabel: string | null = null
     if (r.status === 'PENDING') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -230,8 +276,8 @@ export default async function MyRequestsPage({
       employeeName={employeeName}
       employeePosition={employeePosition}
       departmentName={departmentName}
-      documentRequests={myDocuments ?? []}
-      supplyRequests={supplyRequests as any[]}
+      documentRequests={documentResult.data ?? []}
+      supplyRequests={supplyRequests as never[]}
       expenseType={expenseType}
       month={month}
       dateFrom={dateFrom}
@@ -243,6 +289,11 @@ export default async function MyRequestsPage({
       expenseTotalPages={expenseTotalPages}
       documentTotalPages={documentTotalPages}
       supplyTotalPages={supplyTotalPages}
+      statusFilter={statusFilter}
+      leaveAlerts={leaveAlerts}
+      expenseAlerts={expenseAlerts}
+      documentAlerts={documentAlerts}
+      supplyAlerts={supplyAlerts}
     />
   )
 }
