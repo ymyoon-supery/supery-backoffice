@@ -21,6 +21,7 @@ export interface ExpenseViewData {
   requestDate: string
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED'
   expenseType?: string | null
+  id?: string | null
   comment?: string | null
 }
 
@@ -349,20 +350,18 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
               </div>
             )}
 
-            {/* 재신청 (직원용 — onApprove/onReject 없을 때만) */}
-            {!onApprove && !onReject && (data.status === 'REJECTED' || data.status === 'PENDING') && (
+            {/* 재신청 (직원용 — 반려된 건만) */}
+            {!onApprove && !onReject && data.status === 'REJECTED' && (
               <div className="pt-3 border-t border-gray-100 no-print">
                 <p className="text-xs text-gray-400 mb-2">
-                  {data.status === 'REJECTED'
-                    ? '반려된 신청입니다. 내용을 확인한 후 재신청할 수 있습니다.'
-                    : '결재 대기 중인 신청입니다. 신규 신청은 아래 버튼을 이용하세요.'}
+                  반려된 신청입니다. 내용을 수정한 후 재신청할 수 있습니다.
                 </p>
                 <button
                   type="button"
-                  onClick={() => router.push(resubmitUrl)}
+                  onClick={() => router.push(data.id ? `${resubmitUrl}?editFrom=${data.id}` : resubmitUrl)}
                   className="w-full py-2.5 text-sm font-medium bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
                 >
-                  재신청하기
+                  수정 후 재신청하기
                 </button>
               </div>
             )}

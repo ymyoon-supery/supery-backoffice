@@ -189,6 +189,7 @@ export default function MyRequestsClient({
   function openExpense(item: ExpenseItem) {
     const rejectedStep = item.expense_approval_steps?.find(s => s.status === 'REJECTED')
     const viewData: ExpenseViewData = {
+      id: item.id,
       title: item.title,
       taxType: item.tax_type ?? null,
       evidenceType: item.evidence_type ?? null,
