@@ -55,7 +55,8 @@ interface ExpenseItem {
   title: string
   amount: number
   category: string
-  status: 'PENDING' | 'APPROVED' | 'REJECTED'
+  expense_type?: string | null
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
   created_at: string
   displayLabel: string
   tax_type?: string | null
@@ -69,6 +70,7 @@ interface ExpenseItem {
   settlement_date?: string | null
   line_items?: Array<{ item: string; date: string; amount?: number; note?: string; count?: number; userName?: string }> | null
   attachment_urls?: string[] | null
+  expense_approval_steps?: Array<{ status: string; comment?: string | null }> | null
   pendingApproverLabel?: string | null
 }
 
@@ -185,6 +187,7 @@ export default function MyRequestsClient({
     : []
 
   function openExpense(item: ExpenseItem) {
+    const rejectedStep = item.expense_approval_steps?.find(s => s.status === 'REJECTED')
     const viewData: ExpenseViewData = {
       title: item.title,
       taxType: item.tax_type ?? null,
@@ -203,7 +206,8 @@ export default function MyRequestsClient({
       departmentName,
       requestDate: item.created_at,
       status: item.status,
-      comment: null,
+      expenseType: item.expense_type ?? null,
+      comment: rejectedStep?.comment ?? null,
     }
     setSelectedExpense(viewData)
   }

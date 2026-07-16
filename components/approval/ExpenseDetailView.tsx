@@ -19,7 +19,8 @@ export interface ExpenseViewData {
   employeePosition?: string | null
   departmentName?: string | null
   requestDate: string
-  status: 'PENDING' | 'APPROVED' | 'REJECTED'
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED'
+  expenseType?: string | null
   comment?: string | null
 }
 
@@ -54,11 +55,14 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   TRANSFER: '계좌송금',
 }
 
-const STATUS_CFG = {
-  PENDING:  { label: '검토중', cls: 'bg-amber-100 text-amber-700' },
-  APPROVED: { label: '승인',   cls: 'bg-green-100 text-green-700' },
-  REJECTED: { label: '반려',   cls: 'bg-red-100 text-red-600' },
+const STATUS_CFG: Record<string, { label: string; cls: string }> = {
+  PENDING:   { label: '검토중', cls: 'bg-amber-100 text-amber-700' },
+  APPROVED:  { label: '승인',   cls: 'bg-green-100 text-green-700' },
+  REJECTED:  { label: '반려',   cls: 'bg-red-100 text-red-600' },
+  CANCELLED: { label: '취소',   cls: 'bg-gray-100 text-gray-500' },
+  COMPLETED: { label: '완료',   cls: 'bg-blue-100 text-blue-700' },
 }
+const PERSONAL_EXPENSE_TYPES = ['CORPORATE_CARD', 'TRANSPORTATION']
 
 function formatKRW(n: number) {
   return n.toLocaleString('ko-KR') + '원'
@@ -113,17 +117,23 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function ExpenseDetailView({ data, onApprove, onReject, isPending, approveLabel = '승인' }: Props) {
   const [rejectReason, setRejectReason] = useState('')
   const [rejecting, setRejecting] = useState(false)
+  const router = useRouter()
+
+  const resubmitUrl = data.expenseType && PERSONAL_EXPENSE_TYPES.includes(data.expenseType)
+    ? '/approval/personal/new'
+    : '/approval/expense/new'
 
   const rowVats = data.lineItems.map(li => parseVatFromNote(li.note, li.amount))
   const totalSupply = rowVats.reduce((s, r) => s + r.supply, 0)
   const totalVat    = rowVats.reduce((s, r) => s + r.vat, 0)
   const totalAmount = rowVats.reduce((s, r) => s + r.total, 0)
   const hasVat = rowVats.some(r => r.vatLabel !== null)
-  const statusCfg = STATUS_CFG[data.status]
+  const statusCfg = STATUS_CFG[data.status] ?? { label: data.status, cls: 'bg-gray-100 text-gray-500' }
 
   const requestDateStr = data.requestDate
     ? new Date(data.requestDate).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
@@ -336,6 +346,24 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
               <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3">
                 <p className="text-xs font-medium text-red-600 mb-1">반려 사유</p>
                 <p className="text-sm text-red-700">{data.comment}</p>
+              </div>
+            )}
+
+            {/* 재신청 (직원용 — onApprove/onReject 없을 때만) */}
+            {!onApprove && !onReject && (data.status === 'REJECTED' || data.status === 'PENDING') && (
+              <div className="pt-3 border-t border-gray-100 no-print">
+                <p className="text-xs text-gray-400 mb-2">
+                  {data.status === 'REJECTED'
+                    ? '반려된 신청입니다. 내용을 확인한 후 재신청할 수 있습니다.'
+                    : '결재 대기 중인 신청입니다. 신규 신청은 아래 버튼을 이용하세요.'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => router.push(resubmitUrl)}
+                  className="w-full py-2.5 text-sm font-medium bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  재신청하기
+                </button>
               </div>
             )}
 
