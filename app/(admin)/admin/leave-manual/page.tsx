@@ -40,18 +40,14 @@ export default async function LeaveManualPage({
       .in('leave_type', DEDUCTS),
   ])
 
-  // 직원별 전체/당해연도/연도별 사용 집계
+  // 직원별 전체/당해연도 사용 집계
   const usedAllTime: Record<string, number> = {}
   const usedThisYear: Record<string, number> = {}
-  const usedByYear: Record<string, Record<number, number>> = {}
   for (const r of usedTotals ?? []) {
-    const year = parseInt(r.start_date.slice(0, 4))
     usedAllTime[r.employee_id] = (usedAllTime[r.employee_id] ?? 0) + Number(r.days_used)
     if (r.start_date >= yearStart) {
       usedThisYear[r.employee_id] = (usedThisYear[r.employee_id] ?? 0) + Number(r.days_used)
     }
-    if (!usedByYear[r.employee_id]) usedByYear[r.employee_id] = {}
-    usedByYear[r.employee_id][year] = (usedByYear[r.employee_id][year] ?? 0) + Number(r.days_used)
   }
 
   const employees = (rawEmployees ?? []).map(e => {
@@ -63,15 +59,10 @@ export default async function LeaveManualPage({
     const used = hiredAt && isUnderOneYear(hiredAt, today)
       ? (usedAllTime[e.id] ?? 0)
       : (usedThisYear[e.id] ?? 0)
-    const by_year = Object.entries(usedByYear[e.id] ?? {})
-      .map(([yr, d]) => ({ year: parseInt(yr), used: Math.round(d * 10) / 10 }))
-      .sort((a, b) => b.year - a.year)
     return {
       ...e,
       annual_leave_days: entitlement,
       remaining_leaves: Math.max(Math.round((entitlement - used) * 10) / 10, 0),
-      total_used: Math.round((usedAllTime[e.id] ?? 0) * 10) / 10,
-      by_year,
     }
   })
 
