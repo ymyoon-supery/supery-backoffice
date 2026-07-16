@@ -1,13 +1,18 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
+import { useState, useTransition, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { differenceInCalendarDays } from 'date-fns'
-import { Pencil, Trash2, X, Download } from 'lucide-react'
+import { Pencil, Trash2, X, Download, ChevronDown, ChevronUp } from 'lucide-react'
 import { adminAddLeaveRecord, adminUpdateLeaveRecord, adminDeleteLeaveRecord } from './actions'
 
-type Employee = { id: string; name: string; email: string; annual_leave_days: number; remaining_leaves: number }
+type Employee = {
+  id: string; name: string; email: string
+  annual_leave_days: number; remaining_leaves: number
+  total_used: number
+  by_year: { year: number; used: number }[]
+}
 type LeaveRecord = {
   id: string; employee_id: string; leave_type: string
   start_date: string; end_date: string; days_used: number; reason: string | null
@@ -141,6 +146,21 @@ export default function LeaveManualClient({ employees, leaveRecords: init }: {
   const [end, setEnd] = useState('')
   const [daysOv, setDaysOv] = useState('')
   const [reason, setReason] = useState('')
+
+  // 사용현황 섹션
+  const [historyTab, setHistoryTab] = useState<'all' | 'individual'>('all')
+  const [historyYear, setHistoryYear] = useState<number | null>(null)
+  const [historyEmpId, setHistoryEmpId] = useState('')
+  const [historyExpandedId, setHistoryExpandedId] = useState<string | null>(null)
+
+  const historyYears = useMemo(() =>
+    Array.from(new Set(employees.flatMap(e => e.by_year.map(b => b.year)))).sort((a, b) => b - a),
+    [employees],
+  )
+  const historySelectedEmp = employees.find(e => e.id === historyEmpId)
+  function historyUsed(e: Employee) {
+    return historyYear ? (e.by_year.find(b => b.year === historyYear)?.used ?? 0) : e.total_used
+  }
 
   // 수정 모달
   const [filterEmpId, setFilterEmpId] = useState('')
@@ -344,6 +364,159 @@ export default function LeaveManualClient({ employees, leaveRecords: init }: {
               ))}
             </tbody>
           </table>
+        )}
+      </div>
+
+      {/* 연차 사용현황 */}
+      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-50">
+          <h2 className="text-sm font-medium text-gray-700">연차 사용현황</h2>
+        </div>
+
+        {/* 연도 필터 */}
+        {historyYears.length > 0 && (
+          <div className="px-4 py-3 border-b border-gray-50 flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-gray-400">연도</span>
+            <button
+              onClick={() => setHistoryYear(null)}
+              className={`px-3 py-1 text-xs rounded-lg border transition-colors ${!historyYear ? 'bg-gray-800 text-white border-gray-800' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+            >전체</button>
+            {historyYears.map(y => (
+              <button key={y} onClick={() => setHistoryYear(y)}
+                className={`px-3 py-1 text-xs rounded-lg border transition-colors ${historyYear === y ? 'bg-primary text-white border-primary' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+              >{y}년</button>
+            ))}
+          </div>
+        )}
+
+        {/* 전체/개인별 탭 */}
+        <div className="px-4 pt-3 flex gap-2">
+          {(['all', 'individual'] as const).map(t => (
+            <button key={t} onClick={() => setHistoryTab(t)}
+              className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${historyTab === t ? 'bg-primary text-white border-primary' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+            >{t === 'all' ? '전체 직원' : '개인별'}</button>
+          ))}
+        </div>
+
+        {/* 전체 직원 */}
+        {historyTab === 'all' && (
+          <div className="mt-3">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-gray-400 border-y border-gray-50 text-left bg-gray-50/60">
+                  <th className="px-4 py-2.5">직원</th>
+                  <th className="px-4 py-2.5 text-right">보유연차</th>
+                  <th className="px-4 py-2.5 text-right">{historyYear ? `${historyYear}년 사용` : '총 사용'}</th>
+                  <th className="px-4 py-2.5 text-right">잔여</th>
+                  {!historyYear && <th className="px-4 py-2.5 w-8"></th>}
+                </tr>
+              </thead>
+              <tbody>
+                {employees.map(emp => {
+                  const used = historyUsed(emp)
+                  const isExp = historyExpandedId === emp.id
+                  return (
+                    <>
+                      <tr key={emp.id}
+                        onClick={() => { if (!historyYear) setHistoryExpandedId(isExp ? null : emp.id) }}
+                        className={`border-b border-gray-50 last:border-0 ${!historyYear ? 'cursor-pointer' : ''} ${isExp ? 'bg-blue-50/30' : 'hover:bg-gray-50/50'}`}
+                      >
+                        <td className="px-4 py-2.5 font-medium text-gray-800">{emp.name}</td>
+                        <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">{emp.annual_leave_days}일</td>
+                        <td className="px-4 py-2.5 text-right tabular-nums font-medium text-orange-500">{used}일</td>
+                        <td className="px-4 py-2.5 text-right tabular-nums font-medium text-green-600">{emp.remaining_leaves}일</td>
+                        {!historyYear && (
+                          <td className="px-4 py-2.5 text-gray-300 text-right pr-4">
+                            {isExp ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                          </td>
+                        )}
+                      </tr>
+                      {isExp && !historyYear && (
+                        <tr key={`${emp.id}-detail`} className="border-b border-gray-50 bg-blue-50/20">
+                          <td colSpan={5} className="px-6 py-2.5">
+                            <div className="flex items-center gap-4 flex-wrap">
+                              <span className="text-xs text-gray-400">연도별</span>
+                              {emp.by_year.length === 0
+                                ? <span className="text-xs text-gray-400">사용 내역 없음</span>
+                                : emp.by_year.map(({ year, used: u }) => (
+                                  <span key={year} className="text-xs">
+                                    <span className="text-gray-400">{year}년</span>
+                                    <span className="ml-1 font-semibold text-gray-700">{u}일</span>
+                                  </span>
+                                ))
+                              }
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  )
+                })}
+                {historyYear && (
+                  <tr className="bg-gray-50/60 border-t border-gray-100 text-sm font-semibold text-gray-700">
+                    <td className="px-4 py-2.5" colSpan={2}>합계</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-orange-600">
+                      {Math.round(employees.reduce((s, e) => s + historyUsed(e), 0) * 10) / 10}일
+                    </td>
+                    <td className="px-4 py-2.5" />
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* 개인별 */}
+        {historyTab === 'individual' && (
+          <div className="p-4 space-y-4">
+            <select value={historyEmpId} onChange={e => setHistoryEmpId(e.target.value)}
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white">
+              <option value="">직원을 선택하세요</option>
+              {employees.map(e => <option key={e.id} value={e.id}>{e.name} ({e.email})</option>)}
+            </select>
+
+            {historySelectedEmp && (
+              <>
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { label: '보유연차', value: historySelectedEmp.annual_leave_days, color: 'text-gray-900' },
+                    { label: historyYear ? `${historyYear}년 사용` : '총 사용연차', value: historyUsed(historySelectedEmp), color: 'text-orange-500' },
+                    { label: '잔여연차', value: historySelectedEmp.remaining_leaves, color: 'text-green-600' },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} className="bg-gray-50 rounded-xl p-3 text-center">
+                      <p className="text-xs text-gray-400 mb-1">{label}</p>
+                      <p className={`text-xl font-bold ${color}`}>{value}<span className="text-xs font-normal text-gray-400 ml-0.5">일</span></p>
+                    </div>
+                  ))}
+                </div>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-xs text-gray-400 border-y border-gray-50 text-left bg-gray-50/60">
+                      <th className="px-3 py-2">연도</th>
+                      <th className="px-3 py-2 text-right">사용연차</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {historySelectedEmp.by_year.length === 0
+                      ? <tr><td colSpan={2} className="px-3 py-6 text-xs text-gray-400 text-center">사용 내역이 없습니다.</td></tr>
+                      : historySelectedEmp.by_year.map(({ year, used }) => (
+                        <tr key={year} className={`hover:bg-gray-50/50 ${historyYear === year ? 'bg-primary/5' : ''}`}>
+                          <td className="px-3 py-2.5 font-medium text-gray-800">
+                            {year}년{historyYear === year && <span className="ml-2 text-xs text-primary">선택됨</span>}
+                          </td>
+                          <td className="px-3 py-2.5 text-right tabular-nums font-medium text-orange-500">{used}일</td>
+                        </tr>
+                      ))
+                    }
+                    <tr className="bg-gray-50/60 border-t border-gray-100 font-semibold text-gray-700">
+                      <td className="px-3 py-2.5">합계</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums">{historySelectedEmp.total_used}일</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </>
+            )}
+          </div>
         )}
       </div>
 
