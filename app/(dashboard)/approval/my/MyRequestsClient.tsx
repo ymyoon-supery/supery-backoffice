@@ -143,12 +143,10 @@ export default function MyRequestsClient({
 }: Props) {
   const [selectedExpense, setSelectedExpense] = useState<ExpenseViewData | null>(null)
   const [expandedSupplyId, setExpandedSupplyId] = useState<string | null>(null)
-  const [activeTab] = useState<Tab>(() => {
-    const validTabs: Tab[] = ['all', 'leave', 'expense', 'document', 'supply']
-    if (validTabs.includes(catTab as Tab) && catTab !== 'all') return catTab as Tab
-    if (expenseType || month || dateFrom || dateTo || keyword) return 'expense'
-    return 'all'
-  })
+  const validTabs: Tab[] = ['all', 'leave', 'expense', 'document', 'supply']
+  const activeTab: Tab = validTabs.includes(catTab as Tab) && catTab !== 'all'
+    ? catTab as Tab
+    : (expenseType || month || dateFrom || dateTo || keyword) ? 'expense' : 'all'
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
