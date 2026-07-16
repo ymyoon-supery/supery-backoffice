@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 
 type YearSummary = { year: number; used: number }
@@ -21,12 +21,57 @@ export default function LeaveHistoryClient({ employees }: { employees: EmployeeS
   const [tab, setTab] = useState<'all' | 'individual'>('all')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState('')
+  const [selectedYear, setSelectedYear] = useState<number | null>(null)
+
+  // 데이터에서 연도 목록 추출
+  const years = useMemo(() =>
+    Array.from(new Set(employees.flatMap(e => e.by_year.map(b => b.year))))
+      .sort((a, b) => b - a),
+    [employees],
+  )
 
   const selectedEmp = employees.find(e => e.id === selectedId)
 
+  function displayUsed(emp: EmployeeSummary) {
+    if (!selectedYear) return emp.total_used
+    return emp.by_year.find(b => b.year === selectedYear)?.used ?? 0
+  }
+
+  const usedLabel = selectedYear ? `${selectedYear}년 사용` : '총 사용'
+
   return (
     <div className="space-y-4">
-      {/* 탭 */}
+      {/* 연도 필터 */}
+      {years.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-gray-400 mr-1">연도</span>
+          <button
+            onClick={() => setSelectedYear(null)}
+            className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+              !selectedYear
+                ? 'bg-gray-800 text-white border-gray-800'
+                : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+            }`}
+          >
+            전체
+          </button>
+          {years.map(y => (
+            <button
+              key={y}
+              onClick={() => setSelectedYear(y)}
+              className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                selectedYear === y
+                  ? 'bg-primary text-white border-primary'
+                  : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              {y}년
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* 전체직원 / 개인별 탭 */}
       <div className="flex gap-2">
         {(['all', 'individual'] as const).map(t => (
           <button
@@ -55,80 +100,90 @@ export default function LeaveHistoryClient({ employees }: { employees: EmployeeS
                   <th className="px-4 py-3">직원</th>
                   <th className="px-4 py-3">입사일</th>
                   <th className="px-4 py-3 text-right">보유연차</th>
-                  <th className="px-4 py-3 text-right">총 사용</th>
+                  <th className="px-4 py-3 text-right">{usedLabel}</th>
                   <th className="px-4 py-3 text-right">잔여</th>
-                  <th className="px-4 py-3 w-8"></th>
+                  {!selectedYear && <th className="px-4 py-3 w-8"></th>}
                 </tr>
               </thead>
               <tbody>
-                {employees.map(emp => (
-                  <tr
-                    key={emp.id}
-                    className={`border-b border-gray-50 last:border-0 transition-colors ${
-                      expandedId === emp.id ? 'bg-blue-50/30' : 'hover:bg-gray-50/50'
-                    }`}
-                  >
-                    <td
-                      colSpan={6}
-                      className="p-0 cursor-pointer"
-                      onClick={() => setExpandedId(expandedId === emp.id ? null : emp.id)}
+                {employees.map(emp => {
+                  const used = displayUsed(emp)
+                  const isExpanded = expandedId === emp.id
+
+                  return (
+                    <tr
+                      key={emp.id}
+                      className={`border-b border-gray-50 last:border-0 ${
+                        isExpanded ? 'bg-blue-50/30' : 'hover:bg-gray-50/50'
+                      } ${!selectedYear ? 'cursor-pointer' : ''}`}
+                      onClick={() => {
+                        if (!selectedYear) setExpandedId(isExpanded ? null : emp.id)
+                      }}
                     >
-                      <table className="w-full text-sm">
-                        <tbody>
-                          <tr>
-                            <td className="px-4 py-3 w-32">
-                              <span className="font-medium text-gray-900">{emp.name}</span>
-                              {emp.under_one_year && (
-                                <span className="ml-1.5 text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full">
-                                  1년 미만
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-gray-400 text-xs w-32">
-                              {emp.hired_at ? emp.hired_at.replace(/-/g, '.') : '—'}
-                            </td>
-                            <td className="px-4 py-3 text-right tabular-nums w-24 text-gray-700">
-                              {emp.annual_leave_days}일
-                            </td>
-                            <td className="px-4 py-3 text-right tabular-nums w-24 font-medium text-orange-500">
-                              {emp.total_used}일
-                            </td>
-                            <td className="px-4 py-3 text-right tabular-nums w-24 font-medium text-green-600">
-                              {emp.remaining_leaves}일
-                            </td>
-                            <td className="px-4 py-3 text-gray-300 w-8 text-right pr-4">
-                              {expandedId === emp.id
-                                ? <ChevronUp size={14} />
-                                : <ChevronDown size={14} />}
-                            </td>
-                          </tr>
-                          {expandedId === emp.id && (
-                            <tr>
-                              <td colSpan={6} className="px-6 pb-3 pt-0">
-                                {emp.by_year.length === 0 ? (
-                                  <span className="text-xs text-gray-400">사용 내역 없음</span>
-                                ) : (
-                                  <div className="flex items-center gap-4 flex-wrap">
-                                    <span className="text-xs text-gray-400">연도별</span>
-                                    {emp.by_year.map(({ year, used }) => (
-                                      <span key={year} className="text-xs">
-                                        <span className="text-gray-400">{year}년</span>
-                                        <span className="ml-1 font-semibold text-gray-700">{used}일</span>
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
+                      <td className="px-4 py-3">
+                        <span className="font-medium text-gray-900">{emp.name}</span>
+                        {emp.under_one_year && (
+                          <span className="ml-1.5 text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full">
+                            1년 미만
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-gray-400 text-xs">
+                        {emp.hired_at ? emp.hired_at.replace(/-/g, '.') : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums text-gray-700">
+                        {emp.annual_leave_days}일
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums font-medium text-orange-500">
+                        {used}일
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums font-medium text-green-600">
+                        {emp.remaining_leaves}일
+                      </td>
+                      {!selectedYear && (
+                        <td className="px-4 py-3 text-gray-300 text-right pr-4">
+                          {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </td>
+                      )}
+                    </tr>
+                  )
+                })}
+                {/* 연도 선택 시 합계 행 */}
+                {selectedYear && (
+                  <tr className="bg-gray-50/60 border-t border-gray-100 font-semibold text-gray-700 text-sm">
+                    <td className="px-4 py-3" colSpan={3}>합계</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-orange-600">
+                      {Math.round(employees.reduce((s, e) => s + displayUsed(e), 0) * 10) / 10}일
                     </td>
+                    <td className="px-4 py-3" />
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           )}
+
+          {/* 펼침 상세 (전체 연도 모드에서만) */}
+          {!selectedYear && expandedId && (() => {
+            const emp = employees.find(e => e.id === expandedId)
+            if (!emp) return null
+            return (
+              <div className="px-6 py-3 bg-blue-50/30 border-t border-blue-100/60">
+                {emp.by_year.length === 0 ? (
+                  <span className="text-xs text-gray-400">사용 내역 없음</span>
+                ) : (
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <span className="text-xs text-gray-400">연도별</span>
+                    {emp.by_year.map(({ year, used }) => (
+                      <span key={year} className="text-xs">
+                        <span className="text-gray-400">{year}년</span>
+                        <span className="ml-1 font-semibold text-gray-700">{used}일</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
         </div>
       )}
 
@@ -165,12 +220,12 @@ export default function LeaveHistoryClient({ employees }: { employees: EmployeeS
                   )}
                 </div>
                 <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
-                  <p className="text-xs text-gray-400 mb-1">총 사용연차</p>
+                  <p className="text-xs text-gray-400 mb-1">{usedLabel}</p>
                   <p className="text-2xl font-bold text-orange-500">
-                    {selectedEmp.total_used}
+                    {displayUsed(selectedEmp)}
                     <span className="text-sm font-normal text-gray-400 ml-1">일</span>
                   </p>
-                  {selectedEmp.under_one_year && (
+                  {selectedEmp.under_one_year && !selectedYear && (
                     <p className="text-xs text-amber-500 mt-1">입사 이후 누적</p>
                   )}
                 </div>
@@ -205,8 +260,18 @@ export default function LeaveHistoryClient({ employees }: { employees: EmployeeS
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {selectedEmp.by_year.map(({ year, used }) => (
-                        <tr key={year} className="text-gray-700 hover:bg-gray-50/50">
-                          <td className="px-4 py-3 font-medium">{year}년</td>
+                        <tr
+                          key={year}
+                          className={`text-gray-700 hover:bg-gray-50/50 ${
+                            selectedYear === year ? 'bg-primary/5' : ''
+                          }`}
+                        >
+                          <td className="px-4 py-3 font-medium">
+                            {year}년
+                            {selectedYear === year && (
+                              <span className="ml-2 text-xs text-primary">선택됨</span>
+                            )}
+                          </td>
                           <td className="px-4 py-3 text-right tabular-nums font-medium text-orange-500">
                             {used}일
                           </td>
