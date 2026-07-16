@@ -21,14 +21,15 @@ interface Props {
   employeeName: string
   employeePosition: string
   departmentName: string
+  allowedTabs?: ActiveTab[]
 }
 
 const TABS: { id: ActiveTab; label: string }[] = [
   { id: 'EXPENSE',         label: '지출결의서' },
   { id: 'CORPORATE_CARD',  label: '법인카드' },
   { id: 'TRANSPORTATION',  label: '교통비' },
-  { id: 'BUSINESS_INCOME', label: '사업소득' },
-  { id: 'PRIZE',           label: '경품비' },
+  { id: 'BUSINESS_INCOME', label: '사업소득(프리랜서 등)' },
+  { id: 'PRIZE',           label: '기타소득(경품비 직접지급)' },
 ]
 
 const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
@@ -1591,8 +1592,10 @@ const TAB_TITLES: Record<ActiveTab, string> = {
 }
 
 export default function ExpenseForm(props: Props) {
+  const { allowedTabs, ...tabProps } = props
+  const visibleTabs = allowedTabs ? TABS.filter(t => allowedTabs.includes(t.id)) : TABS
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<ActiveTab>('EXPENSE')
+  const [activeTab, setActiveTab] = useState<ActiveTab>(visibleTabs[0]?.id ?? 'EXPENSE')
 
   function onSuccess() {
     router.push('/approval/my')
@@ -1600,14 +1603,9 @@ export default function ExpenseForm(props: Props) {
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      {/* 문서 제목 */}
-      <div className="bg-gray-50 border-b border-gray-200 px-6 py-4 text-center">
-        <h2 className="text-base font-bold text-gray-800 tracking-widest">{TAB_TITLES[activeTab]}</h2>
-      </div>
-
       {/* 탭 */}
       <div className="flex border-b border-gray-200">
-        {TABS.map((tab, idx) => (
+        {visibleTabs.map((tab, idx) => (
           <button
             key={tab.id}
             type="button"
@@ -1635,12 +1633,17 @@ export default function ExpenseForm(props: Props) {
         ))}
       </div>
 
+      {/* 소타이틀 */}
+      <div className="px-6 py-3 border-b border-gray-100 bg-gray-50/40">
+        <p className="text-sm font-medium text-gray-600">{TAB_TITLES[activeTab]} 작성</p>
+      </div>
+
       {/* 탭 콘텐츠 */}
-      {activeTab === 'EXPENSE' && <ExpenseTab {...props} onSuccess={onSuccess} />}
-      {activeTab === 'CORPORATE_CARD' && <CorporateCardTab {...props} onSuccess={onSuccess} />}
-      {activeTab === 'TRANSPORTATION' && <TransportationTab {...props} onSuccess={onSuccess} />}
-      {activeTab === 'BUSINESS_INCOME' && <BusinessIncomeTab {...props} onSuccess={onSuccess} />}
-      {activeTab === 'PRIZE' && <PrizeTab {...props} onSuccess={onSuccess} />}
+      {activeTab === 'EXPENSE' && <ExpenseTab {...tabProps} onSuccess={onSuccess} />}
+      {activeTab === 'CORPORATE_CARD' && <CorporateCardTab {...tabProps} onSuccess={onSuccess} />}
+      {activeTab === 'TRANSPORTATION' && <TransportationTab {...tabProps} onSuccess={onSuccess} />}
+      {activeTab === 'BUSINESS_INCOME' && <BusinessIncomeTab {...tabProps} onSuccess={onSuccess} />}
+      {activeTab === 'PRIZE' && <PrizeTab {...tabProps} onSuccess={onSuccess} />}
     </div>
   )
 }

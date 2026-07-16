@@ -3,7 +3,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import ExpenseForm from '@/components/approval/ExpenseForm'
 
-export default async function NewExpensePage() {
+export default async function NewPersonalPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -33,13 +33,13 @@ export default async function NewExpensePage() {
 
   return (
     <div className="max-w-4xl">
-      <h1 className="text-xl font-semibold text-gray-900 mb-6">지출결의</h1>
+      <h1 className="text-xl font-semibold text-gray-900 mb-6">개인정산</h1>
       <ExpenseForm
         employeeId={employee.id}
         employeeName={employee.name}
         employeePosition={employee.position ?? ''}
         departmentName={deptName}
-        allowedTabs={['EXPENSE', 'BUSINESS_INCOME', 'PRIZE']}
+        allowedTabs={['CORPORATE_CARD', 'TRANSPORTATION']}
       />
     </div>
   )

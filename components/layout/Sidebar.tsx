@@ -114,6 +114,7 @@ export default function Sidebar({
       label: '신청/결재',
       items: [
         { href: '/approval/expense/new', label: '지출결의', icon: FileText, exact: true },
+        { href: '/approval/personal/new', label: '개인정산', icon: FileText, exact: true },
         { href: '/documents', label: '서류/비품 신청', icon: Package, exact: false },
         { href: '/approval/my', label: '내 신청 내역', icon: Inbox, exact: false },
         ...((isTeamLead || isSupplyManager) && !isAdmin
