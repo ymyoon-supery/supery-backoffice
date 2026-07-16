@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import MyRequestsClient from './MyRequestsClient'
 
+export const dynamic = 'force-dynamic'
+
 const LEAVE_LABELS: Record<string, string> = {
   ANNUAL: '연차', HALF_DAY: '반차', AM_HALF: '오전반차', PM_HALF: '오후반차',
   SICK: '병가(무급)', GROUP: '공동연차', COMP: '보상휴가', OTHER: '기타',

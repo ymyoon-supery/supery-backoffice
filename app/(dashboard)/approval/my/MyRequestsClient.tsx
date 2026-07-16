@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { format } from 'date-fns'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import ExpenseDetailModal from '@/components/approval/ExpenseDetailModal'
@@ -292,9 +293,9 @@ export default function MyRequestsClient({
           const isActive = activeTab === t.id
           const alerts = tabAlerts[t.id]
           return (
-            <button
+            <Link
               key={t.id}
-              onClick={() => router.push(buildTabUrl(t.id))}
+              href={buildTabUrl(t.id)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 isActive
                   ? 'bg-primary text-white'
@@ -316,7 +317,7 @@ export default function MyRequestsClient({
                   대기 {alerts.pending}
                 </span>
               )}
-            </button>
+            </Link>
           )
         })}
       </div>
@@ -326,9 +327,9 @@ export default function MyRequestsClient({
         {STATUS_FILTERS.map(f => {
           const isActive = statusFilter === f.id
           return (
-            <button
+            <Link
               key={f.id}
-              onClick={() => router.push(buildStatusUrl(f.id))}
+              href={buildStatusUrl(f.id)}
               className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                 isActive
                   ? f.id === 'rejected' ? 'bg-red-500 text-white'
@@ -342,7 +343,7 @@ export default function MyRequestsClient({
               }`}
             >
               {f.label}
-            </button>
+            </Link>
           )
         })}
       </div>
