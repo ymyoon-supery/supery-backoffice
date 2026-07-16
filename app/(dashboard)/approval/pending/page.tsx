@@ -239,11 +239,7 @@ export default async function PendingApprovalsPage({
     })
   }
 
-  doneItems.sort((a, b) => {
-    const da = a.actedAt ? new Date(a.actedAt).getTime() : 0
-    const db = b.actedAt ? new Date(b.actedAt).getTime() : 0
-    return db - da
-  })
+  doneItems.sort((a, b) => new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime())
 
   const totalPages = Math.max(1, Math.ceil(doneItems.length / PAGE_SIZE))
   const offset = (page - 1) * PAGE_SIZE
