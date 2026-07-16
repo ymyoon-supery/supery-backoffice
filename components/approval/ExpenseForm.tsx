@@ -324,9 +324,9 @@ function ExpenseTab({
     if (!initialData?.lineItems?.length) return [{ item: '', date: today, amountRaw: '', vatType: 'EXCLUSIVE', note: '' }]
     return initialData.lineItems.map(li => {
       const n = li.note ?? ''
-      const excMatch = n.match(/^공급가액\s+[\d,]+원\s*\+\s*부가세\s+[\d,]+원(?:\s*\/\s*(.*))?$/)
+      const excMatch = n.match(/^공급가액\s+([\d,]+)원\s*\+\s*부가세\s+[\d,]+원(?:\s*\/\s*(.*))?$/)
       const incMatch = n.match(/^부가세포함\s*\(공급가액\s+[\d,]+원\)(?:\s*\/\s*(.*))?$/)
-      if (excMatch) return { item: li.item, date: li.date, amountRaw: li.amount ? li.amount.toLocaleString('ko-KR') : '', vatType: 'EXCLUSIVE' as const, note: excMatch[1] ?? '' }
+      if (excMatch) return { item: li.item, date: li.date, amountRaw: excMatch[1], vatType: 'EXCLUSIVE' as const, note: excMatch[2] ?? '' }
       if (incMatch) return { item: li.item, date: li.date, amountRaw: li.amount ? li.amount.toLocaleString('ko-KR') : '', vatType: 'INCLUSIVE' as const, note: incMatch[1] ?? '' }
       return { item: li.item, date: li.date, amountRaw: li.amount ? li.amount.toLocaleString('ko-KR') : '', vatType: 'EXCLUSIVE' as const, note: n }
     })
