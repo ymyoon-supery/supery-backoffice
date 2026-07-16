@@ -16,12 +16,30 @@ import { Plus, Trash2, Paperclip, X, FileSpreadsheet } from 'lucide-react'
 type ActiveTab = 'EXPENSE' | 'CORPORATE_CARD' | 'TRANSPORTATION' | 'BUSINESS_INCOME' | 'PRIZE'
 type PaymentMethod = 'CASH' | 'CARD' | 'TRANSFER'
 
+export interface ExpenseInitialData {
+  id: string
+  expenseType: string
+  title: string | null
+  taxType: string | null
+  evidenceType: string | null
+  payee: string | null
+  paymentMethod: string | null
+  bankName: string | null
+  accountNumber: string | null
+  accountHolder: string | null
+  paymentRequestDate: string | null
+  settlementDate: string | null
+  lineItems: Array<{ item: string; date: string; amount?: number; note?: string; userName?: string }> | null
+  attachmentUrls: string[] | null
+}
+
 interface Props {
   employeeId: string
   employeeName: string
   employeePosition: string
   departmentName: string
   allowedTabs?: ActiveTab[]
+  initialData?: ExpenseInitialData | null
 }
 
 const TABS: { id: ActiveTab; label: string }[] = [
@@ -290,18 +308,29 @@ function ExpenseTab({
   employeePosition,
   departmentName,
   onSuccess,
-}: Props & { onSuccess: () => void }) {
+  initialData,
+}: Props & { onSuccess: () => void; initialData?: ExpenseInitialData | null }) {
   const [isPending, startTransition] = useTransition()
-  const [title, setTitle] = useState('')
-  const [evidenceType, setEvidenceType] = useState('')
-  const [payee, setPayee] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('TRANSFER')
-  const [bankName, setBankName] = useState('')
-  const [accountNumber, setAccountNumber] = useState('')
-  const [accountHolder, setAccountHolder] = useState('')
-  const [paymentRequestDate, setPaymentRequestDate] = useState(today)
-  const [settlementDate, setSettlementDate] = useState('')
-  const [lineItems, setLineItems] = useState<ExpenseRow[]>([{ item: '', date: today, amountRaw: '', vatType: 'EXCLUSIVE', note: '' }])
+  const [title, setTitle] = useState(initialData?.title ?? '')
+  const [evidenceType, setEvidenceType] = useState(initialData?.evidenceType ?? '')
+  const [payee, setPayee] = useState(initialData?.payee ?? '')
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>((initialData?.paymentMethod as PaymentMethod) ?? 'TRANSFER')
+  const [bankName, setBankName] = useState(initialData?.bankName ?? '')
+  const [accountNumber, setAccountNumber] = useState(initialData?.accountNumber ?? '')
+  const [accountHolder, setAccountHolder] = useState(initialData?.accountHolder ?? '')
+  const [paymentRequestDate, setPaymentRequestDate] = useState(initialData?.paymentRequestDate ?? today)
+  const [settlementDate, setSettlementDate] = useState(initialData?.settlementDate ?? '')
+  const [lineItems, setLineItems] = useState<ExpenseRow[]>(() => {
+    if (!initialData?.lineItems?.length) return [{ item: '', date: today, amountRaw: '', vatType: 'EXCLUSIVE', note: '' }]
+    return initialData.lineItems.map(li => {
+      const n = li.note ?? ''
+      const excMatch = n.match(/^공급가액\s+[\d,]+원\s*\+\s*부가세\s+[\d,]+원(?:\s*\/\s*(.*))?$/)
+      const incMatch = n.match(/^부가세포함\s*\(공급가액\s+[\d,]+원\)(?:\s*\/\s*(.*))?$/)
+      if (excMatch) return { item: li.item, date: li.date, amountRaw: li.amount ? li.amount.toLocaleString('ko-KR') : '', vatType: 'EXCLUSIVE' as const, note: excMatch[1] ?? '' }
+      if (incMatch) return { item: li.item, date: li.date, amountRaw: li.amount ? li.amount.toLocaleString('ko-KR') : '', vatType: 'INCLUSIVE' as const, note: incMatch[1] ?? '' }
+      return { item: li.item, date: li.date, amountRaw: li.amount ? li.amount.toLocaleString('ko-KR') : '', vatType: 'EXCLUSIVE' as const, note: n }
+    })
+  })
   const [attachments, setAttachments] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
 
@@ -615,11 +644,16 @@ function CorporateCardTab({
   employeePosition,
   departmentName,
   onSuccess,
-}: Props & { onSuccess: () => void }) {
+  initialData,
+}: Props & { onSuccess: () => void; initialData?: ExpenseInitialData | null }) {
   const [isPending, startTransition] = useTransition()
-  const [lineItems, setLineItems] = useState<CardLineItem[]>([
-    { cardLastFour: '', userName: employeeName, usageDate: today, merchantName: '', amountRaw: '', description: '', note: '' },
-  ])
+  const [lineItems, setLineItems] = useState<CardLineItem[]>(() => {
+    if (!initialData?.lineItems?.length) return [{ cardLastFour: '', userName: employeeName, usageDate: today, merchantName: '', amountRaw: '', description: '', note: '' }]
+    return initialData.lineItems.map(li => {
+      const parts = li.item.split(' — ')
+      return { cardLastFour: '', userName: li.userName ?? employeeName, usageDate: li.date, merchantName: parts[0] ?? '', amountRaw: li.amount ? li.amount.toLocaleString('ko-KR') : '', description: parts.slice(1).join(' — '), note: li.note ?? '' }
+    })
+  })
   const [attachments, setAttachments] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
   const [parsing, setParsing] = useState(false)
@@ -869,11 +903,13 @@ function TransportationTab({
   employeePosition,
   departmentName,
   onSuccess,
-}: Props & { onSuccess: () => void }) {
+  initialData,
+}: Props & { onSuccess: () => void; initialData?: ExpenseInitialData | null }) {
   const [isPending, startTransition] = useTransition()
-  const [lineItems, setLineItems] = useState<TransportLineItem[]>([
-    { usageDate: today, amountRaw: '', description: '', note: '' },
-  ])
+  const [lineItems, setLineItems] = useState<TransportLineItem[]>(() => {
+    if (!initialData?.lineItems?.length) return [{ usageDate: today, amountRaw: '', description: '', note: '' }]
+    return initialData.lineItems.map(li => ({ usageDate: li.date, amountRaw: li.amount ? li.amount.toLocaleString('ko-KR') : '', description: li.item, note: li.note ?? '' }))
+  })
   const [attachments, setAttachments] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
 
@@ -1592,10 +1628,13 @@ const TAB_TITLES: Record<ActiveTab, string> = {
 }
 
 export default function ExpenseForm(props: Props) {
-  const { allowedTabs, ...tabProps } = props
+  const { allowedTabs, initialData, ...tabProps } = props
   const visibleTabs = allowedTabs ? TABS.filter(t => allowedTabs.includes(t.id)) : TABS
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<ActiveTab>(visibleTabs[0]?.id ?? 'EXPENSE')
+  const initialTab = initialData?.expenseType
+    ? (visibleTabs.find(t => t.id === initialData.expenseType)?.id ?? visibleTabs[0]?.id ?? 'EXPENSE')
+    : (visibleTabs[0]?.id ?? 'EXPENSE')
+  const [activeTab, setActiveTab] = useState<ActiveTab>(initialTab)
 
   function onSuccess() {
     router.push('/approval/my')
@@ -1639,9 +1678,9 @@ export default function ExpenseForm(props: Props) {
       </div>
 
       {/* 탭 콘텐츠 */}
-      {activeTab === 'EXPENSE' && <ExpenseTab {...tabProps} onSuccess={onSuccess} />}
-      {activeTab === 'CORPORATE_CARD' && <CorporateCardTab {...tabProps} onSuccess={onSuccess} />}
-      {activeTab === 'TRANSPORTATION' && <TransportationTab {...tabProps} onSuccess={onSuccess} />}
+      {activeTab === 'EXPENSE' && <ExpenseTab {...tabProps} initialData={initialData} onSuccess={onSuccess} />}
+      {activeTab === 'CORPORATE_CARD' && <CorporateCardTab {...tabProps} initialData={initialData} onSuccess={onSuccess} />}
+      {activeTab === 'TRANSPORTATION' && <TransportationTab {...tabProps} initialData={initialData} onSuccess={onSuccess} />}
       {activeTab === 'BUSINESS_INCOME' && <BusinessIncomeTab {...tabProps} onSuccess={onSuccess} />}
       {activeTab === 'PRIZE' && <PrizeTab {...tabProps} onSuccess={onSuccess} />}
     </div>
