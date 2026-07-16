@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
-import { calcAnnualLeave } from '@/lib/annualLeave'
+import { calcAnnualLeave, isUnderOneYear } from '@/lib/annualLeave'
 import LeavePromotionClient from './LeavePromotionClient'
 import EmploymentTabs from '@/components/admin/EmploymentTabs'
 
@@ -25,7 +25,8 @@ export default async function LeavePromotionPage({
   const year = parseInt(params.year ?? String(new Date().getFullYear()))
   const employment = params.employment === 'resigned' ? 'resigned' : 'active'
 
-  const yearStart = `${new Date().getFullYear()}-01-01`
+  const today = new Date()
+  const yearStart = `${today.getFullYear()}-01-01`
 
   function tabHref(status: string) {
     const p = new URLSearchParams({ year: String(year), employment: status })
@@ -45,26 +46,32 @@ export default async function LeavePromotionPage({
     supabase.from('departments').select('id, name, group_id'),
     supabase.from('groups').select('id, name'),
     admin.from('leave_requests')
-      .select('employee_id, leave_type, days_used')
+      .select('employee_id, days_used, start_date')
       .eq('status', 'APPROVED')
-      .in('leave_type', DEDUCTS)
-      .gte('start_date', yearStart),
+      .in('leave_type', DEDUCTS),
   ])
 
-  const today = new Date()
-  const usedByEmp: Record<string, number> = {}
+  const usedAllTime: Record<string, number> = {}
+  const usedThisYear: Record<string, number> = {}
   for (const r of usedTotals ?? []) {
-    usedByEmp[r.employee_id] = (usedByEmp[r.employee_id] ?? 0) + Number(r.days_used)
+    usedAllTime[r.employee_id] = (usedAllTime[r.employee_id] ?? 0) + Number(r.days_used)
+    if (r.start_date >= yearStart) {
+      usedThisYear[r.employee_id] = (usedThisYear[r.employee_id] ?? 0) + Number(r.days_used)
+    }
   }
 
   const employees = (rawEmployees ?? []).map(e => {
-    const entitlement = e.hired_at
-      ? calcAnnualLeave(new Date(e.hired_at), today)
+    const hiredAt = e.hired_at ? new Date(e.hired_at) : null
+    const entitlement = hiredAt
+      ? calcAnnualLeave(hiredAt, today)
       : (e.annual_leave_days ?? 15)
+    const used = hiredAt && isUnderOneYear(hiredAt, today)
+      ? (usedAllTime[e.id] ?? 0)
+      : (usedThisYear[e.id] ?? 0)
     return {
       ...e,
       annual_leave_days: entitlement,
-      remaining_leaves: Math.max(Math.round((entitlement - (usedByEmp[e.id] ?? 0)) * 10) / 10, 0),
+      remaining_leaves: Math.max(Math.round((entitlement - used) * 10) / 10, 0),
     }
   })
 

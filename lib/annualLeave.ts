@@ -32,6 +32,12 @@ export function calcAnnualLeave(hiredAt: Date, asOf: Date = new Date()): number 
   return Math.min(15 + Math.floor((fullYears - 1) / 2), 25)
 }
 
+/** 입사 1년 미만 여부 — 1년 미만이면 연차 소진 기산일이 입사일 기준이므로 별도 처리 필요 */
+export function isUnderOneYear(hiredAt: Date, asOf: Date = new Date()): boolean {
+  const anniversary = new Date(hiredAt.getFullYear() + 1, hiredAt.getMonth(), hiredAt.getDate())
+  return anniversary > asOf
+}
+
 /** 연차사용촉진제도 법정 일정 (근로기준법 제61조) */
 export function legalSchedule(year: number) {
   return {

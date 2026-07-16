@@ -1,6 +1,6 @@
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import EmployeesClient from './EmployeesClient'
-import { calcAnnualLeave } from '@/lib/annualLeave'
+import { calcAnnualLeave, isUnderOneYear } from '@/lib/annualLeave'
 
 const DEDUCTS = ['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF', 'GROUP']
 
@@ -10,7 +10,8 @@ export default async function EmployeesSettingsPage() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   )
 
-  const yearStart = `${new Date().getFullYear()}-01-01`
+  const today = new Date()
+  const yearStart = `${today.getFullYear()}-01-01`
 
   const [{ data: rawEmployees }, { data: groups }, { data: teams }, { data: usedTotals }] = await Promise.all([
     supabase
@@ -21,26 +22,32 @@ export default async function EmployeesSettingsPage() {
     supabase.from('departments').select('id, name, group_id').order('name'),
     supabase
       .from('leave_requests')
-      .select('employee_id, days_used')
+      .select('employee_id, days_used, start_date')
       .eq('status', 'APPROVED')
-      .in('leave_type', DEDUCTS)
-      .gte('start_date', yearStart),
+      .in('leave_type', DEDUCTS),
   ])
 
-  const today = new Date()
-  const usedByEmp: Record<string, number> = {}
+  const usedAllTime: Record<string, number> = {}
+  const usedThisYear: Record<string, number> = {}
   for (const r of usedTotals ?? []) {
-    usedByEmp[r.employee_id] = (usedByEmp[r.employee_id] ?? 0) + Number(r.days_used)
+    usedAllTime[r.employee_id] = (usedAllTime[r.employee_id] ?? 0) + Number(r.days_used)
+    if (r.start_date >= yearStart) {
+      usedThisYear[r.employee_id] = (usedThisYear[r.employee_id] ?? 0) + Number(r.days_used)
+    }
   }
 
   const employees = (rawEmployees ?? []).map(e => {
-    const entitlement = e.hired_at
-      ? calcAnnualLeave(new Date(e.hired_at), today)
+    const hiredAt = e.hired_at ? new Date(e.hired_at) : null
+    const entitlement = hiredAt
+      ? calcAnnualLeave(hiredAt, today)
       : (e.annual_leave_days ?? 15)
+    const used = hiredAt && isUnderOneYear(hiredAt, today)
+      ? (usedAllTime[e.id] ?? 0)
+      : (usedThisYear[e.id] ?? 0)
     return {
       ...e,
       annual_leave_days: entitlement,
-      remaining_leaves: Math.max(Math.round((entitlement - (usedByEmp[e.id] ?? 0)) * 10) / 10, 0),
+      remaining_leaves: Math.max(Math.round((entitlement - used) * 10) / 10, 0),
     }
   })
 

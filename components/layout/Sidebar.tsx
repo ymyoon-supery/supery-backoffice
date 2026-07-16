@@ -31,6 +31,7 @@ const adminNavGroups = [
     label: '연차',
     items: [
       { href: '/admin/leave-manual', label: '연차관리', icon: FilePlus },
+      { href: '/admin/leave-history', label: '연차사용내역', icon: BarChart2 },
       { href: '/admin/leave-promotion', label: '연차사용촉진', icon: Bell },
     ],
   },

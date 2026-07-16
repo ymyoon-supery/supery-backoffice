@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
-import { calcAnnualLeave } from '@/lib/annualLeave'
+import { calcAnnualLeave, isUnderOneYear } from '@/lib/annualLeave'
 import LeaveManualClient from './LeaveManualClient'
 import EmploymentTabs from '@/components/admin/EmploymentTabs'
 
@@ -24,7 +24,8 @@ export default async function LeaveManualPage({
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   )
 
-  const yearStart = `${new Date().getFullYear()}-01-01`
+  const today = new Date()
+  const yearStart = `${today.getFullYear()}-01-01`
 
   const [{ data: rawEmployees }, { data: leaveRecords, error: leaveError }, { data: usedTotals }] = await Promise.all([
     admin.from('employees').select('id, name, email, hired_at, annual_leave_days, remaining_leaves').eq('is_active', employment === 'active').order('name'),
@@ -34,26 +35,34 @@ export default async function LeaveManualPage({
       .order('start_date', { ascending: false })
       .limit(500),
     admin.from('leave_requests')
-      .select('employee_id, leave_type, days_used')
+      .select('employee_id, days_used, start_date')
       .eq('status', 'APPROVED')
-      .in('leave_type', DEDUCTS)
-      .gte('start_date', yearStart),
+      .in('leave_type', DEDUCTS),
   ])
 
-  const today = new Date()
-  const usedByEmp: Record<string, number> = {}
+  // 직원별 전체/당해연도 사용 집계
+  const usedAllTime: Record<string, number> = {}
+  const usedThisYear: Record<string, number> = {}
   for (const r of usedTotals ?? []) {
-    usedByEmp[r.employee_id] = (usedByEmp[r.employee_id] ?? 0) + Number(r.days_used)
+    usedAllTime[r.employee_id] = (usedAllTime[r.employee_id] ?? 0) + Number(r.days_used)
+    if (r.start_date >= yearStart) {
+      usedThisYear[r.employee_id] = (usedThisYear[r.employee_id] ?? 0) + Number(r.days_used)
+    }
   }
 
   const employees = (rawEmployees ?? []).map(e => {
-    const entitlement = e.hired_at
-      ? calcAnnualLeave(new Date(e.hired_at), today)
+    const hiredAt = e.hired_at ? new Date(e.hired_at) : null
+    const entitlement = hiredAt
+      ? calcAnnualLeave(hiredAt, today)
       : (e.annual_leave_days ?? 15)
+    // 1년 미만: 입사 이후 누적 사용 / 1년 이상: 당해연도 사용
+    const used = hiredAt && isUnderOneYear(hiredAt, today)
+      ? (usedAllTime[e.id] ?? 0)
+      : (usedThisYear[e.id] ?? 0)
     return {
       ...e,
       annual_leave_days: entitlement,
-      remaining_leaves: Math.max(Math.round((entitlement - (usedByEmp[e.id] ?? 0)) * 10) / 10, 0),
+      remaining_leaves: Math.max(Math.round((entitlement - used) * 10) / 10, 0),
     }
   })
 
