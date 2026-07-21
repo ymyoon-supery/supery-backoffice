@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import PendingApprovalsClient from '@/components/approval/PendingApprovalsClient'
+
+export const dynamic = 'force-dynamic'
 import { calcAnnualLeave } from '@/lib/annualLeave'
 
 const DEDUCTS = ['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF', 'GROUP']
@@ -13,6 +15,20 @@ const LEAVE_LABELS: Record<string, string> = {
 
 export type PendingItem = { kind: 'leave' | 'expense' | 'supply'; step: unknown }
 
+export type DoneItemExpenseDetail = {
+  title: string; amount: number; expenseType: string | null
+  taxType: string | null; evidenceType: string | null; payee: string | null
+  paymentMethod: string | null; bankName: string | null; accountNumber: string | null
+  accountHolder: string | null; paymentRequestDate: string | null; settlementDate: string | null
+  lineItems: unknown[]; attachmentUrls: string[]; employeePosition: string | null
+  comment: string | null
+}
+
+export type DoneItemSupplyItem = {
+  id: string; category: string; description: string
+  estimated_amount: number | null; note: string | null; sort_order: number
+}
+
 export type DoneItem = {
   id: string
   kind: 'leave' | 'expense' | 'supply'
@@ -23,6 +39,9 @@ export type DoneItem = {
   actedAt: string | null
   status: 'APPROVED' | 'REJECTED'
   isJeongyeol: boolean
+  leaveReason?: string | null
+  expenseDetail?: DoneItemExpenseDetail | null
+  supplyItems?: DoneItemSupplyItem[] | null
 }
 
 export default async function PendingApprovalsPage({
@@ -166,17 +185,17 @@ export default async function PendingApprovalsPage({
   const [doneLeaveRes, doneExpenseRes, doneSupplyRes] = await Promise.all([
     wantLeave
       ? supabase.from('leave_approval_steps')
-          .select('id, acted_at, status, comment, leave_requests(id, leave_type, start_date, end_date, days_used, created_at, employees(name))')
+          .select('id, acted_at, status, comment, leave_requests(id, leave_type, start_date, end_date, days_used, reason, created_at, employees(name))')
           .eq('approver_id', employee.id).in('status', ['APPROVED', 'REJECTED']).order('acted_at', { ascending: false })
       : Promise.resolve({ data: [] as unknown[] }),
     wantExpense
       ? supabase.from('expense_approval_steps')
-          .select('id, acted_at, status, comment, expense_reports(id, title, amount, expense_type, created_at, line_items, employees(name))')
+          .select('id, acted_at, status, comment, expense_reports(id, title, amount, expense_type, created_at, tax_type, evidence_type, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls, employees(name, position))')
           .eq('approver_id', employee.id).in('status', ['APPROVED', 'REJECTED']).order('acted_at', { ascending: false })
       : Promise.resolve({ data: [] as unknown[] }),
     wantSupply
       ? supabase.from('supply_approval_steps')
-          .select('id, acted_at, status, comment, supply_requests(id, created_at, employees(name), supply_request_items(id))')
+          .select('id, acted_at, status, comment, supply_requests(id, created_at, employees(name), supply_request_items(id, category, description, estimated_amount, note, sort_order))')
           .eq('approver_id', employee.id).in('status', ['APPROVED', 'REJECTED']).order('acted_at', { ascending: false })
       : Promise.resolve({ data: [] as unknown[] }),
   ])
@@ -195,6 +214,7 @@ export default async function PendingApprovalsPage({
       detail: `${req.start_date}${req.start_date !== req.end_date ? ` ~ ${req.end_date}` : ''}`,
       requestDate: req.created_at, actedAt: step.acted_at,
       status: step.status, isJeongyeol: step.comment === '전결',
+      leaveReason: req.reason ?? null,
     })
   }
 
@@ -221,6 +241,17 @@ export default async function PendingApprovalsPage({
       detail: `${Number(rep.amount ?? 0).toLocaleString()}원`,
       requestDate: rep.created_at, actedAt: step.acted_at,
       status: step.status, isJeongyeol: step.comment === '전결',
+      expenseDetail: {
+        title: rep.title ?? '', amount: Number(rep.amount ?? 0),
+        expenseType: rep.expense_type ?? null, taxType: rep.tax_type ?? null,
+        evidenceType: rep.evidence_type ?? null, payee: rep.payee ?? null,
+        paymentMethod: rep.payment_method ?? null, bankName: rep.bank_name ?? null,
+        accountNumber: rep.account_number ?? null, accountHolder: rep.account_holder ?? null,
+        paymentRequestDate: rep.payment_request_date ?? null, settlementDate: rep.settlement_date ?? null,
+        lineItems: rep.line_items ?? [], attachmentUrls: rep.attachment_urls ?? [],
+        employeePosition: rep.employees?.position ?? null,
+        comment: step.status === 'REJECTED' ? (step.comment ?? null) : null,
+      },
     })
   }
 
@@ -236,6 +267,10 @@ export default async function PendingApprovalsPage({
       detail: `${req.supply_request_items?.length ?? 0}개 항목`,
       requestDate: req.created_at, actedAt: step.acted_at,
       status: step.status, isJeongyeol: step.comment === '전결',
+      supplyItems: (req.supply_request_items ?? []).map((i: { id: string; category: string; description: string; estimated_amount: number | null; note: string | null; sort_order: number }) => ({
+        id: i.id, category: i.category, description: i.description,
+        estimated_amount: i.estimated_amount, note: i.note, sort_order: i.sort_order,
+      })),
     })
   }
 

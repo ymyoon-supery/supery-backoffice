@@ -7,6 +7,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react'
 import { approveLeave } from '@/app/(dashboard)/approval/leave/actions'
 import { approveExpense } from '@/app/(dashboard)/approval/expense/actions'
 import { approveSupplyAction } from '@/app/(dashboard)/documents/actions'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import ExpenseDetailModal from '@/components/approval/ExpenseDetailModal'
 import type { ExpenseViewData } from '@/components/approval/ExpenseDetailView'
@@ -26,11 +27,26 @@ const STATUS_CFG: Record<string, { label: string; cls: string }> = {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type PendingItem = { kind: 'leave' | 'expense' | 'supply'; step: any }
+type DoneItemExpenseDetail = {
+  title: string; amount: number; expenseType: string | null
+  taxType: string | null; evidenceType: string | null; payee: string | null
+  paymentMethod: string | null; bankName: string | null; accountNumber: string | null
+  accountHolder: string | null; paymentRequestDate: string | null; settlementDate: string | null
+  lineItems: unknown[]; attachmentUrls: string[]; employeePosition: string | null
+  comment: string | null
+}
+type DoneItemSupplyItem = {
+  id: string; category: string; description: string
+  estimated_amount: number | null; note: string | null; sort_order: number
+}
 type DoneItem = {
   id: string; kind: 'leave' | 'expense' | 'supply'
   employeeName: string; typeLabel: string; detail: string
   requestDate: string; actedAt: string | null
   status: 'APPROVED' | 'REJECTED'; isJeongyeol: boolean
+  leaveReason?: string | null
+  expenseDetail?: DoneItemExpenseDetail | null
+  supplyItems?: DoneItemSupplyItem[] | null
 }
 
 interface Props {
@@ -62,6 +78,8 @@ export default function PendingApprovalsClient({
   const [selectedExpense, setSelectedExpense] = useState<{ step: any; viewData: ExpenseViewData } | null>(null)
   const [rejectingSupplyId, setRejectingSupplyId] = useState<string | null>(null)
   const [supplyRejectComment, setSupplyRejectComment] = useState('')
+  const [selectedDoneExpense, setSelectedDoneExpense] = useState<ExpenseViewData | null>(null)
+  const [expandedDoneId, setExpandedDoneId] = useState<string | null>(null)
 
   function buildUrl(overrides: Record<string, string>) {
     const base: Record<string, string> = { viewTab, type, page: String(page) }
@@ -170,30 +188,30 @@ export default function PendingApprovalsClient({
       {/* 미결재 / 결재완료 tabs */}
       <div className="flex gap-1">
         {VIEW_TABS.map(t => (
-          <button
+          <Link
             key={t.id}
-            onClick={() => router.push(buildUrl({ viewTab: t.id, page: '1' }))}
+            href={buildUrl({ viewTab: t.id, page: '1' })}
             className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
               viewTab === t.id ? 'bg-primary text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
             }`}
           >
             {t.label}
-          </button>
+          </Link>
         ))}
       </div>
 
       {/* Type sub-tabs */}
       <div className="flex gap-1 flex-wrap">
         {TYPE_TABS.map(t => (
-          <button
+          <Link
             key={t.id}
-            onClick={() => router.push(buildUrl({ type: t.id, page: '1' }))}
+            href={buildUrl({ type: t.id, page: '1' })}
             className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
               type === t.id ? 'bg-primary text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
             }`}
           >
             {t.label}
-          </button>
+          </Link>
         ))}
       </div>
 
@@ -400,26 +418,114 @@ export default function PendingApprovalsClient({
         <div className="space-y-2">
           {doneItems.map(item => {
             const cfg = STATUS_CFG[item.status]
+            const isExpanded = expandedDoneId === item.id
+            const hasDetail = item.kind === 'expense' ? !!item.expenseDetail : true
+            const sortedSupplyItems = [...(item.supplyItems ?? [])].sort((a, b) => a.sort_order - b.sort_order)
+
+            function handleDoneClick() {
+              if (item.kind === 'expense' && item.expenseDetail) {
+                const d = item.expenseDetail
+                setSelectedDoneExpense({
+                  id: item.id,
+                  title: d.title,
+                  taxType: d.taxType,
+                  evidenceType: d.evidenceType,
+                  payee: d.payee,
+                  paymentMethod: d.paymentMethod,
+                  bankName: d.bankName,
+                  accountNumber: d.accountNumber,
+                  accountHolder: d.accountHolder,
+                  paymentRequestDate: d.paymentRequestDate,
+                  settlementDate: d.settlementDate,
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  lineItems: d.lineItems as any[],
+                  attachmentUrls: d.attachmentUrls,
+                  employeeName: item.employeeName,
+                  employeePosition: d.employeePosition,
+                  departmentName: null,
+                  requestDate: item.requestDate,
+                  status: item.status,
+                  expenseType: d.expenseType,
+                  comment: d.comment,
+                })
+              } else if (item.kind === 'leave' || item.kind === 'supply') {
+                setExpandedDoneId(isExpanded ? null : item.id)
+              }
+            }
+
             return (
               <div
                 key={item.id}
-                className={`rounded-xl border px-5 py-4 flex items-center justify-between gap-3 ${
+                className={`rounded-xl border px-5 py-4 space-y-3 ${
                   item.isJeongyeol ? 'bg-orange-50 border-orange-200' : 'bg-white border-gray-100'
-                }`}
+                } ${hasDetail ? 'cursor-pointer hover:border-primary/30 hover:bg-primary/5 transition-colors' : ''}`}
+                onClick={handleDoneClick}
               >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-700">{item.employeeName} — {item.typeLabel}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{item.detail}</p>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-700">{item.employeeName} — {item.typeLabel}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {item.detail}
+                      {(item.kind === 'leave' || item.kind === 'supply') && hasDetail && (
+                        <span className="ml-2 text-primary">· {isExpanded ? '접기' : '상세보기'}</span>
+                      )}
+                      {item.kind === 'expense' && (
+                        <span className="ml-2 text-primary">· 클릭하여 상세보기</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    {item.isJeongyeol
+                      ? <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">전결</span>
+                      : <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cfg?.cls}`}>{cfg?.label}</span>
+                    }
+                    <p className="text-xs text-gray-400 mt-1">
+                      {item.actedAt ? format(new Date(item.actedAt), 'MM/dd HH:mm') : ''}
+                    </p>
+                  </div>
                 </div>
-                <div className="text-right shrink-0">
-                  {item.isJeongyeol
-                    ? <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">전결</span>
-                    : <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cfg?.cls}`}>{cfg?.label}</span>
-                  }
-                  <p className="text-xs text-gray-400 mt-1">
-                    {item.actedAt ? format(new Date(item.actedAt), 'MM/dd HH:mm') : ''}
-                  </p>
-                </div>
+
+                {/* Leave detail */}
+                {isExpanded && item.kind === 'leave' && (
+                  <div className="pt-1 border-t border-gray-100 text-xs text-gray-500 space-y-1">
+                    <p><span className="text-gray-400">기간</span> {item.detail}</p>
+                    {item.leaveReason && <p><span className="text-gray-400">사유</span> {item.leaveReason}</p>}
+                  </div>
+                )}
+
+                {/* Supply detail */}
+                {isExpanded && item.kind === 'supply' && sortedSupplyItems.length > 0 && (
+                  <div className="rounded-lg border border-gray-100 overflow-hidden">
+                    <table className="w-full text-xs table-fixed">
+                      <colgroup>
+                        <col style={{ width: '14%' }} />
+                        <col style={{ width: '38%' }} />
+                        <col style={{ width: '22%' }} />
+                        <col style={{ width: '26%' }} />
+                      </colgroup>
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="text-left px-3 py-2 text-gray-500 font-medium">구분</th>
+                          <th className="text-left px-3 py-2 text-gray-500 font-medium">내역</th>
+                          <th className="text-left px-3 py-2 text-gray-500 font-medium">예상금액</th>
+                          <th className="text-left px-3 py-2 text-gray-500 font-medium">비고</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {sortedSupplyItems.map(si => (
+                          <tr key={si.id}>
+                            <td className="px-3 py-2 text-gray-600">{CATEGORY_LABELS[si.category] ?? si.category}</td>
+                            <td className="px-3 py-2 text-gray-800 break-words">{si.description}</td>
+                            <td className="px-3 py-2 text-gray-600">
+                              {si.estimated_amount != null ? `${Number(si.estimated_amount).toLocaleString()}원` : '—'}
+                            </td>
+                            <td className="px-3 py-2 text-gray-400 break-words">{si.note ?? '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )
           })}
@@ -457,6 +563,13 @@ export default function PendingApprovalsClient({
           onApprove={() => handleExpenseApprove(selectedExpense.step.expense_reports?.id)}
           onReject={(reason) => handleExpenseReject(selectedExpense.step.expense_reports?.id, reason)}
           isPending={isPending}
+        />
+      )}
+
+      {selectedDoneExpense && (
+        <ExpenseDetailModal
+          data={selectedDoneExpense}
+          onClose={() => setSelectedDoneExpense(null)}
         />
       )}
     </div>
