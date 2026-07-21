@@ -11,10 +11,15 @@ const CATEGORY_LABELS: Record<string, string> = {
 }
 
 const SUPPLY_STATUS: Record<string, { label: string; className: string }> = {
-  PENDING:   { label: '결재대기', className: 'bg-amber-50 text-amber-700' },
-  APPROVED:  { label: '결재완료', className: 'bg-green-50 text-green-700' },
-  REJECTED:  { label: '반려',     className: 'bg-red-50 text-red-600' },
-  COMPLETED: { label: '처리완료', className: 'bg-blue-50 text-blue-700' },
+  PENDING:   { label: '결재대기',  className: 'bg-amber-50 text-amber-700' },
+  APPROVED:  { label: '결재완료',  className: 'bg-green-50 text-green-700' },
+  REJECTED:  { label: '반려',      className: 'bg-red-50 text-red-600' },
+  COMPLETED: { label: '처리완료',  className: 'bg-blue-50 text-blue-700' },
+}
+
+function getPendingClassName(label: string) {
+  if (label.startsWith('관리자')) return 'bg-purple-50 text-purple-700'
+  return 'bg-amber-50 text-amber-700'
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -46,7 +51,10 @@ export default function SupplyManageClient({ supplyRequests }: { supplyRequests:
           supplyRequests.map((req: any) => {
             const emp = req.employees
             const empLabel = [emp?.position, emp?.name].filter(Boolean).join(' ')
-            const statusInfo = SUPPLY_STATUS[req.status] ?? SUPPLY_STATUS.PENDING
+            const pendingLabel: string | null = req.pendingApproverLabel ?? null
+            const statusInfo = req.status === 'PENDING' && pendingLabel
+              ? { label: pendingLabel, className: getPendingClassName(pendingLabel) }
+              : (SUPPLY_STATUS[req.status] ?? SUPPLY_STATUS.PENDING)
             const canComplete = req.status === 'APPROVED'
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const sortedItems = [...(req.supply_request_items ?? [])].sort((a: any, b: any) => a.sort_order - b.sort_order)
