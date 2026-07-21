@@ -538,21 +538,15 @@ export default function PendingApprovalsClient({
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-3 pt-2">
-          <button
-            onClick={() => router.push(buildUrl({ page: String(page - 1) }))}
-            disabled={page <= 1}
-            className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            이전
-          </button>
+          {page > 1
+            ? <Link href={buildUrl({ page: String(page - 1) })} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">이전</Link>
+            : <span className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-400 opacity-40 cursor-not-allowed">이전</span>
+          }
           <span className="text-xs text-gray-500">{page} / {totalPages}</span>
-          <button
-            onClick={() => router.push(buildUrl({ page: String(page + 1) }))}
-            disabled={page >= totalPages}
-            className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            다음
-          </button>
+          {page < totalPages
+            ? <Link href={buildUrl({ page: String(page + 1) })} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">다음</Link>
+            : <span className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-400 opacity-40 cursor-not-allowed">다음</span>
+          }
         </div>
       )}
 

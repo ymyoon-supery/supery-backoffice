@@ -442,16 +442,16 @@ export default function MyRequestsClient({
         )}
         {activeTab === 'leave' && leaveTotalPages > 1 && (
           <div className="flex items-center justify-center gap-3 pt-2">
-            <button onClick={() => router.push(buildTabUrl('leave', catPage - 1))} disabled={catPage <= 1} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">이전</button>
+            {catPage > 1 ? <Link href={buildTabUrl('leave', catPage - 1)} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">이전</Link> : <span className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-400 opacity-40 cursor-not-allowed">이전</span>}
             <span className="text-xs text-gray-500">{catPage} / {leaveTotalPages}</span>
-            <button onClick={() => router.push(buildTabUrl('leave', catPage + 1))} disabled={catPage >= leaveTotalPages} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">다음</button>
+            {catPage < leaveTotalPages ? <Link href={buildTabUrl('leave', catPage + 1)} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">다음</Link> : <span className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-400 opacity-40 cursor-not-allowed">다음</span>}
           </div>
         )}
         {activeTab === 'expense' && expenseTotalPages > 1 && (
           <div className="flex items-center justify-center gap-3 pt-2">
-            <button onClick={() => router.push(buildTabUrl('expense', catPage - 1))} disabled={catPage <= 1} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">이전</button>
+            {catPage > 1 ? <Link href={buildTabUrl('expense', catPage - 1)} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">이전</Link> : <span className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-400 opacity-40 cursor-not-allowed">이전</span>}
             <span className="text-xs text-gray-500">{catPage} / {expenseTotalPages}</span>
-            <button onClick={() => router.push(buildTabUrl('expense', catPage + 1))} disabled={catPage >= expenseTotalPages} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">다음</button>
+            {catPage < expenseTotalPages ? <Link href={buildTabUrl('expense', catPage + 1)} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">다음</Link> : <span className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-400 opacity-40 cursor-not-allowed">다음</span>}
           </div>
         )}
       </div>
@@ -501,9 +501,9 @@ export default function MyRequestsClient({
       )}
       {activeTab === 'document' && documentTotalPages > 1 && (
         <div className="flex items-center justify-center gap-3 pt-2">
-          <button onClick={() => router.push(buildTabUrl('document', catPage - 1))} disabled={catPage <= 1} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">이전</button>
+          {catPage > 1 ? <Link href={buildTabUrl('document', catPage - 1)} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">이전</Link> : <span className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-400 opacity-40 cursor-not-allowed">이전</span>}
           <span className="text-xs text-gray-500">{catPage} / {documentTotalPages}</span>
-          <button onClick={() => router.push(buildTabUrl('document', catPage + 1))} disabled={catPage >= documentTotalPages} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">다음</button>
+          {catPage < documentTotalPages ? <Link href={buildTabUrl('document', catPage + 1)} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">다음</Link> : <span className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-400 opacity-40 cursor-not-allowed">다음</span>}
         </div>
       )}
 
@@ -512,9 +512,9 @@ export default function MyRequestsClient({
       )}
       {activeTab === 'supply' && supplyTotalPages > 1 && (
         <div className="flex items-center justify-center gap-3 pt-2">
-          <button onClick={() => router.push(buildTabUrl('supply', catPage - 1))} disabled={catPage <= 1} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">이전</button>
+          {catPage > 1 ? <Link href={buildTabUrl('supply', catPage - 1)} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">이전</Link> : <span className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-400 opacity-40 cursor-not-allowed">이전</span>}
           <span className="text-xs text-gray-500">{catPage} / {supplyTotalPages}</span>
-          <button onClick={() => router.push(buildTabUrl('supply', catPage + 1))} disabled={catPage >= supplyTotalPages} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">다음</button>
+          {catPage < supplyTotalPages ? <Link href={buildTabUrl('supply', catPage + 1)} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">다음</Link> : <span className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-400 opacity-40 cursor-not-allowed">다음</span>}
         </div>
       )}
 
