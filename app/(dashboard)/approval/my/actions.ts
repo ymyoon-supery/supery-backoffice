@@ -23,7 +23,15 @@ export async function cancelLeaveRequest(id: string) {
     .eq('status', 'PENDING')
 
   if (error) return { error: error.message }
+
+  await supabase
+    .from('leave_approval_steps')
+    .update({ status: 'CANCELLED' })
+    .eq('leave_request_id', id)
+    .eq('status', 'PENDING')
+
   revalidatePath('/approval/my')
+  revalidatePath('/approval/pending')
   return { error: null }
 }
 
@@ -39,7 +47,15 @@ export async function cancelExpenseRequest(id: string) {
     .eq('status', 'PENDING')
 
   if (error) return { error: error.message }
+
+  await supabase
+    .from('expense_approval_steps')
+    .update({ status: 'CANCELLED' })
+    .eq('expense_report_id', id)
+    .eq('status', 'PENDING')
+
   revalidatePath('/approval/my')
+  revalidatePath('/approval/pending')
   return { error: null }
 }
 
@@ -71,6 +87,14 @@ export async function cancelSupplyRequest(id: string) {
     .eq('status', 'PENDING')
 
   if (error) return { error: error.message }
+
+  await supabase
+    .from('supply_approval_steps')
+    .update({ status: 'CANCELLED' })
+    .eq('supply_request_id', id)
+    .eq('status', 'PENDING')
+
   revalidatePath('/approval/my')
+  revalidatePath('/approval/pending')
   return { error: null }
 }

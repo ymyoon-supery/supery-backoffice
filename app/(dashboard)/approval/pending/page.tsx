@@ -103,11 +103,11 @@ export default async function PendingApprovalsPage({
     ])
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let leaveSteps   = (leaveRes.data   ?? []) as any[]
+    let leaveSteps   = ((leaveRes.data   ?? []) as any[]).filter((s: any) => s.leave_requests?.status !== 'CANCELLED')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let expenseSteps = (expenseRes.data ?? []) as any[]
+    let expenseSteps = ((expenseRes.data ?? []) as any[]).filter((s: any) => s.expense_reports?.status !== 'CANCELLED')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let supplySteps  = (supplyRes.data  ?? []) as any[]
+    let supplySteps  = ((supplyRes.data  ?? []) as any[]).filter((s: any) => s.supply_requests?.status !== 'CANCELLED')
 
     // Annual leave remaining calculation
     const empInfoMap: Record<string, { hiredAt: string | null; annualLeaveDays: number }> = {}
