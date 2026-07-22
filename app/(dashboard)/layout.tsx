@@ -32,15 +32,22 @@ export default async function DashboardLayout({
 
   let pendingCount = 0
   if ((isTeamLead || isSupplyManager) && employee.role !== 'ADMIN') {
-    const pending = await Promise.all([
-      supabase.from('leave_approval_steps').select('*', { count: 'exact', head: true })
+    const [leaveRes, expenseRes, supplyRes] = await Promise.all([
+      supabase.from('leave_approval_steps')
+        .select('id, leave_requests(status)')
         .eq('approver_id', employee.id).eq('status', 'PENDING'),
-      supabase.from('expense_approval_steps').select('*', { count: 'exact', head: true })
+      supabase.from('expense_approval_steps')
+        .select('id, expense_reports(status)')
         .eq('approver_id', employee.id).eq('status', 'PENDING'),
-      supabase.from('supply_approval_steps').select('*', { count: 'exact', head: true })
+      supabase.from('supply_approval_steps')
+        .select('id, supply_requests(status)')
         .eq('approver_id', employee.id).eq('status', 'PENDING'),
     ])
-    pendingCount = pending.reduce((sum, { count }) => sum + (count ?? 0), 0)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    pendingCount =
+      (leaveRes.data ?? []).filter((s: any) => s.leave_requests?.status !== 'CANCELLED').length +
+      (expenseRes.data ?? []).filter((s: any) => s.expense_reports?.status !== 'CANCELLED').length +
+      (supplyRes.data ?? []).filter((s: any) => s.supply_requests?.status !== 'CANCELLED').length
   }
 
   return (
