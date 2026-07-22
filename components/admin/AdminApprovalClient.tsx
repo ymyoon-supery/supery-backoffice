@@ -2,6 +2,7 @@
 
 import { Fragment, useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
 import { AlertCircle, ChevronLeft, ChevronRight, ArrowUpDown, ChevronDown } from 'lucide-react'
@@ -61,7 +62,6 @@ export default function AdminApprovalClient({
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
-  const [isNavPending, startNavTransition] = useTransition()
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [paymentDropdownId, setPaymentDropdownId] = useState<string | null>(null)
@@ -86,7 +86,6 @@ export default function AdminApprovalClient({
     const p = new URLSearchParams({ ...base, ...overrides })
     return `/admin/approval?${p}`
   }
-  const nav = (o: Record<string, string>) => startNavTransition(() => router.push(buildUrl(o)))
 
   function handleApprove(item: ApprovalItem) {
     startTransition(async () => {
@@ -173,10 +172,10 @@ export default function AdminApprovalClient({
       {/* Status tabs */}
       <div className="flex gap-1 border-b border-gray-100">
         {[{ k: 'pending', l: '미결재' }, { k: 'done', l: '결재완료' }].map(t => (
-          <button key={t.k} onClick={() => nav({ tab: t.k, page: '1' })}
+          <Link key={t.k} href={buildUrl({ tab: t.k, page: '1' })}
             className={`px-4 py-2 text-sm font-medium transition-colors ${tab === t.k ? 'border-b-2 border-primary text-primary' : 'text-gray-500 hover:text-gray-700'}`}>
             {t.l}
-          </button>
+          </Link>
         ))}
       </div>
 
@@ -184,27 +183,27 @@ export default function AdminApprovalClient({
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex border border-gray-200 rounded-lg overflow-hidden text-xs">
           {[['all', '전체'], ['leave', '연차'], ['expense', '지결서'], ['home_location', '재택변경']].map(([k, l]) => (
-            <button key={k} onClick={() => nav({ type: k, page: '1' })}
+            <Link key={k} href={buildUrl({ type: k, page: '1' })}
               className={`px-3 py-1.5 transition-colors ${type === k ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
               {l}
-            </button>
+            </Link>
           ))}
         </div>
 
         <div className="flex border border-gray-200 rounded-lg overflow-hidden text-xs">
           {[['all', '전체'], ['day', '일간'], ['week', '주간'], ['month', '월간']].map(([k, l]) => (
-            <button key={k} onClick={() => nav({ period: k, page: '1' })}
+            <Link key={k} href={buildUrl({ period: k, page: '1' })}
               className={`px-3 py-1.5 transition-colors ${period === k ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
               {l}
-            </button>
+            </Link>
           ))}
         </div>
 
-        <button onClick={() => nav({ sort: sort === 'desc' ? 'asc' : 'desc', page: '1' })}
+        <Link href={buildUrl({ sort: sort === 'desc' ? 'asc' : 'desc', page: '1' })}
           className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50 transition-colors">
           <ArrowUpDown size={12} />
           {sort === 'desc' ? '최신순' : '오래된순'}
-        </button>
+        </Link>
 
         {total > 0 && (
           <span className="ml-auto text-xs text-gray-400">전체 {total}건</span>
@@ -227,17 +226,6 @@ export default function AdminApprovalClient({
 
       {/* List container */}
       <div className="relative bg-white rounded-xl border border-gray-100 overflow-hidden">
-        {isNavPending && (
-          <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center">
-            <div className="flex items-center gap-2 text-sm text-gray-400">
-              <svg className="animate-spin h-4 w-4 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-              </svg>
-              불러오는 중...
-            </div>
-          </div>
-        )}
 
         {/* ── Mobile card list ── */}
         <div className="md:hidden divide-y divide-gray-50">
@@ -704,26 +692,19 @@ export default function AdminApprovalClient({
         <div className="flex items-center justify-between">
           <p className="text-xs text-gray-400">{page} / {totalPages} 페이지</p>
           <div className="flex items-center gap-1">
-            <button onClick={() => nav({ page: String(Math.max(1, page - 1)) })}
-              disabled={page <= 1}
-              className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed">
-              <ChevronLeft size={14} />
-            </button>
+            {page > 1
+              ? <Link href={buildUrl({ page: String(page - 1) })} className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50"><ChevronLeft size={14} /></Link>
+              : <span className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg text-gray-500 opacity-30 cursor-not-allowed"><ChevronLeft size={14} /></span>
+            }
             {pageNums.map(n => (
-              <button key={n} onClick={() => nav({ page: String(n) })}
-                className={`w-8 h-8 text-xs rounded-lg border transition-colors ${
-                  n === page
-                    ? 'bg-primary text-white border-primary'
-                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                }`}>
-                {n}
-              </button>
+              n === page
+                ? <span key={n} className="w-8 h-8 text-xs rounded-lg border bg-primary text-white border-primary flex items-center justify-center">{n}</span>
+                : <Link key={n} href={buildUrl({ page: String(n) })} className="w-8 h-8 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center justify-center">{n}</Link>
             ))}
-            <button onClick={() => nav({ page: String(Math.min(totalPages, page + 1)) })}
-              disabled={page >= totalPages}
-              className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed">
-              <ChevronRight size={14} />
-            </button>
+            {page < totalPages
+              ? <Link href={buildUrl({ page: String(page + 1) })} className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50"><ChevronRight size={14} /></Link>
+              : <span className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg text-gray-500 opacity-30 cursor-not-allowed"><ChevronRight size={14} /></span>
+            }
           </div>
         </div>
       )}
