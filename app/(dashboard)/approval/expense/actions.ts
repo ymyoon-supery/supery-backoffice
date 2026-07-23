@@ -146,6 +146,8 @@ export type PrizeInput = {
   taxPaymentType: 'SELF' | 'COMPANY' | null
   paymentMethod: 'GIFT_CARD' | 'CASH'
   giftCardEvidence: 'CORPORATE_CARD' | 'PERSONAL_CARD' | null
+  giftCardCardCompany: string | null
+  giftCardCardNumber: string | null
   bankName: string | null
   accountNumber: string | null
   note: string
@@ -201,6 +203,8 @@ export async function submitPrizeExpense(input: PrizeInput) {
     attachmentUrls: input.attachmentUrls,
     taxType,
     evidenceType,
+    cardCompany: input.giftCardEvidence === 'PERSONAL_CARD' ? input.giftCardCardCompany ?? null : null,
+    cardNumber: input.giftCardEvidence === 'PERSONAL_CARD' ? input.giftCardCardNumber ?? null : null,
     category: 'PRIZE_INCOME',
     expenseType: 'PRIZE',
   })

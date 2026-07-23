@@ -1323,6 +1323,8 @@ type PrizeFields = {
   taxPaymentType: 'SELF' | 'COMPANY'
   paymentType: 'GIFT_CARD' | 'CASH'
   giftCardEvidence: 'CORPORATE_CARD' | 'PERSONAL_CARD'
+  giftCardCardCompany: string
+  giftCardCardNumber: string
   bankName: string
   accountNumber: string
   note: string
@@ -1344,6 +1346,8 @@ function PrizeTab({
     taxPaymentType: 'SELF',
     paymentType: 'CASH',
     giftCardEvidence: 'CORPORATE_CARD',
+    giftCardCardCompany: '',
+    giftCardCardNumber: '',
     bankName: '',
     accountNumber: '',
     note: '',
@@ -1392,6 +1396,8 @@ function PrizeTab({
         taxPaymentType: isOver50k ? fields.taxPaymentType : null,
         paymentMethod: fields.paymentType,
         giftCardEvidence: fields.paymentType === 'GIFT_CARD' ? fields.giftCardEvidence : null,
+        giftCardCardCompany: fields.paymentType === 'GIFT_CARD' && fields.giftCardEvidence === 'PERSONAL_CARD' ? fields.giftCardCardCompany.trim() || null : null,
+        giftCardCardNumber: fields.paymentType === 'GIFT_CARD' && fields.giftCardEvidence === 'PERSONAL_CARD' ? fields.giftCardCardNumber.trim() || null : null,
         bankName: fields.paymentType === 'CASH' ? fields.bankName.trim() : null,
         accountNumber: fields.paymentType === 'CASH' ? fields.accountNumber.trim() : null,
         note: fields.note.trim(),
@@ -1595,6 +1601,30 @@ function PrizeTab({
                 </button>
               ))}
             </div>
+            {fields.giftCardEvidence === 'PERSONAL_CARD' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div className="space-y-1.5">
+                  <label className="text-xs text-gray-500">카드사</label>
+                  <input
+                    type="text"
+                    value={fields.giftCardCardCompany}
+                    onChange={e => setField('giftCardCardCompany', e.target.value)}
+                    placeholder="신한카드"
+                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs text-gray-500">카드번호 전체</label>
+                  <input
+                    type="text"
+                    value={fields.giftCardCardNumber}
+                    onChange={e => setField('giftCardCardNumber', e.target.value)}
+                    placeholder="0000-0000-0000-0000"
+                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
