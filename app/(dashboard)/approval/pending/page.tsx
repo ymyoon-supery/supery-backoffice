@@ -17,7 +17,7 @@ export type PendingItem = { kind: 'leave' | 'expense' | 'supply'; step: unknown 
 
 export type DoneItemExpenseDetail = {
   title: string; amount: number; expenseType: string | null
-  taxType: string | null; evidenceType: string | null; payee: string | null
+  taxType: string | null; evidenceType: string | null; cardCompany: string | null; cardNumber: string | null; payee: string | null
   paymentMethod: string | null; bankName: string | null; accountNumber: string | null
   accountHolder: string | null; paymentRequestDate: string | null; settlementDate: string | null
   lineItems: unknown[]; attachmentUrls: string[]; employeePosition: string | null
@@ -92,7 +92,7 @@ export default async function PendingApprovalsPage({
         : Promise.resolve({ data: [] as unknown[] }),
       wantExpense
         ? supabase.from('expense_approval_steps')
-            .select('id, step_order, status, expense_reports(id, title, amount, category, expense_type, status, created_at, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls, tax_type, evidence_type, employees(name, position))')
+            .select('id, step_order, status, expense_reports(id, title, amount, category, expense_type, status, created_at, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls, tax_type, evidence_type, card_company, card_number, employees(name, position))')
             .eq('approver_id', employee.id).eq('status', 'PENDING').order('created_at', { ascending: false })
         : Promise.resolve({ data: [] as unknown[] }),
       wantSupply
@@ -190,7 +190,7 @@ export default async function PendingApprovalsPage({
       : Promise.resolve({ data: [] as unknown[] }),
     wantExpense
       ? supabase.from('expense_approval_steps')
-          .select('id, acted_at, status, comment, expense_reports(id, title, amount, expense_type, created_at, tax_type, evidence_type, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls, employees(name, position))')
+          .select('id, acted_at, status, comment, expense_reports(id, title, amount, expense_type, created_at, tax_type, evidence_type, card_company, card_number, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls, employees(name, position))')
           .eq('approver_id', employee.id).in('status', ['APPROVED', 'REJECTED']).order('acted_at', { ascending: false })
       : Promise.resolve({ data: [] as unknown[] }),
     wantSupply
@@ -244,7 +244,9 @@ export default async function PendingApprovalsPage({
       expenseDetail: {
         title: rep.title ?? '', amount: Number(rep.amount ?? 0),
         expenseType: rep.expense_type ?? null, taxType: rep.tax_type ?? null,
-        evidenceType: rep.evidence_type ?? null, payee: rep.payee ?? null,
+        evidenceType: rep.evidence_type ?? null,
+        cardCompany: rep.card_company ?? null, cardNumber: rep.card_number ?? null,
+        payee: rep.payee ?? null,
         paymentMethod: rep.payment_method ?? null, bankName: rep.bank_name ?? null,
         accountNumber: rep.account_number ?? null, accountHolder: rep.account_holder ?? null,
         paymentRequestDate: rep.payment_request_date ?? null, settlementDate: rep.settlement_date ?? null,

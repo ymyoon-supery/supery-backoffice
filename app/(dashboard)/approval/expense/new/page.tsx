@@ -40,7 +40,7 @@ export default async function NewExpensePage({
   if (editFrom) {
     const { data: existing } = await supabase
       .from('expense_reports')
-      .select('id, expense_type, title, tax_type, evidence_type, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls')
+      .select('id, expense_type, title, tax_type, evidence_type, card_company, card_number, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls')
       .eq('id', editFrom)
       .eq('employee_id', employee.id)
       .single()
@@ -51,6 +51,8 @@ export default async function NewExpensePage({
         title: existing.title,
         taxType: existing.tax_type,
         evidenceType: existing.evidence_type,
+        cardCompany: existing.card_company ?? null,
+        cardNumber: existing.card_number ?? null,
         payee: existing.payee,
         paymentMethod: existing.payment_method,
         bankName: existing.bank_name,

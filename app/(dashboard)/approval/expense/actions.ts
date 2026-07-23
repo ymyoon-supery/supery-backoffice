@@ -29,6 +29,8 @@ type SubmitExpenseInput = {
   evidenceType: string | null
   category?: string
   expenseType?: string
+  cardCompany?: string | null
+  cardNumber?: string | null
 }
 
 export async function submitExpense(input: SubmitExpenseInput) {
@@ -57,6 +59,8 @@ export async function submitExpense(input: SubmitExpenseInput) {
     p_tax_type: input.taxType,
     p_evidence_type: input.evidenceType,
     p_expense_type: input.expenseType ?? 'EXPENSE',
+    p_card_company: input.cardCompany ?? null,
+    p_card_number: input.cardNumber ?? null,
   })
 
   if (error) return { error: error.message }

@@ -43,6 +43,8 @@ export default function ExpenseDetailSheet({
     title: item.title ?? item.detail.split(' · ')[0] ?? '',
     taxType: item.taxType ?? null,
     evidenceType: item.evidenceType ?? null,
+    cardCompany: item.cardCompany ?? null,
+    cardNumber: item.cardNumber ?? null,
     payee: item.payee ?? null,
     paymentMethod: item.paymentMethod ?? null,
     bankName: item.bankName ?? null,

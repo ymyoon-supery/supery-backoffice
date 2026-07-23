@@ -83,6 +83,8 @@ interface ExpenseItem {
   displayLabel: string
   tax_type?: string | null
   evidence_type?: string | null
+  card_company?: string | null
+  card_number?: string | null
   payee?: string | null
   payment_method?: string | null
   bank_name?: string | null
@@ -253,6 +255,8 @@ export default function MyRequestsClient({
       title: item.title,
       taxType: item.tax_type ?? null,
       evidenceType: item.evidence_type ?? null,
+      cardCompany: item.card_company ?? null,
+      cardNumber: item.card_number ?? null,
       payee: item.payee ?? null,
       paymentMethod: item.payment_method ?? null,
       bankName: item.bank_name ?? null,

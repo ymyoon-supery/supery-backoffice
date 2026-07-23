@@ -38,6 +38,8 @@ export type ApprovalItem = {
   title?: string | null
   taxType?: string | null
   evidenceType?: string | null
+  cardCompany?: string | null
+  cardNumber?: string | null
   lineItems?: Array<{ item: string; date: string; amount?: number; note?: string; count?: number; userName?: string }> | null
   payee?: string | null
   paymentMethod?: string | null
@@ -159,7 +161,7 @@ export default async function AdminApprovalPage({
           id, title, amount, category, expense_type, created_at, payment_status,
           payee, payment_method, bank_name, account_number, account_holder,
           payment_request_date, settlement_date, line_items, attachment_urls,
-          tax_type, evidence_type,
+          tax_type, evidence_type, card_company, card_number,
           employees ( name, position )
         )
       `)
@@ -187,6 +189,8 @@ export default async function AdminApprovalPage({
         title:              rep.title ?? null,
         taxType:            rep.tax_type ?? null,
         evidenceType:       rep.evidence_type ?? null,
+        cardCompany:        rep.card_company ?? null,
+        cardNumber:         rep.card_number ?? null,
         payee:              rep.payee ?? null,
         paymentMethod:      rep.payment_method ?? null,
         bankName:           rep.bank_name ?? null,
@@ -296,7 +300,7 @@ export default async function AdminApprovalPage({
     if (type !== 'leave' && type !== 'home_location') {
       const { data: waitingExpense } = await admin
         .from('expense_approval_steps')
-        .select(`id, expense_report_id, expense_reports ( id, title, amount, category, expense_type, created_at, payment_status, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls, tax_type, evidence_type, employees ( name, position ) )`)
+        .select(`id, expense_report_id, expense_reports ( id, title, amount, category, expense_type, created_at, payment_status, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls, tax_type, evidence_type, card_company, card_number, employees ( name, position ) )`)
         .eq('approver_id', employee.id)
         .eq('status', 'WAITING')
         .eq('step_order', 2)
@@ -335,6 +339,8 @@ export default async function AdminApprovalPage({
               title:              rep.title ?? null,
               taxType:            rep.tax_type ?? null,
               evidenceType:       rep.evidence_type ?? null,
+              cardCompany:        rep.card_company ?? null,
+              cardNumber:         rep.card_number ?? null,
               payee:              rep.payee ?? null,
               paymentMethod:      rep.payment_method ?? null,
               bankName:           rep.bank_name ?? null,

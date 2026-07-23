@@ -29,7 +29,7 @@ const STATUS_CFG: Record<string, { label: string; cls: string }> = {
 type PendingItem = { kind: 'leave' | 'expense' | 'supply'; step: any }
 type DoneItemExpenseDetail = {
   title: string; amount: number; expenseType: string | null
-  taxType: string | null; evidenceType: string | null; payee: string | null
+  taxType: string | null; evidenceType: string | null; cardCompany: string | null; cardNumber: string | null; payee: string | null
   paymentMethod: string | null; bankName: string | null; accountNumber: string | null
   accountHolder: string | null; paymentRequestDate: string | null; settlementDate: string | null
   lineItems: unknown[]; attachmentUrls: string[]; employeePosition: string | null
@@ -131,6 +131,8 @@ export default function PendingApprovalsClient({
       title: rep.title ?? '',
       taxType: rep.tax_type ?? null,
       evidenceType: rep.evidence_type ?? null,
+      cardCompany: rep.card_company ?? null,
+      cardNumber: rep.card_number ?? null,
       payee: rep.payee ?? null,
       paymentMethod: rep.payment_method ?? null,
       bankName: rep.bank_name ?? null,
@@ -430,6 +432,8 @@ export default function PendingApprovalsClient({
                   title: d.title,
                   taxType: d.taxType,
                   evidenceType: d.evidenceType,
+                  cardCompany: d.cardCompany,
+                  cardNumber: d.cardNumber,
                   payee: d.payee,
                   paymentMethod: d.paymentMethod,
                   bankName: d.bankName,

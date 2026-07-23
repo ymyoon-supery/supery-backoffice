@@ -22,6 +22,8 @@ export interface ExpenseInitialData {
   title: string | null
   taxType: string | null
   evidenceType: string | null
+  cardCompany: string | null
+  cardNumber: string | null
   payee: string | null
   paymentMethod: string | null
   bankName: string | null
@@ -313,6 +315,8 @@ function ExpenseTab({
   const [isPending, startTransition] = useTransition()
   const [title, setTitle] = useState(initialData?.title ?? '')
   const [evidenceType, setEvidenceType] = useState(initialData?.evidenceType ?? '')
+  const [cardCompany, setCardCompany] = useState(initialData?.cardCompany ?? '')
+  const [cardNumber, setCardNumber] = useState(initialData?.cardNumber ?? '')
   const [payee, setPayee] = useState(initialData?.payee ?? '')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>((initialData?.paymentMethod as PaymentMethod) ?? 'TRANSFER')
   const [bankName, setBankName] = useState(initialData?.bankName ?? '')
@@ -390,6 +394,8 @@ function ExpenseTab({
         attachmentUrls,
         taxType: null,
         evidenceType: evidenceType || null,
+        cardCompany: evidenceType === 'PERSONAL_CARD' ? cardCompany.trim() || null : null,
+        cardNumber: evidenceType === 'PERSONAL_CARD' ? cardNumber.trim() || null : null,
         category: 'OTHER',
         expenseType: 'EXPENSE',
       })
@@ -434,6 +440,35 @@ function ExpenseTab({
           ))}
         </div>
       </div>
+
+      {/* 개인카드 정보 (개인카드영수증 선택 시) */}
+      {evidenceType === 'PERSONAL_CARD' && (
+        <div className="space-y-3">
+          <SectionLabel>카드 정보 <span className="text-red-500">*</span></SectionLabel>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs text-gray-500">카드사</label>
+              <input
+                type="text"
+                value={cardCompany}
+                onChange={e => setCardCompany(e.target.value)}
+                placeholder="예: 신한카드"
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs text-gray-500">카드번호 전체</label>
+              <input
+                type="text"
+                value={cardNumber}
+                onChange={e => setCardNumber(e.target.value)}
+                placeholder="예: 1234-5678-9012-3456"
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 지급처 */}
       <div className="space-y-1.5">

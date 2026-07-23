@@ -6,6 +6,8 @@ export interface ExpenseViewData {
   title: string
   taxType: string | null
   evidenceType: string | null
+  cardCompany?: string | null
+  cardNumber?: string | null
   payee: string | null
   paymentMethod: string | null
   bankName: string | null
@@ -201,6 +203,9 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
                 <Row label="제목" value={data.title} />
                 <Row label="구분 (세목)" value={data.taxType ? TAX_TYPE_LABELS[data.taxType] ?? data.taxType : null} />
                 <Row label="증빙" value={data.evidenceType ? EVIDENCE_TYPE_LABELS[data.evidenceType] ?? data.evidenceType : null} />
+                {(data.cardCompany || data.cardNumber) && (
+                  <Row label="카드 정보" value={[data.cardCompany, data.cardNumber].filter(Boolean).join(' · ')} />
+                )}
                 <Row label="지급처" value={data.payee} />
                 <Row
                   label="지급방식"
