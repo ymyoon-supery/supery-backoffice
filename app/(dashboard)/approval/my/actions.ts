@@ -15,20 +15,9 @@ export async function cancelLeaveRequest(id: string) {
   const { supabase, employeeId } = await getEmployeeId()
   if (!employeeId) return { error: '로그인이 필요합니다.' }
 
-  const { error } = await supabase
-    .from('leave_requests')
-    .update({ status: 'CANCELLED' })
-    .eq('id', id)
-    .eq('employee_id', employeeId)
-    .eq('status', 'PENDING')
+  const { error } = await supabase.rpc('cancel_own_leave_request', { p_request_id: id })
 
   if (error) return { error: error.message }
-
-  await supabase
-    .from('leave_approval_steps')
-    .update({ status: 'CANCELLED' })
-    .eq('leave_request_id', id)
-    .in('status', ['PENDING', 'WAITING'])
 
   revalidatePath('/approval/my')
   revalidatePath('/approval/pending')

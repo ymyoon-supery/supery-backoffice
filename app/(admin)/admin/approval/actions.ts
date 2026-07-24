@@ -77,7 +77,7 @@ export async function updateExpensePaymentStatus(
     PENDING_PAYMENT: 'PAID',
     PAID: 'SETTLED',
   }
-  if (validTransitions[report.payment_status ?? ''] !== paymentStatus) {
+  if (validTransitions[report.payment_status ?? 'PENDING_PAYMENT'] !== paymentStatus) {
     return { error: '허용되지 않는 상태 전환입니다.' }
   }
 

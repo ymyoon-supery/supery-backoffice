@@ -57,6 +57,7 @@ export default async function MyRequestsPage({
   const dateFrom    = params.dateFrom ?? ''
   const dateTo      = params.dateTo ?? ''
   const keyword     = params.keyword ?? ''
+  const safeKw      = keyword.replace(/[,.()\[\]:]/g, '').trim()
   const statusFilter = ['all', 'rejected', 'pending', 'done'].includes(params.statusFilter ?? '')
     ? (params.statusFilter ?? 'all')
     : 'all'
@@ -134,7 +135,7 @@ export default async function MyRequestsPage({
       if (dateTo)   cq = cq.lte('created_at', `${dateTo}T23:59:59`)
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (keyword) cq = (cq as any).filter('line_items::text', 'ilike', `%${keyword}%`)
+    if (safeKw) cq = (cq as any).filter('line_items::text', 'ilike', `%${safeKw}%`)
     const { count } = await cq
     expenseTotalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE))
   }
@@ -195,7 +196,7 @@ export default async function MyRequestsPage({
           if (dateTo)   q = q.lte('created_at', `${dateTo}T23:59:59`)
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if (keyword) q = (q as any).filter('line_items::text', 'ilike', `%${keyword}%`)
+        if (safeKw) q = (q as any).filter('line_items::text', 'ilike', `%${safeKw}%`)
         const expRange = catTab === 'expense' ? [offset, offset + PAGE_SIZE - 1] as const : [0, PAGE_SIZE - 1] as const
         return q.range(expRange[0], expRange[1])
       })(),
