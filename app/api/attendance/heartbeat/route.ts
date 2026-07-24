@@ -79,11 +79,13 @@ export async function POST(_request: NextRequest) {
     }
   }
 
-  // Update last_heartbeat
-  await supabase
-    .from('employees')
-    .update({ last_heartbeat: now.toISOString() })
-    .eq('id', employee.id)
+  // Update last_heartbeat only while employee is actively working
+  if (lastType && WORKING_TYPES.has(lastType)) {
+    await supabase
+      .from('employees')
+      .update({ last_heartbeat: now.toISOString() })
+      .eq('id', employee.id)
+  }
 
   return NextResponse.json({ ok: true })
 }
