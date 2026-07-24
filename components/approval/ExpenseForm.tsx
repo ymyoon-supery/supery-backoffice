@@ -834,7 +834,7 @@ function CorporateCardTab({
                 <th className="px-3 py-2.5 text-right text-xs font-medium text-blue-600 w-[12%] bg-blue-50/60 whitespace-nowrap">이용금액(원)</th>
                 {/* 수동 입력 항목 */}
                 <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 border-l-2 border-blue-100">
-                  사용내역 <span className="text-red-500 font-normal">(필수 입력)</span>
+                  사용내역
                 </th>
                 <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[10%]">
                   비고 <span className="text-gray-400 font-normal">(선택)</span>
