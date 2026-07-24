@@ -962,7 +962,11 @@ function TransportationTab({
 
   const canSubmit =
     totalAmount > 0 &&
-    lineItems.every(r => r.description.trim() && r.usageDate) &&
+    lineItems.every(r =>
+      r.description.trim() &&
+      r.usageDate &&
+      Number(r.amountRaw.replace(/[^0-9]/g, '')) > 0
+    ) &&
     !uploading
 
   function updateItem(idx: number, key: keyof TransportLineItem, value: string) {
