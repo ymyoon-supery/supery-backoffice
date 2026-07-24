@@ -94,6 +94,7 @@ export async function adminAddLeaveRecord(input: ManualLeaveInput) {
   })
   if (insertError) return { error: insertError.message }
 
+  // Adjust after successful insert so a failed insert never touches remaining_leaves
   if (DEDUCTS_LEAVE.includes(input.leaveType)) {
     await adjustLeaves(client, input.employeeId, -input.daysUsed)
   }
@@ -123,10 +124,7 @@ export async function adminUpdateLeaveRecord(id: string, input: ManualLeaveInput
   const newDeduction = DEDUCTS_LEAVE.includes(input.leaveType) ? input.daysUsed : 0
   const delta = oldDeduction - newDeduction  // positive = restore, negative = extra deduction
 
-  if (delta !== 0) {
-    await adjustLeaves(client, current.employee_id, delta)
-  }
-
+  // Update record first — if this fails, remaining_leaves is untouched
   const { error: updateError } = await client.from('leave_requests').update({
     leave_type: input.leaveType,
     start_date: input.startDate,
@@ -136,6 +134,10 @@ export async function adminUpdateLeaveRecord(id: string, input: ManualLeaveInput
   }).eq('id', id)
 
   if (updateError) return { error: updateError.message }
+
+  if (delta !== 0) {
+    await adjustLeaves(client, current.employee_id, delta)
+  }
 
   revalidatePath('/admin/leave-manual')
   return { error: null }
@@ -155,14 +157,15 @@ export async function adminDeleteLeaveRecord(id: string) {
 
   if (fetchError || !record) return { error: '삭제할 내역을 찾을 수 없습니다.' }
 
-  if (DEDUCTS_LEAVE.includes(record.leave_type)) {
-    await adjustLeaves(client, record.employee_id, Number(record.days_used))
-  }
-
+  // Delete record first — if this fails, remaining_leaves is untouched
   const { error: deleteError } = await client.from('leave_requests').delete()
     .eq('id', id)
 
   if (deleteError) return { error: deleteError.message }
+
+  if (DEDUCTS_LEAVE.includes(record.leave_type)) {
+    await adjustLeaves(client, record.employee_id, Number(record.days_used))
+  }
 
   revalidatePath('/admin/leave-manual')
   return { error: null }
