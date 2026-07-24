@@ -73,7 +73,7 @@ export default async function PendingApprovalsPage({
   const params = await searchParams
   const viewTab      = params.viewTab === 'done' ? 'done' : 'pending'
   const type         = ['all', 'leave', 'expense', 'supply'].includes(params.type ?? '') ? params.type! : 'all'
-  const page         = Math.max(1, parseInt(params.page ?? '1') || 1)
+  const page         = Math.max(1, parseInt(params.page ?? '1', 10) || 1)
   const expenseType  = params.expenseType ?? ''
   const month        = params.month ?? ''
   const dateFrom     = params.dateFrom ?? ''

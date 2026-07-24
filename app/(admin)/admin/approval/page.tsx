@@ -74,7 +74,7 @@ export default async function AdminApprovalPage({
   const type   = ['leave', 'expense', 'home_location'].includes(params.type ?? '') ? params.type! : 'all'
   const period = ['day',   'week',  'month' ].includes(params.period ?? '') ? params.period! : 'all'
   const sort   = params.sort  === 'asc'  ? 'asc'  : 'desc'
-  const page   = Math.max(1, parseInt(params.page ?? '1') || 1)
+  const page   = Math.max(1, parseInt(params.page ?? '1', 10) || 1)
   const expenseType  = params.expenseType ?? ''
   const month        = params.month ?? ''
   const dateFrom     = params.dateFrom ?? ''

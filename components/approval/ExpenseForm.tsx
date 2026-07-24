@@ -276,7 +276,7 @@ async function uploadFiles(
   const urls: string[] = []
   for (const file of files) {
     const ext = file.name.split('.').pop()
-    const safeName = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+    const safeName = `${Date.now()}_${crypto.randomUUID().replace(/-/g, '')}.${ext}`
     const path = `${employeeId}/${safeName}`
     const { error } = await supabase.storage.from('receipts').upload(path, file, { upsert: false })
     if (error) {

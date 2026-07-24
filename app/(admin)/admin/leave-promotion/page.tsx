@@ -23,7 +23,7 @@ export default async function LeavePromotionPage({
 
   const params = await searchParams
   const today = new Date(Date.now() + 9 * 3600000)
-  const year = parseInt(params.year ?? String(today.getUTCFullYear()))
+  const year = parseInt(params.year ?? String(today.getUTCFullYear()), 10)
   const employment = params.employment === 'resigned' ? 'resigned' : 'active'
 
   const yearStart = `${today.getUTCFullYear()}-01-01`

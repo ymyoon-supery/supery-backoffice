@@ -50,7 +50,7 @@ export default async function MyRequestsPage({
 
   const params = await searchParams
   const catTab      = ['all', 'leave', 'expense', 'document', 'supply'].includes(params.catTab ?? '') ? params.catTab! : 'all'
-  const catPage     = Math.max(1, parseInt(params.catPage ?? '1') || 1)
+  const catPage     = Math.max(1, parseInt(params.catPage ?? '1', 10) || 1)
   const offset      = (catPage - 1) * PAGE_SIZE
   const expenseType = params.expenseType ?? ''
   const month       = params.month ?? ''

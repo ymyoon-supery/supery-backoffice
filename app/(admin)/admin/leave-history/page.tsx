@@ -59,7 +59,7 @@ export default async function LeaveHistoryPage() {
       : (usedThisYear[e.id] ?? 0)
 
     const byYear = Object.entries(usedByEmpYear[e.id] ?? {})
-      .map(([yr, used]) => ({ year: parseInt(yr), used: Math.round(used * 10) / 10 }))
+      .map(([yr, used]) => ({ year: parseInt(yr, 10), used: Math.round(used * 10) / 10 }))
       .sort((a, b) => b.year - a.year)
 
     return {
