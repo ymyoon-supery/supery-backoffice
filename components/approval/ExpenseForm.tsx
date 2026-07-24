@@ -1246,7 +1246,7 @@ function BusinessIncomeTab({
       )}
 
       <div className="space-y-1.5">
-        <SectionLabel>내역</SectionLabel>
+        <SectionLabel>지출항목</SectionLabel>
         <input
           type="text"
           value={fields.description}
