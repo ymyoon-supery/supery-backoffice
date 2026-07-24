@@ -18,7 +18,7 @@ export default async function AdminAttendancePage({
   if (!user) redirect('/login')
 
   const params = await searchParams
-  const view = (['day', 'week', 'month'].includes(params.view ?? '') ? params.view : 'week') as 'day' | 'week' | 'month'
+  const view = (['day', 'week', 'month'].includes(params.view ?? '') ? params.view : 'day') as 'day' | 'week' | 'month'
   const baseDate = params.date ? parseISO(params.date) : new Date()
   const selectedEmpId = params.empId ?? ''
   const employment = params.employment === 'resigned' ? 'resigned' : 'active'
