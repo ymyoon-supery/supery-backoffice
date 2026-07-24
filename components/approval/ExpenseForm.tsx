@@ -704,7 +704,14 @@ function CorporateCardTab({
 
   const canSubmit =
     totalAmount > 0 &&
-    lineItems.every(r => r.merchantName.trim() && r.usageDate && r.description.trim()) &&
+    lineItems.every(r =>
+      r.cardLastFour.trim() &&
+      r.userName.trim() &&
+      r.usageDate &&
+      r.merchantName.trim() &&
+      r.amountRaw.trim() &&
+      r.description.trim()
+    ) &&
     !uploading &&
     !parsing
 
