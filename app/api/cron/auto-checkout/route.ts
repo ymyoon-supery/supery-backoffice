@@ -77,6 +77,7 @@ export async function GET(request: NextRequest) {
 
   let autoCheckouts = 0
   let anomalies = 0
+  const failures: { employeeId: string; reason: string }[] = []
 
   for (const record of unprocessed) {
     const lastHeartbeat = heartbeatMap.get(record.employee_id)
@@ -101,6 +102,8 @@ export async function GET(request: NextRequest) {
           .from('employees')
           .update({ last_heartbeat: null })
           .eq('id', record.employee_id)
+      } else {
+        failures.push({ employeeId: record.employee_id, reason: error.message })
       }
     } else {
       const { error } = await supabase.from('attendance_records').insert({
@@ -111,9 +114,13 @@ export async function GET(request: NextRequest) {
         is_field: false,
         is_anomaly: true,
       })
-      if (!error) anomalies++
+      if (!error) {
+        anomalies++
+      } else {
+        failures.push({ employeeId: record.employee_id, reason: error.message })
+      }
     }
   }
 
-  return NextResponse.json({ ok: true, autoCheckouts, anomalies })
+  return NextResponse.json({ ok: true, autoCheckouts, anomalies, failures })
 }

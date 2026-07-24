@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import DocumentRequestClient from './DocumentRequestClient'
 
@@ -20,11 +19,7 @@ export default async function DocumentsPage() {
 
   let departmentName: string | null = null
   if (emp.department_id) {
-    const admin = createServiceClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    )
-    const { data: dept } = await admin
+    const { data: dept } = await supabase
       .from('departments')
       .select('name')
       .eq('id', emp.department_id)

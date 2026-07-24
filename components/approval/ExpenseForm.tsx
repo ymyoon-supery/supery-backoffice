@@ -96,14 +96,14 @@ function formatKRWInput(value: string) {
 }
 
 function parseExcelDate(val: unknown): string {
-  if (!val) return getToday()
+  if (!val) return ''
   if (val instanceof Date) return format(val, 'yyyy-MM-dd')
   const s = String(val).trim().replace(/\./g, '-')
   if (/^\d{8}$/.test(s.replace(/-/g, ''))) {
     const d = s.replace(/-/g, '')
     return `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`
   }
-  return s || getToday()
+  return s || ''
 }
 
 function findColIdx(headers: string[], candidates: string[]): number {

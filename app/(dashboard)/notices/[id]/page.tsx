@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { redirect, notFound } from 'next/navigation'
 import NoticeDetailClient from './NoticeDetailClient'
 
@@ -12,13 +11,8 @@ export default async function NoticeDetailPage({ params }: { params: Promise<{ i
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const admin = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  )
-
   const [{ data: notice }, { data: emp }] = await Promise.all([
-    admin.from('notices')
+    supabase.from('notices')
       .select('id, title, content, is_pinned, created_at, author_id, employees(name)')
       .eq('id', id)
       .single(),
