@@ -541,8 +541,8 @@ export default function TimeTracker({
         )}
 
         <div className="flex flex-wrap gap-2">
-          {state === 'BEFORE_WORK' && !showCheckInOptions && !showFieldForm && (
-            <ActionButton icon={<Clock size={15} />} label="출근"
+          {(state === 'BEFORE_WORK' || state === 'DONE') && !showCheckInOptions && !showFieldForm && (
+            <ActionButton icon={<Clock size={15} />} label={state === 'DONE' ? '재출근' : '출근'}
               onClick={() => setShowCheckInOptions(true)} disabled={isPending} variant="primary" />
           )}
           {state === 'WORKING' && (

@@ -39,34 +39,61 @@ export function calcDaySummary(
   const sorted = [...recs].sort(
     (a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
   )
-  const checkIn = sorted.find(r => r.type === 'CHECK_IN')
-  const checkOut = [...sorted].reverse().find(r => r.type === 'CHECK_OUT')
-  if (!checkIn) {
+
+  const checkIns = sorted.filter(r => r.type === 'CHECK_IN')
+  const checkOuts = sorted.filter(r => r.type === 'CHECK_OUT')
+
+  if (checkIns.length === 0) {
     return { checkIn: null, checkOut: null, breakMin: 0, workMin: 0, lateMin: 0, earlyLeaveMin: 0 }
   }
 
-  const checkInKST = toKSTTime(checkIn.recorded_at)
-  if (!checkOut) {
+  const firstCheckIn = checkIns[0]
+  const lastCheckOut = checkOuts.length > 0 ? checkOuts[checkOuts.length - 1] : null
+  const checkInKST = toKSTTime(firstCheckIn.recorded_at)
+
+  if (!lastCheckOut) {
     return { checkIn: checkInKST, checkOut: null, breakMin: 0, workMin: 0, lateMin: 0, earlyLeaveMin: 0 }
   }
 
-  const shiftRecs = sorted.filter(r =>
-    new Date(r.recorded_at) >= new Date(checkIn.recorded_at) &&
-    new Date(r.recorded_at) <= new Date(checkOut.recorded_at)
-  )
+  const checkOutKST = toKSTTime(lastCheckOut.recorded_at)
 
-  let breakMin = 0
-  let breakStart: Date | null = null
-  for (const r of shiftRecs) {
-    if (r.type === 'BREAK_START') breakStart = new Date(r.recorded_at)
-    else if (r.type === 'BREAK_END' && breakStart) {
-      breakMin += differenceInMinutes(new Date(r.recorded_at), breakStart)
-      breakStart = null
+  // Pair each CHECK_IN with the first CHECK_OUT that follows it.
+  // Supports mid-day leave-and-return: (in0→out0), (in1→out1), …
+  const sessions: { start: Date; end: Date }[] = []
+  let outIdx = 0
+  for (const ci of checkIns) {
+    const inDate = new Date(ci.recorded_at)
+    while (outIdx < checkOuts.length && new Date(checkOuts[outIdx].recorded_at) <= inDate) outIdx++
+    if (outIdx < checkOuts.length) {
+      sessions.push({ start: inDate, end: new Date(checkOuts[outIdx].recorded_at) })
+      outIdx++
     }
   }
 
-  const checkOutKST = toKSTTime(checkOut.recorded_at)
-  const gross = differenceInMinutes(new Date(checkOut.recorded_at), new Date(checkIn.recorded_at))
+  if (sessions.length === 0) {
+    return { checkIn: checkInKST, checkOut: null, breakMin: 0, workMin: 0, lateMin: 0, earlyLeaveMin: 0 }
+  }
+
+  // Sum gross time and breaks across all sessions
+  let totalGross = 0
+  let totalBreakMin = 0
+
+  for (const session of sessions) {
+    totalGross += differenceInMinutes(session.end, session.start)
+
+    const sessionRecs = sorted.filter(r =>
+      new Date(r.recorded_at) >= session.start &&
+      new Date(r.recorded_at) <= session.end
+    )
+    let breakStart: Date | null = null
+    for (const r of sessionRecs) {
+      if (r.type === 'BREAK_START') breakStart = new Date(r.recorded_at)
+      else if (r.type === 'BREAK_END' && breakStart) {
+        totalBreakMin += differenceInMinutes(new Date(r.recorded_at), breakStart)
+        breakStart = null
+      }
+    }
+  }
 
   const checkInMin = timeToMin(checkInKST)
   const checkOutMin = timeToMin(checkOutKST)
@@ -76,14 +103,14 @@ export function calcDaySummary(
   const startMin = timeToMin(schedule.workStartTime)
   const endMin = timeToMin(schedule.workEndTime)
 
-  // 점심 자동 차감: 근무가 점심 window를 완전히 포함하고 기록된 휴식이 부족하면 차이만큼 차감
+  // Lunch deduction: apply once if the overall work span covers the full lunch window
   const spansLunch = checkInMin <= lunchStartMin && checkOutMin >= lunchEndMin
-  const lunchDeduct = spansLunch && breakMin < lunchDurationMin ? lunchDurationMin - breakMin : 0
-  const workMin = Math.max(0, gross - breakMin - lunchDeduct)
+  const lunchDeduct = spansLunch && totalBreakMin < lunchDurationMin ? lunchDurationMin - totalBreakMin : 0
+  const workMin = Math.max(0, totalGross - totalBreakMin - lunchDeduct)
 
   // Note: minute-of-day comparison assumes same-day shifts (no midnight crossing)
   const lateMin = Math.max(0, checkInMin - startMin)
   const earlyLeaveMin = Math.max(0, endMin - checkOutMin)
 
-  return { checkIn: checkInKST, checkOut: checkOutKST, breakMin, workMin, lateMin, earlyLeaveMin }
+  return { checkIn: checkInKST, checkOut: checkOutKST, breakMin: totalBreakMin, workMin, lateMin, earlyLeaveMin }
 }

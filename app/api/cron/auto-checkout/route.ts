@@ -36,13 +36,33 @@ export async function GET(request: NextRequest) {
 
   const { data: checkOuts } = await supabase
     .from('attendance_records')
-    .select('employee_id')
+    .select('employee_id, recorded_at')
     .eq('type', 'CHECK_OUT')
     .gte('recorded_at', dayStart)
     .lte('recorded_at', dayEnd)
 
-  const checkedOutIds = new Set(checkOuts?.map(r => r.employee_id) ?? [])
-  const unprocessed = checkIns.filter(r => !checkedOutIds.has(r.employee_id))
+  // Group check-outs by employee for fast lookup
+  const checkOutsByEmployee = new Map<string, Date[]>()
+  for (const co of checkOuts ?? []) {
+    if (!checkOutsByEmployee.has(co.employee_id)) checkOutsByEmployee.set(co.employee_id, [])
+    checkOutsByEmployee.get(co.employee_id)!.push(new Date(co.recorded_at))
+  }
+
+  // Find the last CHECK_IN per employee, then check if a CHECK_OUT exists after it.
+  // Supports mid-day leave-and-return: employee is unprocessed only when their
+  // final CHECK_IN has no subsequent CHECK_OUT.
+  const lastCheckInByEmployee = new Map<string, typeof checkIns[0]>()
+  for (const ci of checkIns) {
+    const prev = lastCheckInByEmployee.get(ci.employee_id)
+    if (!prev || new Date(ci.recorded_at) > new Date(prev.recorded_at)) {
+      lastCheckInByEmployee.set(ci.employee_id, ci)
+    }
+  }
+
+  const unprocessed = [...lastCheckInByEmployee.values()].filter(ci => {
+    const outs = checkOutsByEmployee.get(ci.employee_id) ?? []
+    return !outs.some(outTime => outTime > new Date(ci.recorded_at))
+  })
 
   if (unprocessed.length === 0) {
     return NextResponse.json({ ok: true, processed: 0 })
