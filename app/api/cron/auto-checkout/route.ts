@@ -16,10 +16,9 @@ export async function GET(request: NextRequest) {
   )
 
   // Cron runs at 02:00 KST — process previous KST day
-  const now = new Date()
-  const kstYesterday = new Date(now.getTime() + 9 * 60 * 60 * 1000)
-  kstYesterday.setDate(kstYesterday.getDate() - 1)
-  const dateStr = kstYesterday.toISOString().split('T')[0]
+  // Use UTC arithmetic after shifting to KST to avoid server-TZ dependency
+  const kstYesterdayMs = Date.now() + 9 * 60 * 60 * 1000 - 24 * 60 * 60 * 1000
+  const dateStr = new Date(kstYesterdayMs).toISOString().slice(0, 10)
   const dayStart = `${dateStr}T00:00:00+09:00`
   const dayEnd = `${dateStr}T23:59:59+09:00`
 
@@ -82,7 +81,12 @@ export async function GET(request: NextRequest) {
   for (const record of unprocessed) {
     const lastHeartbeat = heartbeatMap.get(record.employee_id)
 
-    if (lastHeartbeat) {
+    const heartbeatInRange =
+      lastHeartbeat &&
+      lastHeartbeat >= dayStart &&
+      lastHeartbeat <= dayEnd
+
+    if (heartbeatInRange) {
       const { error } = await supabase.from('attendance_records').insert({
         employee_id: record.employee_id,
         type: 'CHECK_OUT',
