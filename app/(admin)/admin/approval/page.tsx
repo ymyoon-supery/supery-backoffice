@@ -409,7 +409,7 @@ export default async function AdminApprovalPage({
   // ── 연차 잔여 동적 계산 (입사일 기준, 올해 승인 사용량 기준) ──────
   const allLeaveEmpIds = [...new Set([...leaveItemEmpIds, ...fullApproveItemEmpIds].filter((id): id is string => !!id))]
   if (allLeaveEmpIds.length > 0) {
-    const yearStart = `${new Date().getFullYear()}-01-01`
+    const yearStart = `${kstD.getUTCFullYear()}-01-01`
     const { data: usedTotals } = await admin
       .from('leave_requests')
       .select('employee_id, days_used')

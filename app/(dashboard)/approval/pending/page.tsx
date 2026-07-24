@@ -120,7 +120,7 @@ export default async function PendingApprovalsPage({
     const empIds = Object.keys(empInfoMap)
     const usedByEmp: Record<string, number> = {}
     if (empIds.length > 0) {
-      const yearStart = `${new Date().getFullYear()}-01-01`
+      const yearStart = `${new Date(Date.now() + 9 * 3600000).getUTCFullYear()}-01-01`
       const { data: usedTotals } = await supabase.from('leave_requests').select('employee_id, days_used').eq('status', 'APPROVED').in('leave_type', DEDUCTS).gte('start_date', yearStart).in('employee_id', empIds)
       for (const r of usedTotals ?? []) usedByEmp[r.employee_id] = (usedByEmp[r.employee_id] ?? 0) + Number(r.days_used)
     }
