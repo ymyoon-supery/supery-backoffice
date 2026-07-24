@@ -181,7 +181,7 @@ export default async function MyRequestsPage({
         if (expenseStatuses.length === 0) return Promise.resolve({ data: [] as never[] })
         let q = supabase
           .from('expense_reports')
-          .select('id, title, amount, category, expense_type, status, created_at, tax_type, evidence_type, card_company, card_number, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls, expense_approval_steps(step_order, status, comment, approver_id, employees(position, name, role))')
+          .select('id, title, amount, category, expense_type, status, created_at, tax_type, evidence_type, card_company, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls, expense_approval_steps(step_order, status, comment, approver_id, employees(position, name, role))')
           .eq('employee_id', employee.id)
           .in('status', expenseStatuses)
           .order('created_at', { ascending: false })
@@ -244,7 +244,7 @@ export default async function MyRequestsPage({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rawExpenses = (expenseResult.data ?? []) as any[]
   const prizeCardIds = rawExpenses
-    .filter(e => e.expense_type === 'PRIZE' && e.evidence_type === 'PERSONAL_CARD')
+    .filter(e => e.evidence_type === 'PERSONAL_CARD')
     .map(e => e.id as string)
   const cardDecryptMap = new Map<string, string>()
   if (prizeCardIds.length > 0) {
@@ -264,7 +264,7 @@ export default async function MyRequestsPage({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const expenseItems = rawExpenses.map((r: any) => ({
     ...r,
-    card_number: cardDecryptMap.get(r.id) ?? r.card_number ?? null,
+    card_number: cardDecryptMap.get(r.id) ?? null,
     kind: 'expense' as const,
     displayLabel: `${r.title} — ${Number(r.amount).toLocaleString()}원`,
     pendingApproverLabel: r.status === 'PENDING' ? getPendingApproverLabel(r.expense_approval_steps, employee.id) : null,

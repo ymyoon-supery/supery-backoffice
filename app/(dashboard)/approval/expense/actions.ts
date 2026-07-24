@@ -6,6 +6,13 @@ import { revalidateTag } from 'next/cache'
 import { CACHE_TAGS } from '@/lib/cache/tags'
 import { encryptSSN, encryptCardNumber } from '@/lib/crypto/ssn'
 
+function serviceClient() {
+  return createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+}
+
 export type LineItem = {
   item: string
   date: string
@@ -60,14 +67,26 @@ export async function submitExpense(input: SubmitExpenseInput) {
     p_evidence_type: input.evidenceType,
     p_expense_type: input.expenseType ?? 'EXPENSE',
     p_card_company: input.cardCompany ?? null,
-    p_card_number: input.cardNumber ?? null,
   })
 
   if (error) return { error: error.message }
 
+  const reportId = data as string
+
+  if (input.cardNumber) {
+    const { encrypted, iv } = encryptCardNumber(input.cardNumber)
+    const { error: cardError } = await serviceClient()
+      .from('expense_card_sensitive_data')
+      .insert({ expense_report_id: reportId, encrypted_card_number: encrypted, iv })
+    if (cardError) {
+      await serviceClient().from('expense_reports').delete().eq('id', reportId)
+      return { error: cardError.message }
+    }
+  }
+
   revalidateTag(CACHE_TAGS.approvalInbox)
   revalidateTag(CACHE_TAGS.expenseList)
-  return { error: null, id: data as string }
+  return { error: null, id: reportId }
 }
 
 // ─── 사업소득(원천징수) 지급요청서 ────────────────────────────────────────────
@@ -124,16 +143,12 @@ export async function submitBusinessIncomeExpense(input: BusinessIncomeInput) {
   if (expenseResult.error || !expenseResult.id) return { error: expenseResult.error ?? '제출 실패' }
 
   const { encrypted, iv } = encryptSSN(input.ssn)
-  const admin = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  )
-  const { error: ssnError } = await admin
+  const { error: ssnError } = await serviceClient()
     .from('expense_sensitive_data')
     .insert({ expense_report_id: expenseResult.id, encrypted_ssn: encrypted, iv })
 
   if (ssnError) {
-    await admin.from('expense_reports').delete().eq('id', expenseResult.id)
+    await serviceClient().from('expense_reports').delete().eq('id', expenseResult.id)
     return { error: ssnError.message }
   }
 
@@ -216,29 +231,24 @@ export async function submitPrizeExpense(input: PrizeInput) {
 
   if (expenseResult.error || !expenseResult.id) return { error: expenseResult.error ?? '제출 실패' }
 
-  const admin = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  )
-
   if (input.isOver50k && input.ssn) {
     const { encrypted, iv } = encryptSSN(input.ssn)
-    const { error: ssnError } = await admin
+    const { error: ssnError } = await serviceClient()
       .from('expense_sensitive_data')
       .insert({ expense_report_id: expenseResult.id, encrypted_ssn: encrypted, iv })
     if (ssnError) {
-      await admin.from('expense_reports').delete().eq('id', expenseResult.id)
+      await serviceClient().from('expense_reports').delete().eq('id', expenseResult.id)
       return { error: ssnError.message }
     }
   }
 
   if (input.giftCardEvidence === 'PERSONAL_CARD' && input.giftCardCardNumber) {
     const { encrypted, iv } = encryptCardNumber(input.giftCardCardNumber)
-    const { error: cardError } = await admin
+    const { error: cardError } = await serviceClient()
       .from('expense_card_sensitive_data')
       .insert({ expense_report_id: expenseResult.id, encrypted_card_number: encrypted, iv })
     if (cardError) {
-      await admin.from('expense_reports').delete().eq('id', expenseResult.id)
+      await serviceClient().from('expense_reports').delete().eq('id', expenseResult.id)
       return { error: cardError.message }
     }
   }

@@ -162,7 +162,7 @@ export default async function AdminApprovalPage({
           id, title, amount, category, expense_type, created_at, payment_status,
           payee, payment_method, bank_name, account_number, account_holder,
           payment_request_date, settlement_date, line_items, attachment_urls,
-          tax_type, evidence_type, card_company, card_number,
+          tax_type, evidence_type, card_company,
           employees ( name, position )
         )
       `)
@@ -191,7 +191,7 @@ export default async function AdminApprovalPage({
         taxType:            rep.tax_type ?? null,
         evidenceType:       rep.evidence_type ?? null,
         cardCompany:        rep.card_company ?? null,
-        cardNumber:         rep.card_number ?? null,
+        cardNumber:         null,
         payee:              rep.payee ?? null,
         paymentMethod:      rep.payment_method ?? null,
         bankName:           rep.bank_name ?? null,
@@ -207,7 +207,7 @@ export default async function AdminApprovalPage({
 
   // Decrypt card numbers for PRIZE personal card expenses
   const expensePrizeIds = expenseItems
-    .filter(e => e.expenseType === 'PRIZE' && e.evidenceType === 'PERSONAL_CARD')
+    .filter(e => e.evidenceType === 'PERSONAL_CARD')
     .map(e => e.requestId)
   if (expensePrizeIds.length > 0) {
     const { data: cardSecrets } = await admin.from('expense_card_sensitive_data')
@@ -317,7 +317,7 @@ export default async function AdminApprovalPage({
     if (type !== 'leave' && type !== 'home_location') {
       const { data: waitingExpense } = await admin
         .from('expense_approval_steps')
-        .select(`id, expense_report_id, expense_reports ( id, title, amount, category, expense_type, created_at, payment_status, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls, tax_type, evidence_type, card_company, card_number, employees ( name, position ) )`)
+        .select(`id, expense_report_id, expense_reports ( id, title, amount, category, expense_type, created_at, payment_status, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls, tax_type, evidence_type, card_company, employees ( name, position ) )`)
         .eq('approver_id', employee.id)
         .eq('status', 'WAITING')
         .eq('step_order', 2)
@@ -357,7 +357,7 @@ export default async function AdminApprovalPage({
               taxType:            rep.tax_type ?? null,
               evidenceType:       rep.evidence_type ?? null,
               cardCompany:        rep.card_company ?? null,
-              cardNumber:         rep.card_number ?? null,
+              cardNumber:         null,
               payee:              rep.payee ?? null,
               paymentMethod:      rep.payment_method ?? null,
               bankName:           rep.bank_name ?? null,
@@ -375,7 +375,7 @@ export default async function AdminApprovalPage({
 
   // Decrypt card numbers for fullApprove PRIZE personal card expenses
   const fullApprovePrizeIds = fullApproveExpenseItems
-    .filter(e => e.expenseType === 'PRIZE' && e.evidenceType === 'PERSONAL_CARD')
+    .filter(e => e.evidenceType === 'PERSONAL_CARD')
     .map(e => e.requestId)
   if (fullApprovePrizeIds.length > 0) {
     const { data: cardSecrets } = await admin.from('expense_card_sensitive_data')
