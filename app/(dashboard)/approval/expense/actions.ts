@@ -145,6 +145,7 @@ export async function submitBusinessIncomeExpense(input: BusinessIncomeInput) {
 
 export type PrizeInput = {
   title: string
+  description: string
   recipientName: string
   ssn: string | null
   prizeAmount: number
@@ -189,7 +190,7 @@ export async function submitPrizeExpense(input: PrizeInput) {
   ].filter(Boolean) as string[]
 
   const lineItems: LineItem[] = [{
-    item: '경품비',
+    item: input.description,
     date: input.paymentRequestDate,
     amount: input.prizeAmount,
     note: noteParts.join(' / ') || undefined,

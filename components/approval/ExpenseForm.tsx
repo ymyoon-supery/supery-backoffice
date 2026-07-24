@@ -1352,6 +1352,7 @@ type PrizeFields = {
   giftCardCardNumber: string
   bankName: string
   accountNumber: string
+  description: string
   note: string
 }
 
@@ -1376,6 +1377,7 @@ function PrizeTab({
     giftCardCardNumber: '',
     bankName: '',
     accountNumber: '',
+    description: '',
     note: '',
   })
   const [paymentRequestDate, setPaymentRequestDate] = useState(getToday())
@@ -1398,6 +1400,7 @@ function PrizeTab({
 
   const canSubmit =
     title.trim() !== '' &&
+    fields.description.trim() !== '' &&
     fields.recipientName.trim() !== '' &&
     prizeAmount > 0 &&
     !amountExceeds50k &&
@@ -1419,6 +1422,7 @@ function PrizeTab({
 
       const result = await submitPrizeExpense({
         title: title.trim(),
+        description: fields.description.trim(),
         recipientName: fields.recipientName.trim(),
         ssn: isOver50k ? ssnClean : null,
         prizeAmount,
@@ -1451,6 +1455,18 @@ function PrizeTab({
           value={title}
           onChange={e => setTitle(e.target.value)}
           placeholder="예: 이벤트 당첨자 경품 지급"
+          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
+        />
+      </div>
+
+      {/* 지출항목 */}
+      <div className="space-y-1.5">
+        <SectionLabel>지출항목</SectionLabel>
+        <input
+          type="text"
+          value={fields.description}
+          onChange={e => setField('description', e.target.value)}
+          placeholder="예: 경품 상품권 지급"
           className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
         />
       </div>
