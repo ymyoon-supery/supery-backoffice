@@ -28,8 +28,8 @@ export default async function LeavePage() {
 
   if (!employee) redirect('/login')
 
-  const today = new Date()
-  const yearStart = `${today.getFullYear()}-01-01`
+  const today = new Date(Date.now() + 9 * 3600000)
+  const yearStart = `${today.getUTCFullYear()}-01-01`
   const hiredAt = employee.hired_at ? new Date(employee.hired_at) : null
   const entitlement = hiredAt
     ? calcAnnualLeave(hiredAt, today)

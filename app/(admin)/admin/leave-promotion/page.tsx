@@ -22,11 +22,11 @@ export default async function LeavePromotionPage({
   )
 
   const params = await searchParams
-  const year = parseInt(params.year ?? String(new Date().getFullYear()))
+  const today = new Date(Date.now() + 9 * 3600000)
+  const year = parseInt(params.year ?? String(today.getUTCFullYear()))
   const employment = params.employment === 'resigned' ? 'resigned' : 'active'
 
-  const today = new Date()
-  const yearStart = `${today.getFullYear()}-01-01`
+  const yearStart = `${today.getUTCFullYear()}-01-01`
 
   function tabHref(status: string) {
     const p = new URLSearchParams({ year: String(year), employment: status })

@@ -10,8 +10,8 @@ export default async function EmployeesSettingsPage() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   )
 
-  const today = new Date()
-  const yearStart = `${today.getFullYear()}-01-01`
+  const today = new Date(Date.now() + 9 * 3600000)
+  const yearStart = `${today.getUTCFullYear()}-01-01`
 
   const [{ data: rawEmployees }, { data: groups }, { data: teams }, { data: usedTotals }] = await Promise.all([
     supabase
