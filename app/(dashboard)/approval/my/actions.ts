@@ -28,7 +28,7 @@ export async function cancelLeaveRequest(id: string) {
     .from('leave_approval_steps')
     .update({ status: 'CANCELLED' })
     .eq('leave_request_id', id)
-    .eq('status', 'PENDING')
+    .in('status', ['PENDING', 'WAITING'])
 
   revalidatePath('/approval/my')
   revalidatePath('/approval/pending')
@@ -52,7 +52,7 @@ export async function cancelExpenseRequest(id: string) {
     .from('expense_approval_steps')
     .update({ status: 'CANCELLED' })
     .eq('expense_report_id', id)
-    .eq('status', 'PENDING')
+    .in('status', ['PENDING', 'WAITING'])
 
   revalidatePath('/approval/my')
   revalidatePath('/approval/pending')
@@ -92,7 +92,7 @@ export async function cancelSupplyRequest(id: string) {
     .from('supply_approval_steps')
     .update({ status: 'CANCELLED' })
     .eq('supply_request_id', id)
-    .eq('status', 'PENDING')
+    .in('status', ['PENDING', 'WAITING'])
 
   revalidatePath('/approval/my')
   revalidatePath('/approval/pending')
