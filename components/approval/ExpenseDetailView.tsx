@@ -319,17 +319,22 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">증빙파일</p>
                 <div className="flex flex-wrap gap-2">
-                  {data.attachmentUrls.map((url, i) => (
-                    <a
-                      key={i}
-                      href={url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-primary hover:bg-primary/5 transition-colors no-print"
-                    >
-                      파일 {i + 1}
-                    </a>
-                  ))}
+                  {data.attachmentUrls.map((url, i) => {
+                    const href = url.startsWith('https://')
+                      ? url
+                      : `/api/storage/receipt?path=${encodeURIComponent(url)}`
+                    return (
+                      <a
+                        key={i}
+                        href={href}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-primary hover:bg-primary/5 transition-colors no-print"
+                      >
+                        파일 {i + 1}
+                      </a>
+                    )
+                  })}
                 </div>
               </div>
             )}

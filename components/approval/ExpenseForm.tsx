@@ -283,8 +283,7 @@ async function uploadFiles(
       toast.error(`파일 업로드 실패: ${error.message}`)
       return []
     }
-    const { data } = supabase.storage.from('receipts').getPublicUrl(path)
-    urls.push(data.publicUrl)
+    urls.push(path)
   }
   return urls
 }
