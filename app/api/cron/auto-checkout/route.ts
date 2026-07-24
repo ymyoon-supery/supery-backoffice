@@ -82,10 +82,13 @@ export async function GET(request: NextRequest) {
   for (const record of unprocessed) {
     const lastHeartbeat = heartbeatMap.get(record.employee_id)
 
+    const dayStartMs = new Date(dayStart).getTime()
+    const dayEndMs = new Date(dayEnd).getTime()
+    const heartbeatMs = lastHeartbeat ? new Date(lastHeartbeat).getTime() : null
     const heartbeatInRange =
-      lastHeartbeat &&
-      lastHeartbeat >= dayStart &&
-      lastHeartbeat <= dayEnd
+      heartbeatMs !== null &&
+      heartbeatMs >= dayStartMs &&
+      heartbeatMs <= dayEndMs
 
     if (heartbeatInRange) {
       const { error } = await supabase.from('attendance_records').insert({
@@ -98,10 +101,13 @@ export async function GET(request: NextRequest) {
       })
       if (!error) {
         autoCheckouts++
-        await supabase
+        const { error: clearError } = await supabase
           .from('employees')
           .update({ last_heartbeat: null })
           .eq('id', record.employee_id)
+        if (clearError) {
+          failures.push({ employeeId: record.employee_id, reason: `heartbeat clear: ${clearError.message}` })
+        }
       } else {
         failures.push({ employeeId: record.employee_id, reason: error.message })
       }
