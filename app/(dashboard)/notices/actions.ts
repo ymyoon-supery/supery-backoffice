@@ -37,11 +37,23 @@ export async function updateNotice(id: string, title: string, content: string, i
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: '인증이 필요합니다.' }
 
-  const { error } = await supabase
+  const { data: emp } = await supabase
+    .from('employees')
+    .select('id, role, can_write_notice')
+    .eq('auth_user_id', user.id)
+    .single()
+
+  if (!emp || (emp.role !== 'ADMIN' && !emp.can_write_notice)) {
+    return { error: '권한이 없습니다.' }
+  }
+
+  let q = supabase
     .from('notices')
     .update({ title: title.trim(), content: content.trim(), is_pinned: isPinned })
     .eq('id', id)
+  if (emp.role !== 'ADMIN') q = q.eq('author_id', emp.id)
 
+  const { error } = await q
   if (error) return { error: error.message }
   revalidatePath('/notices')
   revalidatePath(`/notices/${id}`)
@@ -54,7 +66,20 @@ export async function deleteNotice(id: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: '인증이 필요합니다.' }
 
-  const { error } = await supabase.from('notices').delete().eq('id', id)
+  const { data: emp } = await supabase
+    .from('employees')
+    .select('id, role, can_write_notice')
+    .eq('auth_user_id', user.id)
+    .single()
+
+  if (!emp || (emp.role !== 'ADMIN' && !emp.can_write_notice)) {
+    return { error: '권한이 없습니다.' }
+  }
+
+  let q = supabase.from('notices').delete().eq('id', id)
+  if (emp.role !== 'ADMIN') q = q.eq('author_id', emp.id)
+
+  const { error } = await q
   if (error) return { error: error.message }
   revalidatePath('/notices')
   revalidatePath('/admin/notices')
