@@ -55,8 +55,6 @@ export function calcDaySummary(
     return { checkIn: checkInKST, checkOut: null, breakMin: 0, workMin: 0, lateMin: 0, earlyLeaveMin: 0 }
   }
 
-  const checkOutKST = toKSTTime(lastCheckOut.recorded_at)
-
   // Pair each CHECK_IN with the first CHECK_OUT that follows it.
   // Supports mid-day leave-and-return: (in0→out0), (in1→out1), …
   const sessions: { start: Date; end: Date }[] = []
@@ -74,7 +72,13 @@ export function calcDaySummary(
     return { checkIn: checkInKST, checkOut: null, breakMin: 0, workMin: 0, lateMin: 0, earlyLeaveMin: 0 }
   }
 
-  // Sum gross time and breaks across all sessions
+  // If the last CHECK_IN is after the last CHECK_OUT, there is an open (ongoing) session.
+  // Do not report a checkout time or early-leave penalty while the employee is still in.
+  const hasOpenSession =
+    new Date(checkIns[checkIns.length - 1].recorded_at) >
+    new Date(lastCheckOut.recorded_at)
+
+  // Sum gross time and breaks across all completed sessions
   let totalGross = 0
   let totalBreakMin = 0
 
@@ -96,11 +100,20 @@ export function calcDaySummary(
   }
 
   const checkInMin = timeToMin(checkInKST)
+  const startMin = timeToMin(schedule.workStartTime)
+  const lateMin = Math.max(0, checkInMin - startMin)
+
+  if (hasOpenSession) {
+    // Still working: show accumulated work so far, no checkout time, no early-leave
+    const workMin = Math.max(0, totalGross - totalBreakMin)
+    return { checkIn: checkInKST, checkOut: null, breakMin: totalBreakMin, workMin, lateMin, earlyLeaveMin: 0 }
+  }
+
+  const checkOutKST = toKSTTime(lastCheckOut.recorded_at)
   const checkOutMin = timeToMin(checkOutKST)
   const lunchStartMin = timeToMin(schedule.lunchStartTime)
   const lunchEndMin = timeToMin(schedule.lunchEndTime)
   const lunchDurationMin = lunchEndMin - lunchStartMin
-  const startMin = timeToMin(schedule.workStartTime)
   const endMin = timeToMin(schedule.workEndTime)
 
   // Lunch deduction: apply once if the overall work span covers the full lunch window
@@ -109,7 +122,6 @@ export function calcDaySummary(
   const workMin = Math.max(0, totalGross - totalBreakMin - lunchDeduct)
 
   // Note: minute-of-day comparison assumes same-day shifts (no midnight crossing)
-  const lateMin = Math.max(0, checkInMin - startMin)
   const earlyLeaveMin = Math.max(0, endMin - checkOutMin)
 
   return { checkIn: checkInKST, checkOut: checkOutKST, breakMin: totalBreakMin, workMin, lateMin, earlyLeaveMin }
