@@ -73,6 +73,7 @@ export async function submitExpense(input: SubmitExpenseInput) {
 // ─── 사업소득(원천징수) 지급요청서 ────────────────────────────────────────────
 
 export type BusinessIncomeInput = {
+  title: string
   recipientName: string
   ssn: string
   grossAmount: number
@@ -104,7 +105,7 @@ export async function submitBusinessIncomeExpense(input: BusinessIncomeInput) {
   }]
 
   const expenseResult = await submitExpense({
-    title: `사업소득 지급요청 — ${input.recipientName} (${input.paymentRequestDate})`,
+    title: input.title,
     payee: input.recipientName,
     paymentMethod: 'TRANSFER',
     bankName: input.bankName,
@@ -143,6 +144,7 @@ export async function submitBusinessIncomeExpense(input: BusinessIncomeInput) {
 // ─── 현금성 경품비(기타소득) 지급요청서 ──────────────────────────────────────
 
 export type PrizeInput = {
+  title: string
   recipientName: string
   ssn: string | null
   prizeAmount: number
@@ -194,7 +196,7 @@ export async function submitPrizeExpense(input: PrizeInput) {
   }]
 
   const expenseResult = await submitExpense({
-    title: `경품비 지급요청 — ${input.recipientName} (${input.prizeAmount.toLocaleString('ko-KR')}원)`,
+    title: input.title,
     payee: input.recipientName,
     paymentMethod,
     bankName: input.bankName,

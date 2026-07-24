@@ -39,6 +39,14 @@ const STATUS_SORT: Record<string, number> = {
   REJECTED: 0, PENDING: 1, APPROVED: 2, COMPLETED: 2, CANCELLED: 3,
 }
 
+const EXPENSE_TYPE_LABELS: Record<string, string> = {
+  EXPENSE:         '지출결의서',
+  CORPORATE_CARD:  '법인카드',
+  TRANSPORTATION:  '교통비',
+  BUSINESS_INCOME: '사업소득',
+  PRIZE:           '기타소득',
+}
+
 type StatusFilter = 'all' | 'rejected' | 'pending' | 'done'
 type AlertCounts = { rejected: number; pending: number }
 
@@ -382,9 +390,9 @@ export default function MyRequestsClient({
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-gray-900">{item.displayLabel}</p>
                   {item.kind === 'leave' ? (
                     <>
+                      <p className="text-sm font-medium text-gray-900">{item.displayLabel}</p>
                       <p className="text-xs text-gray-500 mt-0.5">
                         {item.start_date === item.end_date
                           ? item.start_date
@@ -396,10 +404,22 @@ export default function MyRequestsClient({
                       )}
                     </>
                   ) : (
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {format(new Date(item.created_at), 'yyyy.MM.dd')}
-                      <span className="ml-2 text-primary">· 클릭하여 상세보기</span>
-                    </p>
+                    <>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded shrink-0">
+                          {EXPENSE_TYPE_LABELS[item.expense_type ?? ''] ?? '지출결의서'}
+                        </span>
+                        <span className="text-sm font-medium text-gray-900 truncate">{item.title}</span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {item.payee && <span>{item.payee} · </span>}
+                        {Number(item.amount).toLocaleString()}원
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {format(new Date(item.created_at), 'yyyy.MM.dd')}
+                        <span className="ml-2 text-primary">· 클릭하여 상세보기</span>
+                      </p>
+                    </>
                   )}
                   {item.pendingApproverLabel && (
                     <span className="inline-flex items-center gap-1 mt-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">

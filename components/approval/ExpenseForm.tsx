@@ -1119,6 +1119,7 @@ function BusinessIncomeTab({
   onSuccess,
 }: Props & { onSuccess: () => void }) {
   const [isPending, startTransition] = useTransition()
+  const [title, setTitle] = useState('')
   const [fields, setFields] = useState<BusinessIncomeFields>({
     recipientName: '',
     ssn: '',
@@ -1142,6 +1143,7 @@ function BusinessIncomeTab({
   const ssnClean = fields.ssn.replace(/-/g, '')
 
   const canSubmit =
+    title.trim() !== '' &&
     fields.recipientName.trim() !== '' &&
     ssnClean.length === 13 &&
     grossAmount > 0 &&
@@ -1162,6 +1164,7 @@ function BusinessIncomeTab({
       }
 
       const result = await submitBusinessIncomeExpense({
+        title: title.trim(),
         recipientName: fields.recipientName.trim(),
         ssn: ssnClean,
         grossAmount,
@@ -1181,6 +1184,17 @@ function BusinessIncomeTab({
 
   return (
     <div className="p-6 space-y-6">
+      <div className="space-y-1.5">
+        <SectionLabel>제목</SectionLabel>
+        <input
+          type="text"
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          placeholder="예: 홍길동 영상편집 용역 6월"
+          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
+        />
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <SectionLabel>이름</SectionLabel>
@@ -1338,6 +1352,7 @@ function PrizeTab({
   onSuccess,
 }: Props & { onSuccess: () => void }) {
   const [isPending, startTransition] = useTransition()
+  const [title, setTitle] = useState('')
   const [isOver50k, setIsOver50k] = useState(false)
   const [fields, setFields] = useState<PrizeFields>({
     recipientName: '',
@@ -1371,6 +1386,7 @@ function PrizeTab({
   const amountExceeds50k = !isOver50k && prizeAmount > 50000
 
   const canSubmit =
+    title.trim() !== '' &&
     fields.recipientName.trim() !== '' &&
     prizeAmount > 0 &&
     !amountExceeds50k &&
@@ -1391,6 +1407,7 @@ function PrizeTab({
       }
 
       const result = await submitPrizeExpense({
+        title: title.trim(),
         recipientName: fields.recipientName.trim(),
         ssn: isOver50k ? ssnClean : null,
         prizeAmount,
@@ -1415,6 +1432,18 @@ function PrizeTab({
 
   return (
     <div className="p-6 space-y-6">
+      {/* 제목 */}
+      <div className="space-y-1.5">
+        <SectionLabel>제목</SectionLabel>
+        <input
+          type="text"
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          placeholder="예: 이벤트 당첨자 경품 지급"
+          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
+        />
+      </div>
+
       {/* 금액 구분 토글 */}
       <div className="space-y-2">
         <SectionLabel>경품 금액 구분</SectionLabel>
