@@ -64,6 +64,23 @@ export async function updateExpensePaymentStatus(
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   )
 
+  const { data: report } = await admin
+    .from('expense_reports')
+    .select('status, payment_status')
+    .eq('id', reportId)
+    .single()
+
+  if (!report) return { error: '결의서를 찾을 수 없습니다.' }
+  if (report.status !== 'APPROVED') return { error: '최종 승인된 결의서만 지급 처리할 수 있습니다.' }
+
+  const validTransitions: Record<string, string> = {
+    PENDING_PAYMENT: 'PAID',
+    PAID: 'SETTLED',
+  }
+  if (validTransitions[report.payment_status ?? ''] !== paymentStatus) {
+    return { error: '허용되지 않는 상태 전환입니다.' }
+  }
+
   const { error } = await admin
     .from('expense_reports')
     .update({ payment_status: paymentStatus })

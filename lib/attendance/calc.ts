@@ -99,9 +99,11 @@ export function calcDaySummary(
     }
   }
 
-  const checkInMin = timeToMin(checkInKST)
-  const startMin = timeToMin(schedule.workStartTime)
-  const lateMin = Math.max(0, checkInMin - startMin)
+  // Use absolute timestamps so midnight-crossing shifts are calculated correctly
+  const kstDate = toKSTDate(firstCheckIn.recorded_at)
+  const checkInAbs = new Date(firstCheckIn.recorded_at).getTime()
+  const workStartAbs = new Date(`${kstDate}T${schedule.workStartTime}:00+09:00`).getTime()
+  const lateMin = Math.max(0, Math.floor((checkInAbs - workStartAbs) / 60000))
 
   if (hasOpenSession) {
     // Still working: show accumulated work so far, no checkout time, no early-leave
@@ -110,19 +112,18 @@ export function calcDaySummary(
   }
 
   const checkOutKST = toKSTTime(lastCheckOut.recorded_at)
-  const checkOutMin = timeToMin(checkOutKST)
-  const lunchStartMin = timeToMin(schedule.lunchStartTime)
-  const lunchEndMin = timeToMin(schedule.lunchEndTime)
-  const lunchDurationMin = lunchEndMin - lunchStartMin
-  const endMin = timeToMin(schedule.workEndTime)
+  const checkOutAbs = new Date(lastCheckOut.recorded_at).getTime()
+  const lunchStartAbs = new Date(`${kstDate}T${schedule.lunchStartTime}:00+09:00`).getTime()
+  const lunchEndAbs = new Date(`${kstDate}T${schedule.lunchEndTime}:00+09:00`).getTime()
+  const lunchDurationMin = Math.floor((lunchEndAbs - lunchStartAbs) / 60000)
+  const workEndAbs = new Date(`${kstDate}T${schedule.workEndTime}:00+09:00`).getTime()
 
   // Lunch deduction: apply once if the overall work span covers the full lunch window
-  const spansLunch = checkInMin <= lunchStartMin && checkOutMin >= lunchEndMin
+  const spansLunch = checkInAbs <= lunchStartAbs && checkOutAbs >= lunchEndAbs
   const lunchDeduct = spansLunch && totalBreakMin < lunchDurationMin ? lunchDurationMin - totalBreakMin : 0
   const workMin = Math.max(0, totalGross - totalBreakMin - lunchDeduct)
 
-  // Note: minute-of-day comparison assumes same-day shifts (no midnight crossing)
-  const earlyLeaveMin = Math.max(0, endMin - checkOutMin)
+  const earlyLeaveMin = Math.max(0, Math.floor((workEndAbs - checkOutAbs) / 60000))
 
   return { checkIn: checkInKST, checkOut: checkOutKST, breakMin: totalBreakMin, workMin, lateMin, earlyLeaveMin }
 }

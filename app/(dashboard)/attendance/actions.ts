@@ -81,9 +81,12 @@ export async function createHomeLocationRequest(lat: number, lng: number, locati
 
 export async function checkOfficeIp() {
   const hdrs = await headers()
+  // x-real-ip is set by Vercel's infrastructure and cannot be spoofed by the client.
+  // x-forwarded-for is appended by each proxy hop; the last entry is Vercel's value,
+  // but the first entry can be injected by the client, so it must never be trusted alone.
   const currentIp =
-    hdrs.get('x-forwarded-for')?.split(',')[0].trim() ??
     hdrs.get('x-real-ip') ??
+    hdrs.get('x-forwarded-for')?.split(',').at(-1)?.trim() ??
     ''
 
   const admin = createServiceClient(
