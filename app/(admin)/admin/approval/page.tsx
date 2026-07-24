@@ -3,6 +3,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import AdminApprovalClient from '@/components/admin/AdminApprovalClient'
 import { calcAnnualLeave } from '@/lib/annualLeave'
+import { decryptCardNumber } from '@/lib/crypto/ssn'
 
 const PAGE_SIZE = 20
 const DEDUCTS_LEAVE = ['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF', 'GROUP']
@@ -204,6 +205,22 @@ export default async function AdminApprovalPage({
     })
   }
 
+  // Decrypt card numbers for PRIZE personal card expenses
+  const expensePrizeIds = expenseItems
+    .filter(e => e.expenseType === 'PRIZE' && e.evidenceType === 'PERSONAL_CARD')
+    .map(e => e.requestId)
+  if (expensePrizeIds.length > 0) {
+    const { data: cardSecrets } = await admin.from('expense_card_sensitive_data')
+      .select('expense_report_id, encrypted_card_number, iv').in('expense_report_id', expensePrizeIds)
+    const cardMap = new Map<string, string>()
+    for (const cs of cardSecrets ?? []) {
+      try { cardMap.set(cs.expense_report_id, decryptCardNumber(cs.encrypted_card_number, cs.iv)) } catch {}
+    }
+    expenseItems = expenseItems.map(e =>
+      cardMap.has(e.requestId) ? { ...e, cardNumber: cardMap.get(e.requestId) } : e
+    )
+  }
+
   // ── Expense JS 필터 ──────────────────────────────────────────────
   if (expenseType) expenseItems = expenseItems.filter(e => e.expenseType === expenseType)
   if (month) {
@@ -354,6 +371,22 @@ export default async function AdminApprovalPage({
           })
       }
     }
+  }
+
+  // Decrypt card numbers for fullApprove PRIZE personal card expenses
+  const fullApprovePrizeIds = fullApproveExpenseItems
+    .filter(e => e.expenseType === 'PRIZE' && e.evidenceType === 'PERSONAL_CARD')
+    .map(e => e.requestId)
+  if (fullApprovePrizeIds.length > 0) {
+    const { data: cardSecrets } = await admin.from('expense_card_sensitive_data')
+      .select('expense_report_id, encrypted_card_number, iv').in('expense_report_id', fullApprovePrizeIds)
+    const cardMap = new Map<string, string>()
+    for (const cs of cardSecrets ?? []) {
+      try { cardMap.set(cs.expense_report_id, decryptCardNumber(cs.encrypted_card_number, cs.iv)) } catch {}
+    }
+    fullApproveExpenseItems = fullApproveExpenseItems.map(e =>
+      cardMap.has(e.requestId) ? { ...e, cardNumber: cardMap.get(e.requestId) } : e
+    )
   }
 
   // ── fullApprove Expense JS 필터 ──────────────────────────────────

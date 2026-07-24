@@ -1376,6 +1376,7 @@ function PrizeTab({
     !amountExceeds50k &&
     (!isOver50k || ssnClean.length === 13) &&
     (fields.paymentType === 'GIFT_CARD' || (fields.bankName.trim() !== '' && fields.accountNumber.trim() !== '')) &&
+    (fields.paymentType !== 'GIFT_CARD' || fields.giftCardEvidence !== 'PERSONAL_CARD' || (fields.giftCardCardCompany.trim() !== '' && fields.giftCardCardNumber.trim() !== '')) &&
     !uploading
 
   function handleSubmit() {

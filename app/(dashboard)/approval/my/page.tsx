@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import MyRequestsClient from './MyRequestsClient'
+import { decryptCardNumber } from '@/lib/crypto/ssn'
 
 export const dynamic = 'force-dynamic'
 
@@ -240,8 +242,29 @@ export default async function MyRequestsPage({
   }))
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const expenseItems = (expenseResult.data ?? []).map((r: any) => ({
+  const rawExpenses = (expenseResult.data ?? []) as any[]
+  const prizeCardIds = rawExpenses
+    .filter(e => e.expense_type === 'PRIZE' && e.evidence_type === 'PERSONAL_CARD')
+    .map(e => e.id as string)
+  const cardDecryptMap = new Map<string, string>()
+  if (prizeCardIds.length > 0) {
+    const adminClient = createServiceClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    )
+    const { data: cardSecrets } = await adminClient
+      .from('expense_card_sensitive_data')
+      .select('expense_report_id, encrypted_card_number, iv')
+      .in('expense_report_id', prizeCardIds)
+    for (const cs of cardSecrets ?? []) {
+      try { cardDecryptMap.set(cs.expense_report_id, decryptCardNumber(cs.encrypted_card_number, cs.iv)) } catch {}
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const expenseItems = rawExpenses.map((r: any) => ({
     ...r,
+    card_number: cardDecryptMap.get(r.id) ?? r.card_number ?? null,
     kind: 'expense' as const,
     displayLabel: `${r.title} — ${Number(r.amount).toLocaleString()}원`,
     pendingApproverLabel: r.status === 'PENDING' ? getPendingApproverLabel(r.expense_approval_steps, employee.id) : null,

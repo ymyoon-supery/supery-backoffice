@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import PendingApprovalsClient from '@/components/approval/PendingApprovalsClient'
+import { decryptCardNumber } from '@/lib/crypto/ssn'
 
 export const dynamic = 'force-dynamic'
 import { calcAnnualLeave } from '@/lib/annualLeave'
@@ -152,6 +154,25 @@ export default async function PendingApprovalsPage({
       })
     }
 
+    // Decrypt card numbers for PRIZE personal card expenses
+    const pendingPrizeIds = expenseSteps
+      .filter((s: any) => s.expense_reports?.expense_type === 'PRIZE' && s.expense_reports?.evidence_type === 'PERSONAL_CARD')
+      .map((s: any) => s.expense_reports?.id as string).filter(Boolean)
+    if (pendingPrizeIds.length > 0) {
+      const adminClient = createServiceClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+      const { data: cardSecrets } = await adminClient.from('expense_card_sensitive_data')
+        .select('expense_report_id, encrypted_card_number, iv').in('expense_report_id', pendingPrizeIds)
+      const cardMap = new Map<string, string>()
+      for (const cs of cardSecrets ?? []) {
+        try { cardMap.set(cs.expense_report_id, decryptCardNumber(cs.encrypted_card_number, cs.iv)) } catch {}
+      }
+      expenseSteps = expenseSteps.map((s: any) => {
+        const rep = s.expense_reports
+        if (!rep || !cardMap.has(rep.id)) return s
+        return { ...s, expense_reports: { ...rep, card_number: cardMap.get(rep.id) } }
+      })
+    }
+
     // Combine, sort by created_at desc, paginate
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const combined: { kind: 'leave' | 'expense' | 'supply'; step: any }[] = [
@@ -218,6 +239,20 @@ export default async function PendingApprovalsPage({
     })
   }
 
+  // Decrypt card numbers for done PRIZE personal card expenses
+  const donePrizeIds = ((doneExpenseRes.data ?? []) as any[])
+    .filter((s: any) => s.expense_reports?.expense_type === 'PRIZE' && s.expense_reports?.evidence_type === 'PERSONAL_CARD')
+    .map((s: any) => s.expense_reports?.id as string).filter(Boolean)
+  const doneCardMap = new Map<string, string>()
+  if (donePrizeIds.length > 0) {
+    const adminClient = createServiceClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+    const { data: cardSecrets } = await adminClient.from('expense_card_sensitive_data')
+      .select('expense_report_id, encrypted_card_number, iv').in('expense_report_id', donePrizeIds)
+    for (const cs of cardSecrets ?? []) {
+      try { doneCardMap.set(cs.expense_report_id, decryptCardNumber(cs.encrypted_card_number, cs.iv)) } catch {}
+    }
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const step of (doneExpenseRes.data ?? []) as any[]) {
     const rep = step.expense_reports
@@ -245,7 +280,7 @@ export default async function PendingApprovalsPage({
         title: rep.title ?? '', amount: Number(rep.amount ?? 0),
         expenseType: rep.expense_type ?? null, taxType: rep.tax_type ?? null,
         evidenceType: rep.evidence_type ?? null,
-        cardCompany: rep.card_company ?? null, cardNumber: rep.card_number ?? null,
+        cardCompany: rep.card_company ?? null, cardNumber: doneCardMap.get(rep.id) ?? rep.card_number ?? null,
         payee: rep.payee ?? null,
         paymentMethod: rep.payment_method ?? null, bankName: rep.bank_name ?? null,
         accountNumber: rep.account_number ?? null, accountHolder: rep.account_holder ?? null,

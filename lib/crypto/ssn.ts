@@ -30,3 +30,6 @@ export function decryptSSN(encryptedB64: string, ivB64: string): string {
   decipher.setAuthTag(authTag)
   return Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8')
 }
+
+export const encryptCardNumber = encryptSSN
+export const decryptCardNumber = decryptSSN

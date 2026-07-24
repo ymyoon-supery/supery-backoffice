@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { revalidateTag } from 'next/cache'
 import { CACHE_TAGS } from '@/lib/cache/tags'
-import { encryptSSN } from '@/lib/crypto/ssn'
+import { encryptSSN, encryptCardNumber } from '@/lib/crypto/ssn'
 
 export type LineItem = {
   item: string
@@ -204,23 +204,31 @@ export async function submitPrizeExpense(input: PrizeInput) {
     taxType,
     evidenceType,
     cardCompany: input.giftCardEvidence === 'PERSONAL_CARD' ? input.giftCardCardCompany ?? null : null,
-    cardNumber: input.giftCardEvidence === 'PERSONAL_CARD' ? input.giftCardCardNumber ?? null : null,
     category: 'PRIZE_INCOME',
     expenseType: 'PRIZE',
   })
 
   if (expenseResult.error || !expenseResult.id) return { error: expenseResult.error ?? '제출 실패' }
 
+  const admin = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+
   if (input.isOver50k && input.ssn) {
     const { encrypted, iv } = encryptSSN(input.ssn)
-    const admin = createServiceClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    )
     const { error: ssnError } = await admin
       .from('expense_sensitive_data')
       .insert({ expense_report_id: expenseResult.id, encrypted_ssn: encrypted, iv })
     if (ssnError) return { error: ssnError.message }
+  }
+
+  if (input.giftCardEvidence === 'PERSONAL_CARD' && input.giftCardCardNumber) {
+    const { encrypted, iv } = encryptCardNumber(input.giftCardCardNumber)
+    const { error: cardError } = await admin
+      .from('expense_card_sensitive_data')
+      .insert({ expense_report_id: expenseResult.id, encrypted_card_number: encrypted, iv })
+    if (cardError) return { error: cardError.message }
   }
 
   // revalidateTag는 submitExpense 내부에서 이미 호출됨
