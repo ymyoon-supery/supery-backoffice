@@ -6,7 +6,7 @@ import {
 } from 'date-fns'
 import AttendanceSummaryView from '@/components/admin/AttendanceSummaryView'
 import EmploymentTabs from '@/components/admin/EmploymentTabs'
-import { calcDaySummary, toKSTDate, WorkSchedule } from '@/lib/attendance/calc'
+import { calcDaySummary, groupByEmpDate, WorkSchedule } from '@/lib/attendance/calc'
 
 export default async function AdminAttendancePage({
   searchParams,
@@ -77,13 +77,7 @@ export default async function AdminAttendancePage({
 
   const dates = eachDayOfInterval({ start: rangeStart, end: rangeEnd }).map(d => format(d, 'yyyy-MM-dd'))
 
-  const byEmpDate = new Map<string, { type: string; recorded_at: string }[]>()
-  for (const r of records ?? []) {
-    const key = `${r.employee_id}:${toKSTDate(r.recorded_at)}`
-    const list = byEmpDate.get(key) ?? []
-    list.push(r)
-    byEmpDate.set(key, list)
-  }
+  const byEmpDate = groupByEmpDate(records ?? [])
 
   const empSummaries = new Map<string, { id: string; name: string; days: Record<string, ReturnType<typeof calcDaySummary>> }>()
   for (const emp of employees ?? []) {

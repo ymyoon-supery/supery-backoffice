@@ -1,4 +1,3 @@
-// lib/attendance/calc.ts
 import { differenceInMinutes } from 'date-fns'
 
 export type WorkSchedule = {
@@ -126,4 +125,43 @@ export function calcDaySummary(
   const earlyLeaveMin = Math.max(0, Math.floor((workEndAbs - checkOutAbs) / 60000))
 
   return { checkIn: checkInKST, checkOut: checkOutKST, breakMin: totalBreakMin, workMin, lateMin, earlyLeaveMin }
+}
+
+/**
+ * Groups attendance records by employee and KST session date.
+ * Cross-midnight sessions are attributed to the CHECK_IN's KST date so
+ * a session that starts on day N always appears under day N even when
+ * CHECK_OUT falls on day N+1.
+ */
+export function groupByEmpDate<T extends { type: string; recorded_at: string; employee_id: string }>(
+  records: T[],
+): Map<string, T[]> {
+  const byEmp = new Map<string, T[]>()
+  for (const r of records) {
+    const list = byEmp.get(r.employee_id) ?? []
+    list.push(r)
+    byEmp.set(r.employee_id, list)
+  }
+
+  const result = new Map<string, T[]>()
+
+  for (const [empId, recs] of byEmp) {
+    const sorted = [...recs].sort(
+      (a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime(),
+    )
+
+    let sessionDate: string | null = null
+
+    for (const r of sorted) {
+      if (r.type === 'CHECK_IN') sessionDate = toKSTDate(r.recorded_at)
+      const date = sessionDate ?? toKSTDate(r.recorded_at)
+      const key = `${empId}:${date}`
+      const list = result.get(key) ?? []
+      list.push(r)
+      result.set(key, list)
+      if (r.type === 'CHECK_OUT') sessionDate = null
+    }
+  }
+
+  return result
 }
