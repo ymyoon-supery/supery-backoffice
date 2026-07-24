@@ -1,5 +1,6 @@
 'use server'
 
+import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 
@@ -10,12 +11,24 @@ function getAdmin() {
   )
 }
 
+async function requireAdmin(): Promise<{ error: string | null }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: '로그인이 필요합니다.' }
+  const { data: emp } = await supabase.from('employees').select('role').eq('auth_user_id', user.id).single()
+  if (!emp || emp.role !== 'ADMIN') return { error: '권한이 없습니다.' }
+  return { error: null }
+}
+
 export async function uploadPayslip(input: {
   employeeId: string
   yearMonth: string
   fileUrl: string
   fileName: string
 }) {
+  const { error: authError } = await requireAdmin()
+  if (authError) return { error: authError }
+
   const { employeeId, yearMonth, fileUrl, fileName } = input
 
   if (!employeeId || !yearMonth || !fileUrl) {
@@ -53,6 +66,9 @@ export interface PayslipRow {
 }
 
 export async function listPayslipsByMonth(yearMonth?: string): Promise<{ error: string | null; data: PayslipRow[] | null }> {
+  const { error: authError } = await requireAdmin()
+  if (authError) return { error: authError, data: null }
+
   const admin = getAdmin()
 
   let query = admin
@@ -96,6 +112,9 @@ export async function listPayslipsByMonth(yearMonth?: string): Promise<{ error: 
 }
 
 export async function deletePayslip(id: string, employeeId: string, yearMonth: string) {
+  const { error: authError } = await requireAdmin()
+  if (authError) return { error: authError }
+
   const admin = getAdmin()
 
   await admin.storage.from('payslips').remove([`${employeeId}/${yearMonth}.pdf`])
