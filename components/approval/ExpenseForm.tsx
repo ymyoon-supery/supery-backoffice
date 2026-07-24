@@ -67,7 +67,7 @@ const EVIDENCE_TYPE_OPTIONS = [
   { value: 'OTHER_RECEIPT',      label: '기타-개별영수증' },
 ]
 
-const today = format(new Date(), 'yyyy-MM-dd')
+function getToday() { return format(new Date(), 'yyyy-MM-dd') }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -96,14 +96,14 @@ function formatKRWInput(value: string) {
 }
 
 function parseExcelDate(val: unknown): string {
-  if (!val) return today
+  if (!val) return getToday()
   if (val instanceof Date) return format(val, 'yyyy-MM-dd')
   const s = String(val).trim().replace(/\./g, '-')
   if (/^\d{8}$/.test(s.replace(/-/g, ''))) {
     const d = s.replace(/-/g, '')
     return `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`
   }
-  return s || today
+  return s || getToday()
 }
 
 function findColIdx(headers: string[], candidates: string[]): number {
@@ -157,7 +157,7 @@ async function parseCardExcel(file: File): Promise<CardLineItem[] | null> {
       items.push({
         cardLastFour: cardFour,
         userName: userIdx >= 0 ? String(row[userIdx] ?? '').trim() : '',
-        usageDate: dateIdx >= 0 ? parseExcelDate(row[dateIdx]) : today,
+        usageDate: dateIdx >= 0 ? parseExcelDate(row[dateIdx]) : getToday(),
         merchantName: merchantIdx >= 0 ? String(row[merchantIdx] ?? '').trim() : '',
         amountRaw: rawAmt ? Number(rawAmt).toLocaleString('ko-KR') : '',
         description: '',
@@ -322,10 +322,10 @@ function ExpenseTab({
   const [bankName, setBankName] = useState(initialData?.bankName ?? '')
   const [accountNumber, setAccountNumber] = useState(initialData?.accountNumber ?? '')
   const [accountHolder, setAccountHolder] = useState(initialData?.accountHolder ?? '')
-  const [paymentRequestDate, setPaymentRequestDate] = useState(initialData?.paymentRequestDate ?? today)
+  const [paymentRequestDate, setPaymentRequestDate] = useState(initialData?.paymentRequestDate ?? getToday())
   const [settlementDate, setSettlementDate] = useState(initialData?.settlementDate ?? '')
   const [lineItems, setLineItems] = useState<ExpenseRow[]>(() => {
-    if (!initialData?.lineItems?.length) return [{ item: '', date: today, amountRaw: '', vatType: 'EXCLUSIVE', note: '' }]
+    if (!initialData?.lineItems?.length) return [{ item: '', date: getToday(), amountRaw: '', vatType: 'EXCLUSIVE', note: '' }]
     return initialData.lineItems.map(li => {
       const n = li.note ?? ''
       const excMatch = n.match(/^공급가액\s+([\d,]+)원\s*\+\s*부가세\s+[\d,]+원(?:\s*\/\s*(.*))?$/)
@@ -638,7 +638,7 @@ function ExpenseTab({
             </tfoot>
           </table>
         </div>
-        <button type="button" onClick={() => setLineItems(prev => [...prev, { item: '', date: today, amountRaw: '', vatType: 'EXCLUSIVE', note: '' }])} className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors">
+        <button type="button" onClick={() => setLineItems(prev => [...prev, { item: '', date: getToday(), amountRaw: '', vatType: 'EXCLUSIVE', note: '' }])} className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors">
           <Plus size={13} /> 항목 추가
         </button>
       </div>
@@ -683,7 +683,7 @@ function CorporateCardTab({
 }: Props & { onSuccess: () => void; initialData?: ExpenseInitialData | null }) {
   const [isPending, startTransition] = useTransition()
   const [lineItems, setLineItems] = useState<CardLineItem[]>(() => {
-    if (!initialData?.lineItems?.length) return [{ cardLastFour: '', userName: employeeName, usageDate: today, merchantName: '', amountRaw: '', description: '', note: '' }]
+    if (!initialData?.lineItems?.length) return [{ cardLastFour: '', userName: employeeName, usageDate: getToday(), merchantName: '', amountRaw: '', description: '', note: '' }]
     return initialData.lineItems.map(li => {
       const parts = li.item.split(' — ')
       return { cardLastFour: '', userName: li.userName ?? employeeName, usageDate: li.date, merchantName: parts[0] ?? '', amountRaw: li.amount ? li.amount.toLocaleString('ko-KR') : '', description: parts.slice(1).join(' — '), note: li.note ?? '' }
@@ -738,7 +738,7 @@ function CorporateCardTab({
   function addItem() {
     setLineItems(prev => [
       ...prev,
-      { cardLastFour: representativeCard, userName: employeeName, usageDate: today, merchantName: '', amountRaw: '', description: '', note: '' },
+      { cardLastFour: representativeCard, userName: employeeName, usageDate: getToday(), merchantName: '', amountRaw: '', description: '', note: '' },
     ])
   }
 
@@ -769,7 +769,7 @@ function CorporateCardTab({
         bankName: null,
         accountNumber: null,
         accountHolder: null,
-        paymentRequestDate: today,
+        paymentRequestDate: getToday(),
         settlementDate: null,
         lineItems: items,
         attachmentUrls,
@@ -942,7 +942,7 @@ function TransportationTab({
 }: Props & { onSuccess: () => void; initialData?: ExpenseInitialData | null }) {
   const [isPending, startTransition] = useTransition()
   const [lineItems, setLineItems] = useState<TransportLineItem[]>(() => {
-    if (!initialData?.lineItems?.length) return [{ usageDate: today, amountRaw: '', description: '', note: '' }]
+    if (!initialData?.lineItems?.length) return [{ usageDate: getToday(), amountRaw: '', description: '', note: '' }]
     return initialData.lineItems.map(li => ({ usageDate: li.date, amountRaw: li.amount ? li.amount.toLocaleString('ko-KR') : '', description: li.item, note: li.note ?? '' }))
   })
   const [attachments, setAttachments] = useState<File[]>([])
@@ -987,7 +987,7 @@ function TransportationTab({
         bankName: null,
         accountNumber: null,
         accountHolder: null,
-        paymentRequestDate: today,
+        paymentRequestDate: getToday(),
         settlementDate: null,
         lineItems: items,
         attachmentUrls,
@@ -1063,7 +1063,7 @@ function TransportationTab({
             </tfoot>
           </table>
         </div>
-        <button type="button" onClick={() => setLineItems(prev => [...prev, { usageDate: today, amountRaw: '', description: '', note: '' }])} className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors">
+        <button type="button" onClick={() => setLineItems(prev => [...prev, { usageDate: getToday(), amountRaw: '', description: '', note: '' }])} className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors">
           <Plus size={13} /> 항목 추가
         </button>
       </div>
@@ -1128,7 +1128,7 @@ function BusinessIncomeTab({
     accountNumber: '',
     note: '',
   })
-  const [paymentRequestDate, setPaymentRequestDate] = useState(today)
+  const [paymentRequestDate, setPaymentRequestDate] = useState(getToday())
   const [attachments, setAttachments] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
 
@@ -1352,7 +1352,7 @@ function PrizeTab({
     accountNumber: '',
     note: '',
   })
-  const [paymentRequestDate, setPaymentRequestDate] = useState(today)
+  const [paymentRequestDate, setPaymentRequestDate] = useState(getToday())
   const [attachments, setAttachments] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
 

@@ -106,8 +106,8 @@ export async function GET(request: NextRequest) {
       const { error } = await supabase.from('attendance_records').insert({
         employee_id: record.employee_id,
         type: 'CHECK_OUT',
-        recorded_at: record.recorded_at,
-        note: '근태 이상 - 퇴근 기록 없음',
+        recorded_at: dayEnd,
+        note: '근태 이상 - 퇴근 기록 없음 (자동 마감)',
         is_field: false,
         is_anomaly: true,
       })

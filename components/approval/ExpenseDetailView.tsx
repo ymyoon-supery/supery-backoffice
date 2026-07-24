@@ -2,6 +2,14 @@
 
 import { Printer } from 'lucide-react'
 
+function maskCardNumber(num: string): string {
+  const digits = num.replace(/\D/g, '')
+  if (digits.length < 4) return '****'
+  const last4 = digits.slice(-4)
+  const masked = '****-****-****-' + last4
+  return masked
+}
+
 export interface ExpenseViewData {
   title: string
   taxType: string | null
@@ -204,7 +212,7 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
                 <Row label="구분 (세목)" value={data.taxType ? TAX_TYPE_LABELS[data.taxType] ?? data.taxType : null} />
                 <Row label="증빙" value={data.evidenceType ? EVIDENCE_TYPE_LABELS[data.evidenceType] ?? data.evidenceType : null} />
                 {(data.cardCompany || data.cardNumber) && (
-                  <Row label="카드 정보" value={[data.cardCompany, data.cardNumber].filter(Boolean).join(' · ')} />
+                  <Row label="카드 정보" value={[data.cardCompany, data.cardNumber ? maskCardNumber(data.cardNumber) : null].filter(Boolean).join(' · ')} />
                 )}
                 <Row label="지급처" value={data.payee} />
                 <Row

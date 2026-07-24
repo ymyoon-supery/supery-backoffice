@@ -131,7 +131,10 @@ export async function submitBusinessIncomeExpense(input: BusinessIncomeInput) {
     .from('expense_sensitive_data')
     .insert({ expense_report_id: expenseResult.id, encrypted_ssn: encrypted, iv })
 
-  if (ssnError) return { error: ssnError.message }
+  if (ssnError) {
+    await admin.from('expense_reports').delete().eq('id', expenseResult.id)
+    return { error: ssnError.message }
+  }
 
   // revalidateTag는 submitExpense 내부에서 이미 호출됨
   return { error: null, id: expenseResult.id }
@@ -220,7 +223,10 @@ export async function submitPrizeExpense(input: PrizeInput) {
     const { error: ssnError } = await admin
       .from('expense_sensitive_data')
       .insert({ expense_report_id: expenseResult.id, encrypted_ssn: encrypted, iv })
-    if (ssnError) return { error: ssnError.message }
+    if (ssnError) {
+      await admin.from('expense_reports').delete().eq('id', expenseResult.id)
+      return { error: ssnError.message }
+    }
   }
 
   if (input.giftCardEvidence === 'PERSONAL_CARD' && input.giftCardCardNumber) {
@@ -228,7 +234,10 @@ export async function submitPrizeExpense(input: PrizeInput) {
     const { error: cardError } = await admin
       .from('expense_card_sensitive_data')
       .insert({ expense_report_id: expenseResult.id, encrypted_card_number: encrypted, iv })
-    if (cardError) return { error: cardError.message }
+    if (cardError) {
+      await admin.from('expense_reports').delete().eq('id', expenseResult.id)
+      return { error: cardError.message }
+    }
   }
 
   // revalidateTag는 submitExpense 내부에서 이미 호출됨
