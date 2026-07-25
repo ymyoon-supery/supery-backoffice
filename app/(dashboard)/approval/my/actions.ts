@@ -28,20 +28,9 @@ export async function cancelExpenseRequest(id: string) {
   const { supabase, employeeId } = await getEmployeeId()
   if (!employeeId) return { error: '로그인이 필요합니다.' }
 
-  const { error } = await supabase
-    .from('expense_reports')
-    .update({ status: 'CANCELLED' })
-    .eq('id', id)
-    .eq('employee_id', employeeId)
-    .eq('status', 'PENDING')
+  const { error } = await supabase.rpc('cancel_own_expense_request', { p_report_id: id })
 
   if (error) return { error: error.message }
-
-  await supabase
-    .from('expense_approval_steps')
-    .update({ status: 'CANCELLED' })
-    .eq('expense_report_id', id)
-    .in('status', ['PENDING', 'WAITING'])
 
   revalidatePath('/approval/my')
   revalidatePath('/approval/pending')

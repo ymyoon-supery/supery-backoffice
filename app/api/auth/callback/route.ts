@@ -80,6 +80,15 @@ export async function GET(request: NextRequest) {
       await supabase.auth.signOut()
       return NextResponse.redirect(`${origin}/login?error=not_registered`)
     }
+
+    // Returning user — refresh profile metadata
+    await adminClient
+      .from('employees')
+      .update({
+        avatar_url: user.user_metadata.avatar_url ?? null,
+        google_user_id: user.user_metadata.sub ?? null,
+      })
+      .eq('email', user.email!)
   }
 
   return NextResponse.redirect(`${origin}${next}`)
