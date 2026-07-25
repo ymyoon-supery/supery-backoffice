@@ -6,19 +6,19 @@
  * - 3년 이상: 15 + floor((근속연수 - 1) / 2), 최대 25일
  */
 export function calcAnnualLeave(hiredAt: Date, asOf: Date = new Date()): number {
-  // asOf 기준 완성된 근속 개월수
-  let completedMonths = (asOf.getFullYear() - hiredAt.getFullYear()) * 12
-                      + (asOf.getMonth() - hiredAt.getMonth())
-  if (asOf.getDate() < hiredAt.getDate()) completedMonths--
+  // Use UTC accessors so KST-shifted dates (Date.now() + 9h) are handled correctly
+  // on servers running in UTC (e.g. Vercel), preventing month-boundary off-by-one errors.
+  let completedMonths = (asOf.getUTCFullYear() - hiredAt.getUTCFullYear()) * 12
+                      + (asOf.getUTCMonth() - hiredAt.getUTCMonth())
+  if (asOf.getUTCDate() < hiredAt.getUTCDate()) completedMonths--
   completedMonths = Math.max(completedMonths, 0)
 
   if (completedMonths < 12) {
-    // 마지막 월 기념일 이후 경과일 / 30 으로 소수 부분 계산
-    const lastAnniv = new Date(
-      hiredAt.getFullYear(),
-      hiredAt.getMonth() + completedMonths,
-      hiredAt.getDate(),
-    )
+    const lastAnniv = new Date(Date.UTC(
+      hiredAt.getUTCFullYear(),
+      hiredAt.getUTCMonth() + completedMonths,
+      hiredAt.getUTCDate(),
+    ))
     const daysIntoMonth = Math.max(
       Math.floor((asOf.getTime() - lastAnniv.getTime()) / 86400000),
       0,
@@ -34,7 +34,11 @@ export function calcAnnualLeave(hiredAt: Date, asOf: Date = new Date()): number 
 
 /** 입사 1년 미만 여부 — 1년 미만이면 연차 소진 기산일이 입사일 기준이므로 별도 처리 필요 */
 export function isUnderOneYear(hiredAt: Date, asOf: Date = new Date()): boolean {
-  const anniversary = new Date(hiredAt.getFullYear() + 1, hiredAt.getMonth(), hiredAt.getDate())
+  const anniversary = new Date(Date.UTC(
+    hiredAt.getUTCFullYear() + 1,
+    hiredAt.getUTCMonth(),
+    hiredAt.getUTCDate(),
+  ))
   return anniversary > asOf
 }
 

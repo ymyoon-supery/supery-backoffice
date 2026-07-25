@@ -80,3 +80,11 @@ export async function insertEventForEmployee(
   })
   return data.id ?? null
 }
+
+export async function deleteEventForEmployee(
+  subjectEmail: string,
+  eventId: string,
+): Promise<void> {
+  const calendar = getServiceCalendarClient(subjectEmail)
+  await calendar.events.delete({ calendarId: 'primary', eventId })
+}

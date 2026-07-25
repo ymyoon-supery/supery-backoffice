@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { insertEventForEmployee } from '@/lib/google/calendar'
+import { insertEventForEmployee, deleteEventForEmployee } from '@/lib/google/calendar'
 import { uploadPDF } from '@/lib/google/drive'
 import { sendWebhook, buildApprovalMessage } from '@/lib/google/chat'
 
@@ -58,11 +58,12 @@ async function processEvent(supabase: Awaited<ReturnType<typeof createServiceCli
 
   switch (event.event_type) {
     case 'CALENDAR_INSERT': {
-      const { employee_id, start_date, end_date, leave_type } = event.payload as {
+      const { employee_id, start_date, end_date, leave_type, request_id } = event.payload as {
         employee_id: string
         start_date: string
         end_date: string
         leave_type: string
+        request_id?: string
       }
 
       const { data: emp } = await supabase
@@ -72,17 +73,34 @@ async function processEvent(supabase: Awaited<ReturnType<typeof createServiceCli
         .single()
 
       if (emp) {
-        await insertEventForEmployee(emp.email, {
+        const googleEventId = await insertEventForEmployee(emp.email, {
           summary: `[연차] ${emp.name} - ${leave_type}`,
           startDate: start_date,
           endDate: end_date,
         })
+        if (googleEventId && request_id) {
+          await supabase
+            .from('leave_requests')
+            .update({ google_calendar_event_id: googleEventId })
+            .eq('id', request_id)
+        }
       }
       break
     }
 
     case 'CALENDAR_DELETE': {
-      console.log(`[outbox] CALENDAR_DELETE event_id:`, event.payload.event_id)
+      const { employee_id, google_event_id } = event.payload as {
+        employee_id: string
+        google_event_id: string
+      }
+      const { data: emp } = await supabase
+        .from('employees')
+        .select('email')
+        .eq('id', employee_id)
+        .single()
+      if (emp && google_event_id) {
+        await deleteEventForEmployee(emp.email, google_event_id)
+      }
       break
     }
 
@@ -105,7 +123,7 @@ async function processEvent(supabase: Awaited<ReturnType<typeof createServiceCli
         report_id?: string
       }
 
-      if (type === 'leave_approved' && request_id) {
+      if ((type === 'leave_approved' || type === 'leave_rejected') && request_id) {
         const { data: req } = await supabase
           .from('leave_requests')
           .select('leave_type, start_date, end_date, days_used, employees(name)')
@@ -117,7 +135,7 @@ async function processEvent(supabase: Awaited<ReturnType<typeof createServiceCli
           await sendWebhook(
             webhookUrl,
             buildApprovalMessage({
-              type: 'leave_approved',
+              type: type as 'leave_approved' | 'leave_rejected',
               employeeName: empName,
               detail: `${req.start_date} ~ ${req.end_date} (${req.days_used}일)`,
             }),

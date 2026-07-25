@@ -17,10 +17,11 @@ export async function GET(request: NextRequest) {
 
   // Cron runs at 02:00 KST — process previous KST day
   // Use UTC arithmetic after shifting to KST to avoid server-TZ dependency
-  const kstYesterdayMs = Date.now() + 9 * 60 * 60 * 1000 - 24 * 60 * 60 * 1000
-  const dateStr = new Date(kstYesterdayMs).toISOString().slice(0, 10)
+  const nowKst = new Date(Date.now() + 9 * 3600000)
+  nowKst.setUTCDate(nowKst.getUTCDate() - 1)
+  const dateStr = nowKst.toISOString().slice(0, 10)
   const dayStart = `${dateStr}T00:00:00+09:00`
-  const dayEnd = `${dateStr}T23:59:59+09:00`
+  const dayEnd = `${dateStr}T23:59:59.999+09:00`
 
   const { data: checkIns } = await supabase
     .from('attendance_records')
