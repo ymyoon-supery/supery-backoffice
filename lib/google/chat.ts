@@ -15,14 +15,15 @@ export async function sendWebhook(
 }
 
 export function buildApprovalMessage(params: {
-  type: 'leave_approved' | 'leave_rejected' | 'expense_approved'
+  type: 'leave_approved' | 'leave_rejected' | 'expense_approved' | 'expense_rejected'
   employeeName: string
   detail: string
 }): { text: string } {
   if (params.type === 'leave_rejected') {
-    return {
-      text: `❌ *${params.employeeName}*님의 연차 신청이 반려되었습니다.\n${params.detail}`,
-    }
+    return { text: `❌ *${params.employeeName}*님의 연차 신청이 반려되었습니다.\n${params.detail}` }
+  }
+  if (params.type === 'expense_rejected') {
+    return { text: `❌ *${params.employeeName}*님의 지출결의 신청이 반려되었습니다.\n${params.detail}` }
   }
   const emoji = params.type === 'leave_approved' ? '🌴' : '💳'
   const typeLabel = params.type === 'leave_approved' ? '연차' : '지출결의'

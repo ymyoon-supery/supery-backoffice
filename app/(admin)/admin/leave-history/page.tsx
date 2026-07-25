@@ -38,7 +38,7 @@ export default async function LeaveHistoryPage() {
   const usedThisYear: Record<string, number> = {}
 
   for (const r of allUsed ?? []) {
-    const year = parseInt(r.start_date.slice(0, 4))
+    const year = parseInt(r.start_date.slice(0, 4), 10)
     if (!usedByEmpYear[r.employee_id]) usedByEmpYear[r.employee_id] = {}
     usedByEmpYear[r.employee_id][year] =
       (usedByEmpYear[r.employee_id][year] ?? 0) + Number(r.days_used)

@@ -83,6 +83,26 @@ async function processEvent(supabase: Awaited<ReturnType<typeof createServiceCli
             .from('leave_requests')
             .update({ google_calendar_event_id: googleEventId })
             .eq('id', request_id)
+
+          // Race guard: if leave was rejected/cancelled while CALENDAR_INSERT was
+          // in-flight, the cancel/reject RPC couldn't enqueue CALENDAR_DELETE
+          // (google_calendar_event_id was null at that time). Enqueue it now.
+          const { data: lr } = await supabase
+            .from('leave_requests')
+            .select('status')
+            .eq('id', request_id)
+            .single()
+
+          if (lr && (lr.status === 'REJECTED' || lr.status === 'CANCELLED')) {
+            await supabase.from('outbox_events').upsert(
+              {
+                idempotency_key: `CALENDAR_DELETE:leave:${request_id}`,
+                event_type: 'CALENDAR_DELETE',
+                payload: { employee_id, google_event_id: googleEventId },
+              },
+              { onConflict: 'idempotency_key', ignoreDuplicates: true },
+            )
+          }
         }
       }
       break
@@ -141,7 +161,7 @@ async function processEvent(supabase: Awaited<ReturnType<typeof createServiceCli
             }),
           )
         }
-      } else if (type === 'expense_approved' && report_id) {
+      } else if ((type === 'expense_approved' || type === 'expense_rejected') && report_id) {
         const { data: rep } = await supabase
           .from('expense_reports')
           .select('title, amount, employees(name)')
@@ -153,7 +173,7 @@ async function processEvent(supabase: Awaited<ReturnType<typeof createServiceCli
           await sendWebhook(
             webhookUrl,
             buildApprovalMessage({
-              type: 'expense_approved',
+              type: type as 'expense_approved' | 'expense_rejected',
               employeeName: empName,
               detail: `${rep.title} — ${rep.amount.toLocaleString()}원`,
             }),

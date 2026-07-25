@@ -81,14 +81,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${origin}/login?error=not_registered`)
     }
 
-    // Returning user — refresh profile metadata
+    // Returning user — refresh profile metadata (use id, not email, for precision)
     await adminClient
       .from('employees')
       .update({
         avatar_url: user.user_metadata.avatar_url ?? null,
         google_user_id: user.user_metadata.sub ?? null,
       })
-      .eq('email', user.email!)
+      .eq('id', existing.id)
   }
 
   return NextResponse.redirect(`${origin}${next}`)

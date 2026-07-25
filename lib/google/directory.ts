@@ -38,19 +38,37 @@ export async function syncAll(): Promise<{ synced: number; errors: number }> {
       for (const u of users) {
         if (!u.primaryEmail || !u.id) continue
 
-        const { error } = await supabase.from('employees').upsert(
-          {
+        // Check if this employee already exists and has been manually resigned.
+        // We must not overwrite is_active for resigned employees — directory-sync
+        // should only control active/suspended status for employees still in the system.
+        const { data: existing } = await supabase
+          .from('employees')
+          .select('id, resigned_at')
+          .eq('email', u.primaryEmail)
+          .maybeSingle()
+
+        let error
+        if (existing) {
+          // Update profile fields; only sync is_active when not manually resigned
+          const update: Record<string, unknown> = {
+            name: u.name?.fullName ?? u.primaryEmail.split('@')[0],
+            google_user_id: u.id,
+            avatar_url: u.thumbnailPhotoUrl ?? null,
+          }
+          if (!existing.resigned_at) update.is_active = !u.suspended
+          ;({ error } = await supabase.from('employees').update(update).eq('id', existing.id))
+        } else {
+          ;({ error } = await supabase.from('employees').insert({
             email: u.primaryEmail,
             name: u.name?.fullName ?? u.primaryEmail.split('@')[0],
             google_user_id: u.id,
             avatar_url: u.thumbnailPhotoUrl ?? null,
             is_active: !u.suspended,
-          },
-          { onConflict: 'email', ignoreDuplicates: false },
-        )
+          }))
+        }
 
         if (error) {
-          console.error('[directory-sync] upsert error:', u.primaryEmail, error.message)
+          console.error('[directory-sync] sync error:', u.primaryEmail, error.message)
           errors++
         } else {
           synced++

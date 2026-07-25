@@ -221,7 +221,7 @@ export default function LeaveManualClient({ employees, leaveRecords: init }: {
     employees.find(e => e.id === r.employee_id)?.name ?? r.employee_id.slice(0, 8)
 
   const recordYears = useMemo(() =>
-    Array.from(new Set(records.map(r => parseInt(r.start_date.slice(0, 4))))).sort((a, b) => b - a),
+    Array.from(new Set(records.map(r => parseInt(r.start_date.slice(0, 4), 10)))).sort((a, b) => b - a),
     [records],
   )
 
