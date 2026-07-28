@@ -148,6 +148,7 @@ interface Props {
   keyword: string
   catTab: string
   catPage: number
+  allTotalPages: number
   leaveTotalPages: number
   expenseTotalPages: number
   documentTotalPages: number
@@ -173,6 +174,7 @@ export default function MyRequestsClient({
   keyword,
   catTab,
   catPage,
+  allTotalPages,
   leaveTotalPages,
   expenseTotalPages,
   documentTotalPages,
@@ -476,6 +478,13 @@ export default function MyRequestsClient({
             {catPage > 1 ? <Link href={buildTabUrl('expense', catPage - 1)} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">이전</Link> : <span className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-400 opacity-40 cursor-not-allowed">이전</span>}
             <span className="text-xs text-gray-500">{catPage} / {expenseTotalPages}</span>
             {catPage < expenseTotalPages ? <Link href={buildTabUrl('expense', catPage + 1)} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">다음</Link> : <span className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-400 opacity-40 cursor-not-allowed">다음</span>}
+          </div>
+        )}
+        {activeTab === 'all' && allTotalPages > 1 && (
+          <div className="flex items-center justify-center gap-3 pt-2">
+            {catPage > 1 ? <Link href={buildTabUrl('all', catPage - 1)} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">이전</Link> : <span className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-400 opacity-40 cursor-not-allowed">이전</span>}
+            <span className="text-xs text-gray-500">{catPage} / {allTotalPages}</span>
+            {catPage < allTotalPages ? <Link href={buildTabUrl('all', catPage + 1)} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">다음</Link> : <span className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-400 opacity-40 cursor-not-allowed">다음</span>}
           </div>
         )}
       </div>

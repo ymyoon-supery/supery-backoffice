@@ -158,9 +158,7 @@ export default async function MyRequestsPage({
     supplyTotalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE))
   }
 
-  const leaveRange    = catTab === 'leave'    ? [offset, offset + PAGE_SIZE - 1] as const
-    : catTab === 'all' ? [0, 999] as const
-    : [0, PAGE_SIZE - 1] as const
+  const leaveRange    = catTab === 'leave'    ? [offset, offset + PAGE_SIZE - 1] as const : [0, PAGE_SIZE - 1] as const
   const documentRange = catTab === 'document' ? [offset, offset + PAGE_SIZE - 1] as const : [0, PAGE_SIZE - 1] as const
   const supplyRange   = catTab === 'supply'   ? [offset, offset + PAGE_SIZE - 1] as const : [0, PAGE_SIZE - 1] as const
 
@@ -172,13 +170,15 @@ export default async function MyRequestsPage({
   const [dataResults, alertResults] = await Promise.all([
     Promise.all([
       leaveStatuses.length > 0
-        ? supabase
-            .from('leave_requests')
-            .select('id, leave_type, start_date, end_date, days_used, reason, status, created_at, leave_approval_steps(step_order, comment, status, approver_id, employees(position, name, role))')
-            .eq('employee_id', employee.id)
-            .in('status', leaveStatuses)
-            .order('created_at', { ascending: false })
-            .range(leaveRange[0], leaveRange[1])
+        ? (() => {
+            const q = supabase
+              .from('leave_requests')
+              .select('id, leave_type, start_date, end_date, days_used, reason, status, created_at, leave_approval_steps(step_order, comment, status, approver_id, employees(position, name, role))')
+              .eq('employee_id', employee.id)
+              .in('status', leaveStatuses)
+              .order('created_at', { ascending: false })
+            return catTab === 'all' ? q : q.range(leaveRange[0], leaveRange[1])
+          })()
         : Promise.resolve({ data: [] as never[] }),
       (() => {
         if (expenseStatuses.length === 0) return Promise.resolve({ data: [] as never[] })
@@ -199,9 +199,8 @@ export default async function MyRequestsPage({
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (safeKw) q = (q as any).filter('line_items::text', 'ilike', `%${safeKw}%`)
-        const expRange = catTab === 'expense' ? [offset, offset + PAGE_SIZE - 1] as const
-          : catTab === 'all' ? [0, 999] as const
-          : [0, PAGE_SIZE - 1] as const
+        if (catTab === 'all') return q
+        const expRange = catTab === 'expense' ? [offset, offset + PAGE_SIZE - 1] as const : [0, PAGE_SIZE - 1] as const
         return q.range(expRange[0], expRange[1])
       })(),
       documentStatuses.length > 0
@@ -275,9 +274,11 @@ export default async function MyRequestsPage({
     pendingApproverLabel: r.status === 'PENDING' ? getPendingApproverLabel(r.expense_approval_steps, employee.id) : null,
   }))
 
-  const items = [...leaveItems, ...expenseItems].sort(
+  const mergedAll = [...leaveItems, ...expenseItems].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   )
+  const allTotalPages = catTab === 'all' ? Math.max(1, Math.ceil(mergedAll.length / PAGE_SIZE)) : 1
+  const items = catTab === 'all' ? mergedAll.slice(offset, offset + PAGE_SIZE) : mergedAll
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supplyRequests = (supplyResult.data ?? []).map((r: any) => {
@@ -315,6 +316,7 @@ export default async function MyRequestsPage({
       keyword={keyword}
       catTab={catTab}
       catPage={catPage}
+      allTotalPages={allTotalPages}
       leaveTotalPages={leaveTotalPages}
       expenseTotalPages={expenseTotalPages}
       documentTotalPages={documentTotalPages}
