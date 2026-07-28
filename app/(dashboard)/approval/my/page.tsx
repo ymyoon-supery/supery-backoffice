@@ -158,7 +158,9 @@ export default async function MyRequestsPage({
     supplyTotalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE))
   }
 
-  const leaveRange    = catTab === 'leave'    ? [offset, offset + PAGE_SIZE - 1] as const : [0, PAGE_SIZE - 1] as const
+  const leaveRange    = catTab === 'leave'    ? [offset, offset + PAGE_SIZE - 1] as const
+    : catTab === 'all' ? [0, 999] as const
+    : [0, PAGE_SIZE - 1] as const
   const documentRange = catTab === 'document' ? [offset, offset + PAGE_SIZE - 1] as const : [0, PAGE_SIZE - 1] as const
   const supplyRange   = catTab === 'supply'   ? [offset, offset + PAGE_SIZE - 1] as const : [0, PAGE_SIZE - 1] as const
 
@@ -197,7 +199,9 @@ export default async function MyRequestsPage({
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (safeKw) q = (q as any).filter('line_items::text', 'ilike', `%${safeKw}%`)
-        const expRange = catTab === 'expense' ? [offset, offset + PAGE_SIZE - 1] as const : [0, PAGE_SIZE - 1] as const
+        const expRange = catTab === 'expense' ? [offset, offset + PAGE_SIZE - 1] as const
+          : catTab === 'all' ? [0, 999] as const
+          : [0, PAGE_SIZE - 1] as const
         return q.range(expRange[0], expRange[1])
       })(),
       documentStatuses.length > 0
