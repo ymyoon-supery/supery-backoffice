@@ -184,7 +184,7 @@ export default async function MyRequestsPage({
         if (expenseStatuses.length === 0) return Promise.resolve({ data: [] as never[] })
         let q = supabase
           .from('expense_reports')
-          .select('id, title, amount, category, expense_type, status, created_at, tax_type, evidence_type, card_company, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls, expense_approval_steps(step_order, status, comment, approver_id, employees(position, name, role))')
+          .select('id, title, amount, category, expense_type, status, created_at, tax_type, evidence_type, card_company, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls, doc_number, expense_approval_steps(step_order, status, comment, approver_id, employees(position, name, role))')
           .eq('employee_id', employee.id)
           .in('status', expenseStatuses)
           .order('created_at', { ascending: false })
@@ -206,7 +206,7 @@ export default async function MyRequestsPage({
       documentStatuses.length > 0
         ? supabase
             .from('document_requests')
-            .select('id, doc_type, status, purpose, created_at')
+            .select('id, doc_type, status, purpose, created_at, doc_number')
             .eq('employee_id', employee.id)
             .in('status', documentStatuses)
             .order('created_at', { ascending: false })
@@ -215,7 +215,7 @@ export default async function MyRequestsPage({
       supplyStatuses.length > 0
         ? supabase
             .from('supply_requests')
-            .select('id, status, created_at, supply_request_items(id, category, description, estimated_amount, note, sort_order), supply_approval_steps(step_order, status, approver_id, employees(position, name, role))')
+            .select('id, status, created_at, doc_number, supply_request_items(id, category, description, estimated_amount, note, sort_order), supply_approval_steps(step_order, status, approver_id, employees(position, name, role))')
             .eq('employee_id', employee.id)
             .in('status', supplyStatuses)
             .order('created_at', { ascending: false })

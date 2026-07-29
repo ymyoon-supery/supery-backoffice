@@ -104,6 +104,7 @@ interface ExpenseItem {
   attachment_urls?: string[] | null
   expense_approval_steps?: Array<{ status: string; comment?: string | null }> | null
   pendingApproverLabel?: string | null
+  doc_number?: string | null
 }
 
 interface DocumentRequest {
@@ -112,6 +113,7 @@ interface DocumentRequest {
   status: string
   purpose?: string | null
   created_at: string
+  doc_number?: string | null
 }
 
 interface SupplyRequestItem {
@@ -129,6 +131,7 @@ interface SupplyRequest {
   created_at: string
   supply_request_items: SupplyRequestItem[]
   pendingApproverLabel?: string | null
+  doc_number?: string | null
 }
 
 type AnyItem = LeaveItem | ExpenseItem
@@ -283,6 +286,7 @@ export default function MyRequestsClient({
       status: item.status,
       expenseType: item.expense_type ?? null,
       comment: rejectedStep?.comment ?? null,
+      docNumber: item.doc_number ?? null,
     }
     setSelectedExpense(viewData)
   }
@@ -502,6 +506,9 @@ export default function MyRequestsClient({
                     <p className="text-sm font-medium text-gray-900">
                       {DOC_TYPE_LABELS[doc.doc_type] ?? doc.doc_type}
                     </p>
+                    {doc.doc_number && (
+                      <p className="text-xs font-mono text-gray-400 tracking-wider">{doc.doc_number}</p>
+                    )}
                     <p className="text-xs text-gray-400 mt-0.5">
                       {format(new Date(doc.created_at), 'yyyy.MM.dd')}
                       {doc.purpose && <span className="ml-2">· {doc.purpose}</span>}
@@ -570,6 +577,9 @@ export default function MyRequestsClient({
                     <p className="text-sm font-medium text-gray-900">
                       비품/소모품 신청 · {sortedItems.length}개 항목
                     </p>
+                    {req.doc_number && (
+                      <p className="text-xs font-mono text-gray-400 tracking-wider">{req.doc_number}</p>
+                    )}
                     <p className="text-xs text-gray-400 mt-0.5">
                       {format(new Date(req.created_at), 'yyyy.MM.dd')}
                       <span className="ml-2 text-primary">· {isExpanded ? '접기' : '상세보기'}</span>

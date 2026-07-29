@@ -60,6 +60,7 @@ export default function ExpenseDetailSheet({
     requestDate: item.requestDate,
     status: item.status,
     comment: item.comment ?? null,
+    docNumber: item.docNumber ?? null,
   }
 
   return (

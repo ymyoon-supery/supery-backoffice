@@ -50,6 +50,7 @@ export type ApprovalItem = {
   paymentRequestDate?: string | null
   settlementDate?: string | null
   attachmentUrls?: string[] | null
+  docNumber?: string | null
 }
 
 export default async function AdminApprovalPage({
@@ -162,7 +163,7 @@ export default async function AdminApprovalPage({
           id, title, amount, category, expense_type, created_at, payment_status,
           payee, payment_method, bank_name, account_number, account_holder,
           payment_request_date, settlement_date, line_items, attachment_urls,
-          tax_type, evidence_type, card_company,
+          tax_type, evidence_type, card_company, doc_number,
           employees ( name, position )
         )
       `)
@@ -201,6 +202,7 @@ export default async function AdminApprovalPage({
         settlementDate:     rep.settlement_date ?? null,
         lineItems:          rep.line_items ?? null,
         attachmentUrls:     rep.attachment_urls ?? null,
+        docNumber:          rep.doc_number ?? null,
       }]
     })
   }
@@ -317,7 +319,7 @@ export default async function AdminApprovalPage({
     if (type !== 'leave' && type !== 'home_location') {
       const { data: waitingExpense } = await admin
         .from('expense_approval_steps')
-        .select(`id, expense_report_id, expense_reports ( id, title, amount, category, expense_type, created_at, payment_status, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls, tax_type, evidence_type, card_company, employees ( name, position ) )`)
+        .select(`id, expense_report_id, expense_reports ( id, title, amount, category, expense_type, created_at, payment_status, payee, payment_method, bank_name, account_number, account_holder, payment_request_date, settlement_date, line_items, attachment_urls, tax_type, evidence_type, card_company, doc_number, employees ( name, position ) )`)
         .eq('approver_id', employee.id)
         .eq('status', 'WAITING')
         .eq('step_order', 2)
@@ -367,6 +369,7 @@ export default async function AdminApprovalPage({
               settlementDate:     rep.settlement_date ?? null,
               lineItems:          rep.line_items ?? null,
               attachmentUrls:     rep.attachment_urls ?? null,
+              docNumber:          rep.doc_number ?? null,
             }]
           })
       }
