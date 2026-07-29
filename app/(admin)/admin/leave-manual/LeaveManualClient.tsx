@@ -147,6 +147,8 @@ export default function LeaveManualClient({ employees, leaveRecords: init, allEm
   // 수정 모달
   const [filterEmpId, setFilterEmpId] = useState('')
   const [filterYear, setFilterYear] = useState<number | null>(null)
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 20
   const [editing, setEditing] = useState<LeaveRecord | null>(null)
   const [eType, setEType] = useState<LeaveType>('ANNUAL')
   const [eStart, setEStart] = useState('')
@@ -231,6 +233,12 @@ export default function LeaveManualClient({ employees, leaveRecords: init, allEm
     .filter(r => !filterEmpId || r.employee_id === filterEmpId)
     .filter(r => !filterYear || r.start_date.startsWith(String(filterYear)))
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+
+  useEffect(() => { setPage(1) }, [filterEmpId, filterYear])
+
   return (
     <div className="space-y-6">
       {/* 등록 폼 */}
@@ -280,6 +288,7 @@ export default function LeaveManualClient({ employees, leaveRecords: init, allEm
         <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between gap-3 flex-wrap">
           <h2 className="text-sm font-medium text-gray-700 shrink-0">
             연차 내역 ({filtered.length}건)
+            {totalPages > 1 && <span className="text-xs text-gray-400 ml-1.5">{safePage}/{totalPages} 페이지</span>}
           </h2>
           <div className="flex items-center gap-2 flex-wrap">
             {recordYears.length > 0 && (
@@ -332,7 +341,7 @@ export default function LeaveManualClient({ employees, leaveRecords: init, allEm
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {filtered.map(r => (
+              {paginated.map(r => (
                 <tr key={r.id} className="text-gray-700 hover:bg-gray-50/50">
                   <td className="px-4 py-2.5 font-medium">{empName(r)}</td>
                   <td className="px-4 py-2.5 text-gray-500">
@@ -369,6 +378,33 @@ export default function LeaveManualClient({ employees, leaveRecords: init, allEm
               ))}
             </tbody>
           </table>
+        )}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-1 px-4 py-3 border-t border-gray-50">
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1}
+              className="px-3 py-1 text-xs rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+              이전
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 2)
+              .reduce<(number | '...')[]>((acc, p, idx, arr) => {
+                if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('...')
+                acc.push(p)
+                return acc
+              }, [])
+              .map((p, i) =>
+                p === '...'
+                  ? <span key={`e${i}`} className="px-2 text-xs text-gray-300">…</span>
+                  : <button key={p} onClick={() => setPage(p)}
+                      className={`px-3 py-1 text-xs rounded-lg border transition-colors ${safePage === p ? 'bg-primary text-white border-primary' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
+                      {p}
+                    </button>
+              )}
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}
+              className="px-3 py-1 text-xs rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+              다음
+            </button>
+          </div>
         )}
       </div>
 
