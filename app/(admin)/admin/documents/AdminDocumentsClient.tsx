@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { useRouter } from 'next/navigation'
@@ -30,11 +30,52 @@ const SUPPLY_STATUS: Record<string, { label: string; className: string }> = {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function AdminDocumentsClient({ documentRequests, supplyRequests, initialTab }: { documentRequests: any[]; supplyRequests: any[]; initialTab?: Tab }) {
+  const PAGE_SIZE = 20
   const [tab, setTab] = useState<Tab>(initialTab ?? 'documents')
   const [isPending, startTransition] = useTransition()
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [rejectComment, setRejectComment] = useState('')
+  const [docPage, setDocPage] = useState(1)
+  const [supplyPage, setSupplyPage] = useState(1)
   const router = useRouter()
+
+  useEffect(() => { setDocPage(1); setSupplyPage(1) }, [tab])
+
+  const docTotalPages = Math.max(1, Math.ceil(documentRequests.length / PAGE_SIZE))
+  const supplyTotalPages = Math.max(1, Math.ceil(supplyRequests.length / PAGE_SIZE))
+  const pagedDocs = documentRequests.slice((docPage - 1) * PAGE_SIZE, docPage * PAGE_SIZE)
+  const pagedSupply = supplyRequests.slice((supplyPage - 1) * PAGE_SIZE, supplyPage * PAGE_SIZE)
+
+  function Pagination({ page, totalPages, setPage }: { page: number; totalPages: number; setPage: (p: number) => void }) {
+    if (totalPages <= 1) return null
+    return (
+      <div className="flex items-center justify-center gap-1 px-4 py-3 border-t border-gray-50">
+        <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}
+          className="px-3 py-1 text-xs rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          이전
+        </button>
+        {Array.from({ length: totalPages }, (_, i) => i + 1)
+          .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
+          .reduce<(number | '...')[]>((acc, p, idx, arr) => {
+            if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('...')
+            acc.push(p)
+            return acc
+          }, [])
+          .map((p, i) =>
+            p === '...'
+              ? <span key={`e${i}`} className="px-2 text-xs text-gray-300">…</span>
+              : <button key={p} onClick={() => setPage(p as number)}
+                  className={`px-3 py-1 text-xs rounded-lg border transition-colors ${page === p ? 'bg-primary text-white border-primary' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
+                  {p}
+                </button>
+          )}
+        <button onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages}
+          className="px-3 py-1 text-xs rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          다음
+        </button>
+      </div>
+    )
+  }
 
   function handleComplete(id: string) {
     startTransition(async () => {
@@ -120,7 +161,7 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests,
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                {documentRequests.map((req: any) => {
+                {pagedDocs.map((req: any) => {
                   const emp = req.employees
                   const empLabel = [emp?.departments?.name, emp?.position, emp?.name].filter(Boolean).join(' / ')
                   const isPending_ = req.status === 'PENDING'
@@ -162,6 +203,7 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests,
               </tbody>
             </table>
           )}
+          <Pagination page={docPage} totalPages={docTotalPages} setPage={setDocPage} />
         </div>
       )}
 
@@ -173,8 +215,9 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests,
               비품/소모품 신청 내역이 없습니다.
             </div>
           ) : (
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            supplyRequests.map((req: any) => {
+            <>
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            {pagedSupply.map((req: any) => {
               const emp = req.employees
               const empLabel = [emp?.departments?.name, emp?.position, emp?.name].filter(Boolean).join(' / ')
               const statusInfo = SUPPLY_STATUS[req.status] ?? SUPPLY_STATUS.PENDING
@@ -291,7 +334,9 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests,
                   )}
                 </div>
               )
-            })
+            })}
+            <Pagination page={supplyPage} totalPages={supplyTotalPages} setPage={setSupplyPage} />
+            </>
           )}
         </div>
       )}
