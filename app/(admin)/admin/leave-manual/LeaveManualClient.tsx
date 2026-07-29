@@ -124,10 +124,12 @@ function LeaveFields({
   )
 }
 
-export default function LeaveManualClient({ employees, leaveRecords: init }: {
+export default function LeaveManualClient({ employees, leaveRecords: init, allEmpNames }: {
   employees: Employee[]
   leaveRecords: LeaveRecord[]
+  allEmpNames: { id: string; name: string }[]
 }) {
+  const empNameMap = Object.fromEntries(allEmpNames.map(e => [e.id, e.name]))
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [records, setRecords] = useState<LeaveRecord[]>(init)
@@ -218,7 +220,7 @@ export default function LeaveManualClient({ employees, leaveRecords: init }: {
   }
 
   const empName = (r: LeaveRecord) =>
-    employees.find(e => e.id === r.employee_id)?.name ?? r.employee_id.slice(0, 8)
+    empNameMap[r.employee_id] ?? employees.find(e => e.id === r.employee_id)?.name ?? '(알 수 없음)'
 
   const recordYears = useMemo(() =>
     Array.from(new Set(records.map(r => parseInt(r.start_date.slice(0, 4), 10)))).sort((a, b) => b - a),

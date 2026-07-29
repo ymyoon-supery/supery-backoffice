@@ -27,8 +27,9 @@ export default async function LeaveManualPage({
   const today = new Date(Date.now() + 9 * 3600000)
   const yearStart = `${today.getUTCFullYear()}-01-01`
 
-  const [{ data: rawEmployees }, { data: leaveRecords, error: leaveError }, { data: usedTotals }] = await Promise.all([
+  const [{ data: rawEmployees }, { data: allEmpNames }, { data: leaveRecords, error: leaveError }, { data: usedTotals }] = await Promise.all([
     admin.from('employees').select('id, name, email, hired_at, annual_leave_days, remaining_leaves').eq('is_active', employment === 'active').order('name'),
+    admin.from('employees').select('id, name'),
     admin.from('leave_requests')
       .select('id, employee_id, leave_type, start_date, end_date, days_used, reason, is_manual')
       .eq('status', 'APPROVED')
@@ -85,7 +86,7 @@ export default async function LeaveManualPage({
         </div>
       )}
       <div className="mt-4">
-        <LeaveManualClient employees={employees} leaveRecords={records} />
+        <LeaveManualClient employees={employees} leaveRecords={records} allEmpNames={allEmpNames ?? []} />
       </div>
     </div>
   )
