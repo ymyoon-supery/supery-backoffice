@@ -44,6 +44,7 @@ type DoneItem = {
   employeeName: string; typeLabel: string; detail: string
   requestDate: string; actedAt: string | null
   status: 'APPROVED' | 'REJECTED'; isJeongyeol: boolean
+  comment?: string | null
   leaveReason?: string | null
   expenseDetail?: DoneItemExpenseDetail | null
   supplyItems?: DoneItemSupplyItem[] | null
@@ -95,13 +96,21 @@ export default function PendingApprovalsClient({
     return `/approval/pending?${p.toString()}`
   }
 
+  function refreshOrGoBack() {
+    if (page > 1 && pendingItems.length === 1) {
+      router.push(buildUrl({ page: String(page - 1) }))
+    } else {
+      router.refresh()
+    }
+  }
+
   function handleLeave(requestId: string, approved: boolean, comment?: string) {
     startTransition(async () => {
       const result = await approveLeave(requestId, approved, comment)
       if (result.error) { toast.error(result.error); return }
       toast.success(approved ? '승인되었습니다.' : '반려되었습니다.')
       setRejectingLeaveId(null); setRejectReason('')
-      router.refresh()
+      refreshOrGoBack()
     })
   }
 
@@ -110,7 +119,7 @@ export default function PendingApprovalsClient({
       const result = await approveExpense(reportId, true)
       if (result.error) { toast.error(result.error); return }
       toast.success('승인되었습니다.')
-      setSelectedExpense(null); router.refresh()
+      setSelectedExpense(null); refreshOrGoBack()
     })
   }
 
@@ -119,7 +128,7 @@ export default function PendingApprovalsClient({
       const result = await approveExpense(reportId, false, reason)
       if (result.error) { toast.error(result.error); return }
       toast.success('반려되었습니다.')
-      setSelectedExpense(null); router.refresh()
+      setSelectedExpense(null); refreshOrGoBack()
     })
   }
 
@@ -156,7 +165,7 @@ export default function PendingApprovalsClient({
     startTransition(async () => {
       const result = await approveSupplyAction(requestId, true)
       if (result.error) { toast.error(result.error); return }
-      toast.success('승인되었습니다.'); router.refresh()
+      toast.success('승인되었습니다.'); refreshOrGoBack()
     })
   }
 
@@ -166,7 +175,7 @@ export default function PendingApprovalsClient({
       if (result.error) { toast.error(result.error); return }
       toast.success('반려되었습니다.')
       setRejectingSupplyId(null); setSupplyRejectComment('')
-      router.refresh()
+      refreshOrGoBack()
     })
   }
 
@@ -494,10 +503,18 @@ export default function PendingApprovalsClient({
                   <div className="pt-1 border-t border-gray-100 text-xs text-gray-500 space-y-1">
                     <p><span className="text-gray-400">기간</span> {item.detail}</p>
                     {item.leaveReason && <p><span className="text-gray-400">사유</span> {item.leaveReason}</p>}
+                    {item.status === 'REJECTED' && item.comment && (
+                      <p className="text-red-500"><span className="text-red-400">반려사유</span> {item.comment}</p>
+                    )}
                   </div>
                 )}
 
                 {/* Supply detail */}
+                {isExpanded && item.kind === 'supply' && item.status === 'REJECTED' && item.comment && (
+                  <div className="pt-1 border-t border-gray-100 text-xs">
+                    <p className="text-red-500"><span className="text-red-400">반려사유</span> {item.comment}</p>
+                  </div>
+                )}
                 {isExpanded && item.kind === 'supply' && sortedSupplyItems.length > 0 && (
                   <div className="rounded-lg border border-gray-100 overflow-hidden">
                     <table className="w-full text-xs table-fixed">
