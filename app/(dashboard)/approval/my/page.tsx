@@ -306,7 +306,9 @@ export default async function MyRequestsPage({
       ? ((r.supply_approval_steps ?? []) as Array<{ status: string; comment?: string | null }>)
           .find((s: any) => s.status === 'REJECTED' && s.comment)?.comment ?? null
       : null
-    return { ...r, pendingApproverLabel, rejectionComment }
+    const hasApprovedStep = (r.supply_approval_steps ?? []).some((s: any) => s.status === 'APPROVED')
+    const canCancel = r.status === 'PENDING' && !hasApprovedStep
+    return { ...r, pendingApproverLabel, rejectionComment, canCancel }
   })
 
   const pagedDocuments = (() => {

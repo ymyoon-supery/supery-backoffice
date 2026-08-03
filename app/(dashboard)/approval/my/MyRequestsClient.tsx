@@ -121,6 +121,7 @@ interface SupplyRequest {
   supply_request_items: SupplyRequestItem[]
   pendingApproverLabel?: string | null
   rejectionComment?: string | null
+  canCancel?: boolean
   doc_number?: string | null
 }
 
@@ -585,7 +586,7 @@ export default function MyRequestsClient({
                     <span className={`text-xs px-2 py-1 rounded-full font-medium ${status.className}`}>
                       {status.label}
                     </span>
-                    {req.status === 'PENDING' && (
+                    {req.canCancel && (
                       <button
                         type="button"
                         onClick={() => handleCancel('비품/소모품 신청', () => cancelSupplyRequest(req.id))}
