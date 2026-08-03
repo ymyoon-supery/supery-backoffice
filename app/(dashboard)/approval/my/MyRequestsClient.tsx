@@ -378,6 +378,10 @@ export default function MyRequestsClient({
           const rejectionReason = item.kind === 'leave' && item.status === 'REJECTED'
             ? item.leave_approval_steps?.find(s => s.status === 'REJECTED')?.comment
             : null
+          const hasApprovedStep = item.kind === 'leave'
+            ? (item.leave_approval_steps ?? []).some(s => s.status === 'APPROVED')
+            : ((item as ExpenseItem).expense_approval_steps ?? []).some(s => s.status === 'APPROVED')
+          const canCancelThisItem = item.status === 'PENDING' && !hasApprovedStep
 
           return (
             <div
@@ -429,7 +433,7 @@ export default function MyRequestsClient({
                   <span className={`text-xs px-2 py-1 rounded-full font-medium ${status.className}`}>
                     {status.label}
                   </span>
-                  {item.status === 'PENDING' && (
+                  {canCancelThisItem && (
                     <button
                       type="button"
                       onClick={e => {
