@@ -26,6 +26,7 @@ const SUPPLY_STATUS: Record<string, { label: string; className: string }> = {
   APPROVED:  { label: '승인완료', className: 'bg-green-50 text-green-700' },
   REJECTED:  { label: '반려',     className: 'bg-red-50 text-red-600' },
   COMPLETED: { label: '처리완료', className: 'bg-blue-50 text-blue-700' },
+  CANCELLED: { label: '취소',     className: 'bg-gray-100 text-gray-400' },
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -174,7 +175,9 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests,
                       </td>
                       <td className="px-4 py-3 text-gray-400 text-xs">{format(new Date(req.created_at), 'yyyy.MM.dd')}</td>
                       <td className="px-4 py-3">
-                        {isPending_ ? (
+                        {req.status === 'CANCELLED' ? (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 font-medium">취소</span>
+                        ) : isPending_ ? (
                           <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium">대기중</span>
                         ) : (
                           <div>

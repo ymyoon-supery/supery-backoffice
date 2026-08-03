@@ -41,14 +41,16 @@ export async function cancelDocumentRequest(id: string) {
   const { supabase, employeeId } = await getEmployeeId()
   if (!employeeId) return { error: '로그인이 필요합니다.' }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('document_requests')
     .update({ status: 'CANCELLED' })
     .eq('id', id)
     .eq('employee_id', employeeId)
     .eq('status', 'PENDING')
+    .select('id')
 
   if (error) return { error: error.message }
+  if (!data?.length) return { error: '취소할 수 없는 상태입니다.' }
   revalidatePath('/approval/my')
   return { error: null }
 }
@@ -57,14 +59,16 @@ export async function cancelSupplyRequest(id: string) {
   const { supabase, employeeId } = await getEmployeeId()
   if (!employeeId) return { error: '로그인이 필요합니다.' }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('supply_requests')
     .update({ status: 'CANCELLED' })
     .eq('id', id)
     .eq('employee_id', employeeId)
     .eq('status', 'PENDING')
+    .select('id')
 
   if (error) return { error: error.message }
+  if (!data?.length) return { error: '취소할 수 없는 상태입니다.' }
 
   await supabase
     .from('supply_approval_steps')
