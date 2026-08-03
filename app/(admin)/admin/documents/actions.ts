@@ -69,6 +69,16 @@ export async function approveSupplyRequest(
 
   if (stepErr) return { error: stepErr.message }
 
+  // When rejecting, propagate reason to previously APPROVED steps so prior
+  // approvers can see the rejection reason in their 결재완료 list.
+  if (!approved) {
+    await admin
+      .from('supply_approval_steps')
+      .update({ status: 'REJECTED', comment: comment ?? null })
+      .eq('supply_request_id', requestId)
+      .eq('status', 'APPROVED')
+  }
+
   const { error: reqErr } = await admin
     .from('supply_requests')
     .update({ status: approved ? 'APPROVED' : 'REJECTED' })

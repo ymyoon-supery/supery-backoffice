@@ -120,6 +120,7 @@ interface SupplyRequest {
   created_at: string
   supply_request_items: SupplyRequestItem[]
   pendingApproverLabel?: string | null
+  rejectionComment?: string | null
   doc_number?: string | null
 }
 
@@ -596,6 +597,10 @@ export default function MyRequestsClient({
                     )}
                   </div>
                 </div>
+
+                {req.status === 'REJECTED' && req.rejectionComment && (
+                  <p className="text-xs text-red-500 pl-0.5">반려 사유: {req.rejectionComment}</p>
+                )}
 
                 {isExpanded && (
                   <div className="rounded-lg border border-gray-100 overflow-hidden">

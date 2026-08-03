@@ -215,7 +215,7 @@ export default async function MyRequestsPage({
       supplyStatuses.length > 0
         ? supabase
             .from('supply_requests')
-            .select('id, status, created_at, doc_number, supply_request_items(id, category, description, estimated_amount, note, sort_order), supply_approval_steps(step_order, status, approver_id, employees(position, name, role))')
+            .select('id, status, created_at, doc_number, supply_request_items(id, category, description, estimated_amount, note, sort_order), supply_approval_steps(step_order, status, comment, approver_id, employees(position, name, role))')
             .eq('employee_id', employee.id)
             .in('status', supplyStatuses)
             .order('created_at', { ascending: false })
@@ -288,7 +288,7 @@ export default async function MyRequestsPage({
     let pendingApproverLabel: string | null = null
     if (r.status === 'PENDING') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const steps = (r.supply_approval_steps ?? []) as Array<{ step_order: number; status: string; approver_id?: string | null; employees?: { position?: string | null; name?: string | null; role?: string | null } | null }>
+      const steps = (r.supply_approval_steps ?? []) as Array<{ step_order: number; status: string; comment?: string | null; approver_id?: string | null; employees?: { position?: string | null; name?: string | null; role?: string | null } | null }>
       const pending = [...steps]
         .filter(s => s.status === 'PENDING' && s.approver_id !== employee.id)
         .sort((a, b) => a.step_order - b.step_order)[0]
@@ -301,7 +301,12 @@ export default async function MyRequestsPage({
         pendingApproverLabel = `${label} 승인 대기중`
       }
     }
-    return { ...r, pendingApproverLabel }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rejectionComment = r.status === 'REJECTED'
+      ? ((r.supply_approval_steps ?? []) as Array<{ status: string; comment?: string | null }>)
+          .find((s: any) => s.status === 'REJECTED' && s.comment)?.comment ?? null
+      : null
+    return { ...r, pendingApproverLabel, rejectionComment }
   })
 
   const pagedDocuments = (() => {
