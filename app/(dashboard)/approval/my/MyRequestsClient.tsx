@@ -35,10 +35,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   OTHER: '기타',
 }
 
-const STATUS_SORT: Record<string, number> = {
-  REJECTED: 0, PENDING: 1, APPROVED: 2, COMPLETED: 2, CANCELLED: 3,
-}
-
 const EXPENSE_TYPE_LABELS: Record<string, string> = {
   EXPENSE:         '지출결의서',
   CORPORATE_CARD:  '법인카드',
@@ -56,13 +52,6 @@ const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
   { id: 'pending',  label: '대기' },
   { id: 'done',     label: '승인·완료' },
 ]
-
-function sortByStatusDate<T extends { status: string; created_at: string }>(arr: T[]): T[] {
-  return [...arr].sort((a, b) => {
-    const diff = (STATUS_SORT[a.status] ?? 99) - (STATUS_SORT[b.status] ?? 99)
-    return diff !== 0 ? diff : new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  })
-}
 
 interface LeaveItem {
   id: string
@@ -200,9 +189,9 @@ export default function MyRequestsClient({
 
   const statusFilter = (statusFilterProp as StatusFilter) ?? 'all'
 
-  const sortedItems     = sortByStatusDate(items)
-  const sortedDocuments = sortByStatusDate(documentRequests)
-  const sortedSupply    = sortByStatusDate(supplyRequests)
+  const sortedItems     = items
+  const sortedDocuments = documentRequests
+  const sortedSupply    = supplyRequests
 
   const leaveItems   = sortedItems.filter(i => i.kind === 'leave')
   const expenseItems = sortedItems.filter(i => i.kind === 'expense') as ExpenseItem[]

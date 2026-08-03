@@ -11,6 +11,16 @@ const LEAVE_LABELS: Record<string, string> = {
   SICK: '병가(무급)', GROUP: '공동연차', COMP: '보상휴가', OTHER: '기타',
 }
 
+const STATUS_SORT_ORDER: Record<string, number> = {
+  REJECTED: 0, PENDING: 1, APPROVED: 2, COMPLETED: 2, CANCELLED: 3,
+}
+function sortByStatusDate<T extends { status: string; created_at: string }>(arr: T[]): T[] {
+  return [...arr].sort((a, b) => {
+    const diff = (STATUS_SORT_ORDER[a.status] ?? 99) - (STATUS_SORT_ORDER[b.status] ?? 99)
+    return diff !== 0 ? diff : new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  })
+}
+
 const PAGE_SIZE = 10
 
 type AlertCounts = { rejected: number; pending: number }
@@ -158,10 +168,6 @@ export default async function MyRequestsPage({
     supplyTotalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE))
   }
 
-  const leaveRange    = catTab === 'leave'    ? [offset, offset + PAGE_SIZE - 1] as const : [0, PAGE_SIZE - 1] as const
-  const documentRange = catTab === 'document' ? [offset, offset + PAGE_SIZE - 1] as const : [0, PAGE_SIZE - 1] as const
-  const supplyRange   = catTab === 'supply'   ? [offset, offset + PAGE_SIZE - 1] as const : [0, PAGE_SIZE - 1] as const
-
   const makeAlertCounter = (data: { status: string }[] | null): AlertCounts => ({
     rejected: data?.filter(x => x.status === 'REJECTED').length ?? 0,
     pending:  data?.filter(x => x.status === 'PENDING').length ?? 0,
@@ -170,15 +176,12 @@ export default async function MyRequestsPage({
   const [dataResults, alertResults] = await Promise.all([
     Promise.all([
       leaveStatuses.length > 0
-        ? (() => {
-            const q = supabase
-              .from('leave_requests')
-              .select('id, leave_type, start_date, end_date, days_used, reason, status, created_at, leave_approval_steps(step_order, comment, status, approver_id, employees(position, name, role))')
-              .eq('employee_id', employee.id)
-              .in('status', leaveStatuses)
-              .order('created_at', { ascending: false })
-            return catTab === 'all' ? q : q.range(leaveRange[0], leaveRange[1])
-          })()
+        ? supabase
+            .from('leave_requests')
+            .select('id, leave_type, start_date, end_date, days_used, reason, status, created_at, leave_approval_steps(step_order, comment, status, approver_id, employees(position, name, role))')
+            .eq('employee_id', employee.id)
+            .in('status', leaveStatuses)
+            .order('created_at', { ascending: false })
         : Promise.resolve({ data: [] as never[] }),
       (() => {
         if (expenseStatuses.length === 0) return Promise.resolve({ data: [] as never[] })
@@ -199,9 +202,7 @@ export default async function MyRequestsPage({
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (safeKw) q = (q as any).filter('line_items::text', 'ilike', `%${safeKw}%`)
-        if (catTab === 'all') return q
-        const expRange = catTab === 'expense' ? [offset, offset + PAGE_SIZE - 1] as const : [0, PAGE_SIZE - 1] as const
-        return q.range(expRange[0], expRange[1])
+        return q
       })(),
       documentStatuses.length > 0
         ? supabase
@@ -210,7 +211,6 @@ export default async function MyRequestsPage({
             .eq('employee_id', employee.id)
             .in('status', documentStatuses)
             .order('created_at', { ascending: false })
-            .range(documentRange[0], documentRange[1])
         : Promise.resolve({ data: [] as never[] }),
       supplyStatuses.length > 0
         ? supabase
@@ -219,7 +219,6 @@ export default async function MyRequestsPage({
             .eq('employee_id', employee.id)
             .in('status', supplyStatuses)
             .order('created_at', { ascending: false })
-            .range(supplyRange[0], supplyRange[1])
         : Promise.resolve({ data: [] as never[] }),
     ]),
     Promise.all([
@@ -274,11 +273,15 @@ export default async function MyRequestsPage({
     pendingApproverLabel: r.status === 'PENDING' ? getPendingApproverLabel(r.expense_approval_steps, employee.id) : null,
   }))
 
-  const mergedAll = [...leaveItems, ...expenseItems].sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  )
+  const mergedAll = sortByStatusDate([...leaveItems, ...expenseItems])
   const allTotalPages = catTab === 'all' ? Math.max(1, Math.ceil(mergedAll.length / PAGE_SIZE)) : 1
-  const items = catTab === 'all' ? mergedAll.slice(offset, offset + PAGE_SIZE) : mergedAll
+  const items = catTab === 'all'
+    ? mergedAll.slice(offset, offset + PAGE_SIZE)
+    : catTab === 'leave'
+      ? sortByStatusDate(leaveItems).slice(offset, offset + PAGE_SIZE)
+      : catTab === 'expense'
+        ? sortByStatusDate(expenseItems).slice(offset, offset + PAGE_SIZE)
+        : mergedAll
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supplyRequests = (supplyResult.data ?? []).map((r: any) => {
@@ -301,14 +304,24 @@ export default async function MyRequestsPage({
     return { ...r, pendingApproverLabel }
   })
 
+  const pagedDocuments = (() => {
+    const sorted = sortByStatusDate(documentResult.data ?? [])
+    return catTab === 'document' ? sorted.slice(offset, offset + PAGE_SIZE) : sorted
+  })()
+
+  const pagedSupply = (() => {
+    const sorted = sortByStatusDate(supplyRequests)
+    return catTab === 'supply' ? sorted.slice(offset, offset + PAGE_SIZE) : sorted
+  })()
+
   return (
     <MyRequestsClient
       items={items}
       employeeName={employeeName}
       employeePosition={employeePosition}
       departmentName={departmentName}
-      documentRequests={documentResult.data ?? []}
-      supplyRequests={supplyRequests as never[]}
+      documentRequests={pagedDocuments}
+      supplyRequests={pagedSupply as never[]}
       expenseType={expenseType}
       month={month}
       dateFrom={dateFrom}
