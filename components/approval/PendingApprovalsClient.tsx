@@ -510,7 +510,7 @@ export default function PendingApprovalsClient({
                 )}
 
                 {/* Supply detail */}
-                {isExpanded && item.kind === 'supply' && item.status === 'REJECTED' && item.comment && (
+                {item.kind === 'supply' && item.status === 'REJECTED' && item.comment && (
                   <div className="pt-1 border-t border-gray-100 text-xs">
                     <p className="text-red-500"><span className="text-red-400">반려사유</span> {item.comment}</p>
                   </div>
