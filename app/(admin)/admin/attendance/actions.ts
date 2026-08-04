@@ -4,10 +4,18 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidateTag } from 'next/cache'
 import { CACHE_TAGS } from '@/lib/cache/tags'
 
-export async function resolveAnomaly(recordId: string, checkoutTime: string, note: string) {
+async function requireAdmin() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: '인증이 필요합니다.' }
+  if (!user) return null
+  const { data: emp } = await supabase
+    .from('employees').select('role').eq('auth_user_id', user.id).single()
+  return emp?.role === 'ADMIN' ? supabase : null
+}
+
+export async function resolveAnomaly(recordId: string, checkoutTime: string, note: string) {
+  const supabase = await requireAdmin()
+  if (!supabase) return { error: '권한이 없습니다.' }
 
   const { error } = await supabase
     .from('attendance_records')
@@ -22,9 +30,8 @@ export async function resolveAnomaly(recordId: string, checkoutTime: string, not
 }
 
 export async function correctAttendance(recordId: string, note: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: '인증이 필요합니다.' }
+  const supabase = await requireAdmin()
+  if (!supabase) return { error: '권한이 없습니다.' }
 
   const { error } = await supabase
     .from('attendance_records')

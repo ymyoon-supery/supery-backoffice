@@ -5,8 +5,18 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { revalidateTag } from 'next/cache'
 import { CACHE_TAGS } from '@/lib/cache/tags'
 
-export async function fullApproveLeave(requestId: string) {
+async function requireAdminClient() {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+  const { data: emp } = await supabase
+    .from('employees').select('role').eq('auth_user_id', user.id).single()
+  return emp?.role === 'ADMIN' ? supabase : null
+}
+
+export async function fullApproveLeave(requestId: string) {
+  const supabase = await requireAdminClient()
+  if (!supabase) return { error: '권한이 없습니다.' }
   const { error } = await supabase.rpc('admin_full_approve_leave', { p_request_id: requestId })
   if (error) return { error: error.message }
   revalidateTag(CACHE_TAGS.approvalInbox)
@@ -14,7 +24,8 @@ export async function fullApproveLeave(requestId: string) {
 }
 
 export async function fullApproveExpense(reportId: string) {
-  const supabase = await createClient()
+  const supabase = await requireAdminClient()
+  if (!supabase) return { error: '권한이 없습니다.' }
   const { error } = await supabase.rpc('admin_full_approve_expense', { p_report_id: reportId })
   if (error) return { error: error.message }
   revalidateTag(CACHE_TAGS.approvalInbox)
@@ -22,7 +33,8 @@ export async function fullApproveExpense(reportId: string) {
 }
 
 export async function fullRejectLeave(requestId: string, comment?: string) {
-  const supabase = await createClient()
+  const supabase = await requireAdminClient()
+  if (!supabase) return { error: '권한이 없습니다.' }
   const { error } = await supabase.rpc('admin_full_reject_leave', {
     p_request_id: requestId,
     p_comment: comment ?? null,
@@ -33,7 +45,8 @@ export async function fullRejectLeave(requestId: string, comment?: string) {
 }
 
 export async function fullRejectExpense(reportId: string, comment?: string) {
-  const supabase = await createClient()
+  const supabase = await requireAdminClient()
+  if (!supabase) return { error: '권한이 없습니다.' }
   const { error } = await supabase.rpc('admin_full_reject_expense', {
     p_report_id: reportId,
     p_comment: comment ?? null,
