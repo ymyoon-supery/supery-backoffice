@@ -41,6 +41,7 @@ export type DoneItem = {
   actedAt: string | null
   status: 'APPROVED' | 'REJECTED'
   isJeongyeol: boolean
+  comment?: string | null
   leaveReason?: string | null
   expenseDetail?: DoneItemExpenseDetail | null
   supplyItems?: DoneItemSupplyItem[] | null
@@ -216,7 +217,7 @@ export default async function PendingApprovalsPage({
       : Promise.resolve({ data: [] as unknown[] }),
     wantSupply
       ? supabase.from('supply_approval_steps')
-          .select('id, acted_at, status, comment, supply_requests(id, created_at, employees(name), supply_request_items(id, category, description, estimated_amount, note, sort_order))')
+          .select('id, acted_at, status, comment, supply_requests(id, status, created_at, employees(name), supply_request_items(id, category, description, estimated_amount, note, sort_order), supply_approval_steps(status, comment))')
           .eq('approver_id', employee.id).in('status', ['APPROVED', 'REJECTED']).order('acted_at', { ascending: false })
       : Promise.resolve({ data: [] as unknown[] }),
   ])
@@ -235,6 +236,7 @@ export default async function PendingApprovalsPage({
       detail: `${req.start_date}${req.start_date !== req.end_date ? ` ~ ${req.end_date}` : ''}`,
       requestDate: req.created_at, actedAt: step.acted_at,
       status: step.status, isJeongyeol: step.comment === '전결',
+      comment: step.status === 'REJECTED' ? (step.comment ?? null) : null,
       leaveReason: req.reason ?? null,
     })
   }
@@ -297,13 +299,20 @@ export default async function PendingApprovalsPage({
     const req = step.supply_requests
     if (!req) continue
     if (employeeName && !req.employees?.name?.includes(employeeName)) continue
+    // If the overall request was rejected by a later approver, show that rejection reason
+    const reqStatus: string = req.status ?? step.status
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rejectedStep = (req.supply_approval_steps ?? []).find((s: any) => s.status === 'REJECTED')
+    const displayStatus: 'APPROVED' | 'REJECTED' = reqStatus === 'REJECTED' ? 'REJECTED' : step.status
+    const rejectionComment = rejectedStep?.comment ?? step.comment ?? null
     doneItems.push({
       id: step.id, kind: 'supply',
       employeeName: req.employees?.name ?? '—',
       typeLabel: '비품/소모품',
       detail: `${req.supply_request_items?.length ?? 0}개 항목`,
       requestDate: req.created_at, actedAt: step.acted_at,
-      status: step.status, isJeongyeol: step.comment === '전결',
+      status: displayStatus, isJeongyeol: step.comment === '전결',
+      comment: displayStatus === 'REJECTED' ? rejectionComment : null,
       supplyItems: (req.supply_request_items ?? []).map((i: { id: string; category: string; description: string; estimated_amount: number | null; note: string | null; sort_order: number }) => ({
         id: i.id, category: i.category, description: i.description,
         estimated_amount: i.estimated_amount, note: i.note, sort_order: i.sort_order,
