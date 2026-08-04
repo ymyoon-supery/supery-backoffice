@@ -280,6 +280,7 @@ export default function MyRequestsClient({
       expenseType: item.expense_type ?? null,
       comment: rejectedStep?.comment ?? null,
       docNumber: item.doc_number ?? null,
+      storedAmount: item.amount ?? null,
     }
     setSelectedExpense(viewData)
   }

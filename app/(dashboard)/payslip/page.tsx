@@ -1,10 +1,18 @@
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import PayslipDownloadButton from '@/components/payslip/PayslipDownloadButton'
 
 function formatYearMonth(ym: string): string {
   const [year, month] = ym.split('-')
   return `${year}년 ${month}월`
+}
+
+function getAdmin() {
+  return createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
 }
 
 export default async function PayslipPage() {
@@ -21,9 +29,20 @@ export default async function PayslipPage() {
 
   const { data: payslips } = await supabase
     .from('payslips')
-    .select('id, year_month, file_url, file_name, created_at')
+    .select('id, year_month, file_name, created_at')
     .eq('employee_id', employee.id)
     .order('year_month', { ascending: false })
+
+  // Generate signed URLs server-side (1-hour TTL) — bucket is private
+  const signedUrls: string[] = []
+  if (payslips && payslips.length > 0) {
+    const admin = getAdmin()
+    const keys = payslips.map(s => `${employee.id}/${s.year_month}.pdf`)
+    const { data: signed } = await admin.storage.from('payslips').createSignedUrls(keys, 3600)
+    for (let i = 0; i < payslips.length; i++) {
+      signedUrls.push((signed?.[i] as any)?.signedUrl ?? '')
+    }
+  }
 
   return (
     <div className="max-w-2xl space-y-4">
@@ -35,7 +54,7 @@ export default async function PayslipPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {payslips.map(slip => (
+          {payslips.map((slip, i) => (
             <div
               key={slip.id}
               className="bg-white rounded-xl border border-gray-100 px-5 py-4 flex items-center justify-between"
@@ -52,7 +71,7 @@ export default async function PayslipPage() {
               </div>
               <div className="flex items-center gap-2">
                 <a
-                  href={slip.file_url}
+                  href={signedUrls[i]}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-3 py-1.5 border border-gray-200 text-gray-600 text-xs font-medium rounded-lg hover:bg-gray-50 transition-colors"
@@ -60,7 +79,7 @@ export default async function PayslipPage() {
                   보기
                 </a>
                 <PayslipDownloadButton
-                  url={slip.file_url}
+                  url={signedUrls[i]}
                   fileName={slip.file_name ?? `${slip.year_month}_급여명세서.pdf`}
                   className="px-3 py-1.5 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
                 />

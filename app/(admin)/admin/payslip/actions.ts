@@ -23,15 +23,14 @@ async function requireAdmin(): Promise<{ error: string | null }> {
 export async function uploadPayslip(input: {
   employeeId: string
   yearMonth: string
-  fileUrl: string
   fileName: string
 }) {
   const { error: authError } = await requireAdmin()
   if (authError) return { error: authError }
 
-  const { employeeId, yearMonth, fileUrl, fileName } = input
+  const { employeeId, yearMonth, fileName } = input
 
-  if (!employeeId || !yearMonth || !fileUrl) {
+  if (!employeeId || !yearMonth) {
     return { error: '필수 항목이 누락되었습니다.' }
   }
 
@@ -41,11 +40,12 @@ export async function uploadPayslip(input: {
   }
 
   const admin = getAdmin()
+  const fileKey = `${employeeId}/${yearMonth}.pdf`
 
   const { error } = await admin
     .from('payslips')
     .upsert(
-      { employee_id: employeeId, year_month: yearMonth, file_url: fileUrl, file_name: fileName },
+      { employee_id: employeeId, year_month: yearMonth, file_url: fileKey, file_name: fileName },
       { onConflict: 'employee_id,year_month' },
     )
 
@@ -73,7 +73,7 @@ export async function listPayslipsByMonth(yearMonth?: string): Promise<{ error: 
 
   let query = admin
     .from('payslips')
-    .select('id, employee_id, year_month, file_url, file_name, created_at')
+    .select('id, employee_id, year_month, file_name, created_at')
     .order('year_month', { ascending: false })
 
   if (yearMonth) query = query.eq('year_month', yearMonth)
@@ -93,7 +93,11 @@ export async function listPayslipsByMonth(yearMonth?: string): Promise<{ error: 
   const deptMap = Object.fromEntries((departments ?? []).map((d: any) => [d.id as string, d.name as string]))
   const empMap = Object.fromEntries((employees ?? []).map((e: any) => [e.id as string, e]))
 
-  const rows: PayslipRow[] = (payslips as any[]).map(p => {
+  // Generate signed URLs (1-hour TTL) server-side — private bucket, never expose raw paths to client
+  const keys = (payslips as any[]).map(p => `${p.employee_id as string}/${p.year_month as string}.pdf`)
+  const { data: signed } = await admin.storage.from('payslips').createSignedUrls(keys, 3600)
+
+  const rows: PayslipRow[] = (payslips as any[]).map((p, i) => {
     const emp = empMap[p.employee_id]
     const deptName = emp?.department_id ? deptMap[emp.department_id] : null
     return {
@@ -102,7 +106,7 @@ export async function listPayslipsByMonth(yearMonth?: string): Promise<{ error: 
       employeeName: emp?.name ?? '—',
       employeeLabel: [deptName, emp?.position, emp?.name].filter(Boolean).join(' · '),
       yearMonth: p.year_month as string,
-      fileUrl: p.file_url as string,
+      fileUrl: (signed?.[i] as any)?.signedUrl ?? '',
       fileName: p.file_name as string | null,
       createdAt: p.created_at as string,
     }

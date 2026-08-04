@@ -72,8 +72,7 @@ export default function AdminPayslipClient({ employees }: { employees: Employee[
         .upload(path, file, { upsert: true, contentType: 'application/pdf' })
       if (storageError) { toast.error(`업로드 실패: ${storageError.message}`); return }
 
-      const { data: { publicUrl } } = supabase.storage.from('payslips').getPublicUrl(path)
-      const res = await uploadPayslip({ employeeId: selectedEmployeeId, yearMonth, fileUrl: publicUrl, fileName: file.name })
+      const res = await uploadPayslip({ employeeId: selectedEmployeeId, yearMonth, fileName: file.name })
       if (res.error) { toast.error(res.error); return }
 
       toast.success('급여명세서가 업로드되었습니다.')
@@ -97,8 +96,7 @@ export default function AdminPayslipClient({ employees }: { employees: Employee[
         .upload(path, newFile, { upsert: true, contentType: 'application/pdf' })
       if (storageError) { toast.error(`변경 실패: ${storageError.message}`); return }
 
-      const { data: { publicUrl } } = supabase.storage.from('payslips').getPublicUrl(path)
-      const res = await uploadPayslip({ employeeId: slip.employeeId, yearMonth: slip.yearMonth, fileUrl: publicUrl, fileName: newFile.name })
+      const res = await uploadPayslip({ employeeId: slip.employeeId, yearMonth: slip.yearMonth, fileName: newFile.name })
       if (res.error) { toast.error(res.error); return }
 
       toast.success('파일이 변경되었습니다.')

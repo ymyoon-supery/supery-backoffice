@@ -165,6 +165,19 @@ export default function SupplyManageClient({ supplyRequests }: { supplyRequests:
                         </tr>
                       ))}
                     </tbody>
+                    {sortedItems.length > 0 && (
+                      <tfoot className="border-t border-gray-200 bg-gray-50">
+                        <tr>
+                          <td colSpan={2} className="px-3 py-2 text-xs font-medium text-gray-600">합계</td>
+                          <td className="px-3 py-2 text-sm font-bold text-gray-900 tabular-nums">
+                            {sortedItems.some((i: any) => i.estimated_amount != null)
+                              ? `${sortedItems.reduce((s: number, i: any) => s + (Number(i.estimated_amount) || 0), 0).toLocaleString()}원`
+                              : '—'}
+                          </td>
+                          <td />
+                        </tr>
+                      </tfoot>
+                    )}
                   </table>
                 </div>
 

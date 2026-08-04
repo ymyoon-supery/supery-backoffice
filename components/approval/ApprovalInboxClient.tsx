@@ -147,7 +147,7 @@ export default function ApprovalInboxClient({ leaveSteps, expenseSteps, myLeave,
                       {rep.employees?.name} — {rep.title}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      {EXPENSE_LABELS[rep.category]} · {rep.amount.toLocaleString()}원 · {rep.expense_date}
+                      {EXPENSE_LABELS[rep.category]} · {(Number(rep.amount) || 0).toLocaleString()}원 · {rep.expense_date}
                     </p>
                   </div>
                   <span className="text-xs text-gray-400">{format(new Date(rep.created_at), 'MM/dd')}</span>

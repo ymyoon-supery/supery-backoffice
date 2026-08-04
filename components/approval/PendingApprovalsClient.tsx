@@ -160,6 +160,7 @@ export default function PendingApprovalsClient({
       requestDate: rep.created_at,
       status: 'PENDING',
       comment: null,
+      storedAmount: rep.amount ?? null,
     }
     setSelectedExpense({ step, viewData })
   }

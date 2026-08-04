@@ -34,6 +34,7 @@ export interface ExpenseViewData {
   id?: string | null
   comment?: string | null
   docNumber?: string | null
+  storedAmount?: number | null
 }
 
 interface Props {
@@ -309,7 +310,7 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
                       {hasVat ? '최종합계 (부가세 포함)' : '지출합계'}
                     </td>
                     <td className="px-4 py-2.5 text-right text-sm font-bold text-gray-900 tabular-nums whitespace-nowrap">
-                      {formatKRW(totalAmount)}
+                      {formatKRW(data.storedAmount ?? totalAmount)}
                     </td>
                     <td />
                   </tr>
