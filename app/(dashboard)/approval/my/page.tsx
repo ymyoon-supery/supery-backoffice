@@ -16,8 +16,9 @@ const STATUS_SORT_ORDER: Record<string, number> = {
 }
 function sortByStatusDate<T extends { status: string; created_at: string }>(arr: T[]): T[] {
   return [...arr].sort((a, b) => {
-    const diff = (STATUS_SORT_ORDER[a.status] ?? 99) - (STATUS_SORT_ORDER[b.status] ?? 99)
-    return diff !== 0 ? diff : new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    const dateDiff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    if (dateDiff !== 0) return dateDiff
+    return (STATUS_SORT_ORDER[a.status] ?? 99) - (STATUS_SORT_ORDER[b.status] ?? 99)
   })
 }
 

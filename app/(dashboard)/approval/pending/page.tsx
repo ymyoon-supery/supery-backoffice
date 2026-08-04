@@ -15,6 +15,8 @@ const LEAVE_LABELS: Record<string, string> = {
   SICK: '병가(무급)', GROUP: '공동연차', COMP: '보상휴가', OTHER: '기타',
 }
 
+const KIND_ORDER: Record<string, number> = { leave: 0, expense: 1, supply: 2 }
+
 export type PendingItem = { kind: 'leave' | 'expense' | 'supply'; step: unknown }
 
 export type DoneItemExpenseDetail = {
@@ -187,7 +189,11 @@ export default async function PendingApprovalsPage({
       if (item.kind === 'expense') return item.step.expense_reports?.created_at ?? ''
       return item.step.supply_requests?.created_at ?? ''
     }
-    combined.sort((a, b) => new Date(getDate(b)).getTime() - new Date(getDate(a)).getTime())
+    combined.sort((a, b) => {
+      const dateDiff = new Date(getDate(b)).getTime() - new Date(getDate(a)).getTime()
+      if (dateDiff !== 0) return dateDiff
+      return (KIND_ORDER[a.kind] ?? 99) - (KIND_ORDER[b.kind] ?? 99)
+    })
 
     const totalPages = Math.max(1, Math.ceil(combined.length / PAGE_SIZE))
     const offset = (page - 1) * PAGE_SIZE
@@ -320,7 +326,11 @@ export default async function PendingApprovalsPage({
     })
   }
 
-  doneItems.sort((a, b) => new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime())
+  doneItems.sort((a, b) => {
+    const dateDiff = new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime()
+    if (dateDiff !== 0) return dateDiff
+    return (KIND_ORDER[a.kind] ?? 99) - (KIND_ORDER[b.kind] ?? 99)
+  })
 
   const totalPages = Math.max(1, Math.ceil(doneItems.length / PAGE_SIZE))
   const offset = (page - 1) * PAGE_SIZE
