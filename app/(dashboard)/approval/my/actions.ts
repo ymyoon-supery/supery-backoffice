@@ -41,16 +41,9 @@ export async function cancelDocumentRequest(id: string) {
   const { supabase, employeeId } = await getEmployeeId()
   if (!employeeId) return { error: '로그인이 필요합니다.' }
 
-  const { data, error } = await supabase
-    .from('document_requests')
-    .update({ status: 'CANCELLED' })
-    .eq('id', id)
-    .eq('employee_id', employeeId)
-    .eq('status', 'PENDING')
-    .select('id')
+  const { error } = await supabase.rpc('cancel_own_document_request', { p_request_id: id })
 
   if (error) return { error: error.message }
-  if (!data?.length) return { error: '취소할 수 없는 상태입니다.' }
   revalidatePath('/approval/my')
   return { error: null }
 }
@@ -59,34 +52,9 @@ export async function cancelSupplyRequest(id: string) {
   const { supabase, employeeId } = await getEmployeeId()
   if (!employeeId) return { error: '로그인이 필요합니다.' }
 
-  // Disallow cancellation once any approver has already approved a step
-  const { data: approvedSteps } = await supabase
-    .from('supply_approval_steps')
-    .select('id')
-    .eq('supply_request_id', id)
-    .eq('status', 'APPROVED')
-    .limit(1)
-  if (approvedSteps?.length) return { error: '이미 결재가 진행된 신청은 취소할 수 없습니다. 담당자에게 반려를 요청해 주세요.' }
-
-  const { data, error } = await supabase
-    .from('supply_requests')
-    .update({ status: 'CANCELLED' })
-    .eq('id', id)
-    .eq('employee_id', employeeId)
-    .eq('status', 'PENDING')
-    .select('id')
+  const { error } = await supabase.rpc('cancel_own_supply_request', { p_request_id: id })
 
   if (error) return { error: error.message }
-  if (!data?.length) return { error: '취소할 수 없는 상태입니다.' }
-
-  const { error: stepsError } = await supabase
-    .from('supply_approval_steps')
-    .update({ status: 'CANCELLED' })
-    .eq('supply_request_id', id)
-    .in('status', ['PENDING', 'WAITING'])
-
-  if (stepsError) console.error('[cancelSupplyRequest] step cancel failed:', stepsError.message)
-
   revalidatePath('/approval/my')
   revalidatePath('/approval/pending')
   return { error: null }
