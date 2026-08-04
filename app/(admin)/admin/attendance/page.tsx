@@ -90,9 +90,10 @@ export default async function AdminAttendancePage({
   }
 
   const allSummaries = Array.from(empSummaries.values())
+  const employeesOnLeave = new Set((leaveRecords ?? []).map(r => r.employee_id))
   const displaySummaries = selectedEmpId
     ? allSummaries.filter(e => e.id === selectedEmpId)
-    : allSummaries.filter(e => Object.keys(e.days).length > 0)
+    : allSummaries.filter(e => Object.keys(e.days).length > 0 || employeesOnLeave.has(e.id))
 
   return (
     <div className="space-y-4">

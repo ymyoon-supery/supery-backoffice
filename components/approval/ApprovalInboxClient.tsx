@@ -183,7 +183,7 @@ export default function ApprovalInboxClient({ leaveSteps, expenseSteps, myLeave,
           {[...myLeave.map((r: any) => ({ ...r, kind: 'leave' })), ...myExpense.map((r: any) => ({ ...r, kind: 'expense' }))]
             .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
             .map((item: any) => {
-              const status = STATUS_LABELS[item.status] ?? STATUS_LABELS.PENDING
+              const status = STATUS_LABELS[item.status] ?? { label: item.status, className: 'bg-gray-100 text-gray-500' }
               const rejectionReason = item.kind === 'leave' && item.status === 'REJECTED'
                 ? (item.leave_approval_steps as any[])?.find((s: any) => s.status === 'REJECTED')?.comment
                 : null

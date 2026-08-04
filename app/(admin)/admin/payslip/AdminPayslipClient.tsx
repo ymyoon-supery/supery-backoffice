@@ -44,9 +44,9 @@ export default function AdminPayslipClient({ employees }: { employees: Employee[
   const [replacingId, setReplacingId] = useState<string | null>(null)
   const replaceRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
-  const refreshUploadMonth = useCallback(() => {
+  const refreshUploadMonth = useCallback((ym?: string) => {
     startUploadList(async () => {
-      const res = await listPayslipsByMonth(thisMonth())
+      const res = await listPayslipsByMonth(ym || thisMonth())
       if (res.data) setUploadMonthSlips(res.data)
     })
   }, [])
@@ -58,7 +58,7 @@ export default function AdminPayslipClient({ employees }: { employees: Employee[
     })
   }, [])
 
-  useEffect(() => { refreshUploadMonth() }, [refreshUploadMonth])
+  useEffect(() => { refreshUploadMonth(yearMonth || undefined) }, [refreshUploadMonth, yearMonth])
   useEffect(() => { if (tab === 'manage') refreshManageMonth(manageMonth || undefined) }, [tab, manageMonth, refreshManageMonth])
 
   async function handleUpload() {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { useRouter } from 'next/navigation'
@@ -40,6 +40,13 @@ export default function SupplyManageClient({ supplyRequests }: { supplyRequests:
   const [isPending, startTransition] = useTransition()
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const router = useRouter()
+
+  useEffect(() => {
+    if (statusFilter !== 'all') {
+      const count = supplyRequests.filter(r => r.status === statusFilter).length
+      if (count === 0) setStatusFilter('all')
+    }
+  }, [supplyRequests, statusFilter])
 
   const counts: Record<StatusFilter, number> = {
     all: supplyRequests.length,

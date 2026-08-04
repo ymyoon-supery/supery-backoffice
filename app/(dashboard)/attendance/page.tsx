@@ -36,8 +36,8 @@ export default async function AttendancePage() {
   // KST 기준 날짜 (UTC+9 고정 오프셋)
   const kstNow = new Date(today.getTime() + 9 * 60 * 60 * 1000)
   const todayStr = format(kstNow, 'yyyy-MM-dd')
-  const weekStart = format(startOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd')
-  const weekEnd = format(endOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd')
+  const weekStart = format(startOfWeek(kstNow, { weekStartsOn: 1 }), 'yyyy-MM-dd')
+  const weekEnd = format(endOfWeek(kstNow, { weekStartsOn: 1 }), 'yyyy-MM-dd')
 
   const getRecords = unstable_cache(
     async () => {

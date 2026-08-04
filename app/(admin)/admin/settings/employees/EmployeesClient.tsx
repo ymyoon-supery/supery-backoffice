@@ -75,7 +75,7 @@ export default function EmployeesClient({ employees: init, groups, teams }: {
       role: emp.role as 'ADMIN' | 'MANAGER' | 'EMPLOYEE',
       groupId: team?.group_id ?? '',
       hiredAt: emp.hired_at ?? '',
-      remainingLeaves: String(calcDaysForEmp ?? emp.remaining_leaves),
+      remainingLeaves: String(emp.remaining_leaves),
     })
     setShowForm(true)
   }
@@ -101,7 +101,6 @@ export default function EmployeesClient({ employees: init, groups, teams }: {
         } as UpdateEmployeeInput)
         if (!result.error) {
           const newAnnual = calcDays ?? undefined
-          const newRemaining = parsedRemaining ?? newAnnual ?? undefined
           setEmployees(prev => prev.map(e => e.id === editId ? {
             ...e,
             name: form.name,
@@ -111,7 +110,7 @@ export default function EmployeesClient({ employees: init, groups, teams }: {
             role: form.role,
             hired_at: form.hiredAt || null,
             annual_leave_days: newAnnual ?? e.annual_leave_days,
-            remaining_leaves: newRemaining ?? e.remaining_leaves,
+            remaining_leaves: parsedRemaining !== null ? parsedRemaining : e.remaining_leaves,
           } : e))
           toast.success('직원 정보가 수정됐습니다.')
         }

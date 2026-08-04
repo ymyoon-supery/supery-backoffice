@@ -101,7 +101,7 @@ export default function LeaveHistoryClient({ employees }: { employees: EmployeeS
                   <th className="px-4 py-3">입사일</th>
                   <th className="px-4 py-3 text-right">보유연차</th>
                   <th className="px-4 py-3 text-right">{usedLabel}</th>
-                  <th className="px-4 py-3 text-right">잔여</th>
+                  {!selectedYear && <th className="px-4 py-3 text-right">잔여</th>}
                   {!selectedYear && <th className="px-4 py-3 w-8"></th>}
                 </tr>
               </thead>
@@ -137,9 +137,11 @@ export default function LeaveHistoryClient({ employees }: { employees: EmployeeS
                       <td className="px-4 py-3 text-right tabular-nums font-medium text-orange-500">
                         {used}일
                       </td>
-                      <td className="px-4 py-3 text-right tabular-nums font-medium text-green-600">
-                        {emp.remaining_leaves}일
-                      </td>
+                      {!selectedYear && (
+                        <td className="px-4 py-3 text-right tabular-nums font-medium text-green-600">
+                          {emp.remaining_leaves}일
+                        </td>
+                      )}
                       {!selectedYear && (
                         <td className="px-4 py-3 text-gray-300 text-right pr-4">
                           {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -155,7 +157,6 @@ export default function LeaveHistoryClient({ employees }: { employees: EmployeeS
                     <td className="px-4 py-3 text-right tabular-nums text-orange-600">
                       {Math.round(employees.reduce((s, e) => s + displayUsed(e), 0) * 10) / 10}일
                     </td>
-                    <td className="px-4 py-3" />
                   </tr>
                 )}
               </tbody>
