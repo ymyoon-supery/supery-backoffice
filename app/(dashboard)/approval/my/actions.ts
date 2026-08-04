@@ -85,7 +85,7 @@ export async function cancelSupplyRequest(id: string) {
     .eq('supply_request_id', id)
     .in('status', ['PENDING', 'WAITING'])
 
-  if (stepsError) return { error: '신청 취소 중 오류가 발생했습니다.' }
+  if (stepsError) console.error('[cancelSupplyRequest] step cancel failed:', stepsError.message)
 
   revalidatePath('/approval/my')
   revalidatePath('/approval/pending')

@@ -83,7 +83,7 @@ export default async function LeavePage() {
 
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-50">
-          <h2 className="text-sm font-medium text-gray-700">사용 내역 ({(records ?? []).length}건)</h2>
+          <h2 className="text-sm font-medium text-gray-700">신청 내역 ({(records ?? []).length}건)</h2>
         </div>
         {!records || records.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-8">내역이 없습니다.</p>
