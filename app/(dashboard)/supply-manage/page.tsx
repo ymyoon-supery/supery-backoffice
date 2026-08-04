@@ -48,7 +48,7 @@ export default async function SupplyManagePage() {
         .sort((a, b) => a.step_order - b.step_order)[0]
       if (pendingStep) {
         if (pendingStep.approver_id === employee.id) {
-          pendingApproverLabel = '총무팀장 승인 대기중'
+          pendingApproverLabel = '내 결재 필요'
         } else if (pendingStep.employees?.role === 'ADMIN') {
           pendingApproverLabel = '관리자 승인 대기중'
         } else {

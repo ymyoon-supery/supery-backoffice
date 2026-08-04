@@ -30,6 +30,7 @@ const STATUS_TABS: { id: StatusFilter; label: string }[] = [
 ]
 
 function getPendingClassName(label: string) {
+  if (label === '내 결재 필요') return 'bg-blue-50 text-blue-700'
   if (label.startsWith('관리자')) return 'bg-purple-50 text-purple-700'
   return 'bg-amber-50 text-amber-700'
 }
@@ -181,6 +182,9 @@ export default function SupplyManageClient({ supplyRequests }: { supplyRequests:
           })
         )}
       </div>
+      {supplyRequests.length >= 100 && (
+        <p className="text-xs text-center text-gray-400">최근 100건만 표시됩니다.</p>
+      )}
     </div>
   )
 }

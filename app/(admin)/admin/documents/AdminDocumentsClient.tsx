@@ -52,7 +52,8 @@ const SUPPLY_STATUS_TABS: { id: SupplyStatusFilter; label: string }[] = [
 export default function AdminDocumentsClient({ documentRequests, supplyRequests, initialTab, adminEmployeeId }: { documentRequests: any[]; supplyRequests: any[]; initialTab?: Tab; adminEmployeeId?: string | null }) {
   const PAGE_SIZE = 20
   const [tab, setTab] = useState<Tab>(initialTab ?? 'documents')
-  const [isPending, startTransition] = useTransition()
+  const [isDocPending, startDocTransition] = useTransition()
+  const [isSupplyPending, startSupplyTransition] = useTransition()
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [rejectComment, setRejectComment] = useState('')
   const [docPage, setDocPage] = useState(1)
@@ -120,7 +121,7 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests,
   }
 
   function handleComplete(id: string) {
-    startTransition(async () => {
+    startDocTransition(async () => {
       const res = await completeDocumentRequest(id)
       if (res.error) { toast.error(res.error); return }
       toast.success('완료 처리되었습니다.')
@@ -129,7 +130,7 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests,
   }
 
   function handleSupplyApprove(requestId: string) {
-    startTransition(async () => {
+    startSupplyTransition(async () => {
       const res = await approveSupplyRequest(requestId, true)
       if (res.error) { toast.error(res.error); return }
       toast.success('승인되었습니다.')
@@ -138,7 +139,7 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests,
   }
 
   function handleSupplyReject(requestId: string) {
-    startTransition(async () => {
+    startSupplyTransition(async () => {
       const res = await approveSupplyRequest(requestId, false, rejectComment || undefined)
       if (res.error) { toast.error(res.error); return }
       toast.success('반려되었습니다.')
@@ -150,7 +151,7 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests,
 
   function handlePurchaseConfirm(requestId: string) {
     if (!confirm('처리 완료로 변경하시겠습니까?')) return
-    startTransition(async () => {
+    startSupplyTransition(async () => {
       const res = await completeSupplyAction(requestId)
       if (res.error) { toast.error(res.error); return }
       toast.success('처리 완료되었습니다.')
@@ -261,7 +262,7 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests,
                           <button
                             type="button"
                             onClick={() => handleComplete(req.id)}
-                            disabled={isPending}
+                            disabled={isDocPending}
                             className="text-xs px-3 py-1 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
                           >
                             완료 처리
@@ -395,7 +396,7 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests,
                           <button
                             type="button"
                             onClick={() => handleSupplyReject(req.id)}
-                            disabled={isPending}
+                            disabled={isSupplyPending}
                             className="flex-1 py-2 text-sm font-medium bg-red-600 text-white rounded-lg disabled:opacity-50 hover:bg-red-700"
                           >
                             반려 확인
@@ -414,7 +415,7 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests,
                         <button
                           type="button"
                           onClick={() => handleSupplyApprove(req.id)}
-                          disabled={isPending}
+                          disabled={isSupplyPending}
                           className="flex-1 py-2 text-sm font-medium bg-primary text-white rounded-lg disabled:opacity-50 hover:bg-primary/90"
                         >
                           승인
@@ -422,7 +423,7 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests,
                         <button
                           type="button"
                           onClick={() => setRejectingId(req.id)}
-                          disabled={isPending}
+                          disabled={isSupplyPending}
                           className="flex-1 py-2 text-sm font-medium border border-red-200 text-red-600 rounded-lg disabled:opacity-50 hover:bg-red-50"
                         >
                           반려
@@ -435,7 +436,7 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests,
                     <button
                       type="button"
                       onClick={() => handlePurchaseConfirm(req.id)}
-                      disabled={isPending}
+                      disabled={isSupplyPending}
                       className="w-full py-2 text-sm font-medium bg-blue-600 text-white rounded-lg disabled:opacity-50 hover:bg-blue-700 transition-colors"
                     >
                       처리 완료
