@@ -183,6 +183,7 @@ export default async function MyRequestsPage({
             .eq('employee_id', employee.id)
             .in('status', leaveStatuses)
             .order('created_at', { ascending: false })
+            .limit(500)
         : Promise.resolve({ data: [] as never[] }),
       (() => {
         if (expenseStatuses.length === 0) return Promise.resolve({ data: [] as never[] })
@@ -203,7 +204,7 @@ export default async function MyRequestsPage({
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (safeKw) q = (q as any).filter('line_items::text', 'ilike', `%${safeKw}%`)
-        return q
+        return q.limit(500)
       })(),
       documentStatuses.length > 0
         ? supabase
@@ -282,7 +283,7 @@ export default async function MyRequestsPage({
       ? sortByStatusDate(leaveItems).slice(offset, offset + PAGE_SIZE)
       : catTab === 'expense'
         ? sortByStatusDate(expenseItems).slice(offset, offset + PAGE_SIZE)
-        : mergedAll
+        : []
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supplyRequests = (supplyResult.data ?? []).map((r: any) => {

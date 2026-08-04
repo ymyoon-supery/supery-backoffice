@@ -5,7 +5,7 @@ import PendingApprovalsClient from '@/components/approval/PendingApprovalsClient
 import { decryptCardNumber } from '@/lib/crypto/ssn'
 
 export const dynamic = 'force-dynamic'
-import { calcAnnualLeave } from '@/lib/annualLeave'
+import { calcAnnualLeave, isUnderOneYear } from '@/lib/annualLeave'
 
 const DEDUCTS = ['ANNUAL', 'HALF_DAY', 'AM_HALF', 'PM_HALF', 'GROUP']
 const PAGE_SIZE = 10
@@ -120,14 +120,21 @@ export default async function PendingApprovalsPage({
       const emp = step.leave_requests?.employees
       if (emp?.id) empInfoMap[emp.id] = { hiredAt: emp.hired_at ?? null, annualLeaveDays: emp.annual_leave_days ?? 15 }
     }
+    const today = new Date(Date.now() + 9 * 3600000)
     const empIds = Object.keys(empInfoMap)
     const usedByEmp: Record<string, number> = {}
     if (empIds.length > 0) {
-      const yearStart = `${new Date(Date.now() + 9 * 3600000).getUTCFullYear()}-01-01`
-      const { data: usedTotals } = await supabase.from('leave_requests').select('employee_id, days_used').eq('status', 'APPROVED').in('leave_type', DEDUCTS).gte('start_date', yearStart).in('employee_id', empIds)
-      for (const r of usedTotals ?? []) usedByEmp[r.employee_id] = (usedByEmp[r.employee_id] ?? 0) + Number(r.days_used)
+      const yearStart = `${today.getUTCFullYear()}-01-01`
+      const { data: usedTotals } = await supabase.from('leave_requests').select('employee_id, days_used, start_date').eq('status', 'APPROVED').in('leave_type', DEDUCTS).in('employee_id', empIds)
+      for (const r of usedTotals ?? []) {
+        const info = empInfoMap[r.employee_id]
+        const hiredAt = info?.hiredAt ? new Date(info.hiredAt) : null
+        const underOneYear = hiredAt ? isUnderOneYear(hiredAt, today) : false
+        if (underOneYear || r.start_date >= yearStart) {
+          usedByEmp[r.employee_id] = (usedByEmp[r.employee_id] ?? 0) + Number(r.days_used)
+        }
+      }
     }
-    const today = new Date()
     leaveSteps = leaveSteps.map(step => {
       const emp = step.leave_requests?.employees
       if (!emp?.id || !empInfoMap[emp.id]) return step
@@ -307,7 +314,7 @@ export default async function PendingApprovalsPage({
     if (!req) continue
     if (employeeName && !req.employees?.name?.includes(employeeName)) continue
     // If the overall request was rejected by a later approver, show that rejection reason
-    const reqStatus: string = req.status ?? step.status
+    const reqStatus: string = req.status ?? 'PENDING'
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rejectedStep = (req.supply_approval_steps ?? []).find((s: any) => s.status === 'REJECTED')
     const displayStatus: 'APPROVED' | 'REJECTED' = reqStatus === 'REJECTED' ? 'REJECTED' : step.status

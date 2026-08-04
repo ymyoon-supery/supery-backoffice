@@ -107,6 +107,7 @@ export async function GET(request: NextRequest) {
           .update({ last_heartbeat: null })
           .eq('id', record.employee_id)
         if (clearError) {
+          console.error('[auto-checkout] heartbeat clear failed for', record.employee_id, clearError.message)
           failures.push({ employeeId: record.employee_id, reason: `heartbeat clear: ${clearError.message}` })
         }
       } else {

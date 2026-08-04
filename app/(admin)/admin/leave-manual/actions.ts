@@ -65,12 +65,13 @@ async function checkOverlap(
   return null
 }
 
-async function adjustLeaves(client: ReturnType<typeof adminClient>, employeeId: string, delta: number) {
+async function adjustLeaves(client: ReturnType<typeof adminClient>, employeeId: string, delta: number): Promise<string | null> {
   const { data: emp } = await client.from('employees').select('remaining_leaves').eq('id', employeeId).single()
-  if (!emp) return
-  await client.from('employees')
+  if (!emp) return '직원 정보를 찾을 수 없습니다.'
+  const { error } = await client.from('employees')
     .update({ remaining_leaves: Math.max(Number(emp.remaining_leaves) + delta, 0) })
     .eq('id', employeeId)
+  return error ? error.message : null
 }
 
 export async function adminAddLeaveRecord(input: ManualLeaveInput) {
@@ -96,7 +97,8 @@ export async function adminAddLeaveRecord(input: ManualLeaveInput) {
 
   // Adjust after successful insert so a failed insert never touches remaining_leaves
   if (DEDUCTS_LEAVE.includes(input.leaveType)) {
-    await adjustLeaves(client, input.employeeId, -input.daysUsed)
+    const adjustError = await adjustLeaves(client, input.employeeId, -input.daysUsed)
+    if (adjustError) console.error('[leave-manual] adjustLeaves failed on add:', adjustError)
   }
 
   revalidatePath('/admin/leave-manual')
@@ -136,7 +138,8 @@ export async function adminUpdateLeaveRecord(id: string, input: ManualLeaveInput
   if (updateError) return { error: updateError.message }
 
   if (delta !== 0) {
-    await adjustLeaves(client, current.employee_id, delta)
+    const adjustError = await adjustLeaves(client, current.employee_id, delta)
+    if (adjustError) console.error('[leave-manual] adjustLeaves failed on update:', adjustError)
   }
 
   revalidatePath('/admin/leave-manual')
@@ -164,7 +167,8 @@ export async function adminDeleteLeaveRecord(id: string) {
   if (deleteError) return { error: deleteError.message }
 
   if (DEDUCTS_LEAVE.includes(record.leave_type)) {
-    await adjustLeaves(client, record.employee_id, Number(record.days_used))
+    const adjustError = await adjustLeaves(client, record.employee_id, Number(record.days_used))
+    if (adjustError) console.error('[leave-manual] adjustLeaves failed on delete:', adjustError)
   }
 
   revalidatePath('/admin/leave-manual')

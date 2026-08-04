@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { revalidatePath } from 'next/cache'
 
 export async function completeSupplyAction(requestId: string): Promise<{ error: string | null }> {
   const supabase = await createClient()
@@ -37,5 +38,7 @@ export async function completeSupplyAction(requestId: string): Promise<{ error: 
     .eq('status', 'APPROVED')
 
   if (error) return { error: error.message }
+  revalidatePath('/supply-manage')
+  revalidatePath('/admin/documents')
   return { error: null }
 }

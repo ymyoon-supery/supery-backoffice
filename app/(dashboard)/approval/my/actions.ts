@@ -79,11 +79,13 @@ export async function cancelSupplyRequest(id: string) {
   if (error) return { error: error.message }
   if (!data?.length) return { error: '취소할 수 없는 상태입니다.' }
 
-  await supabase
+  const { error: stepsError } = await supabase
     .from('supply_approval_steps')
     .update({ status: 'CANCELLED' })
     .eq('supply_request_id', id)
     .in('status', ['PENDING', 'WAITING'])
+
+  if (stepsError) return { error: '신청 취소 중 오류가 발생했습니다.' }
 
   revalidatePath('/approval/my')
   revalidatePath('/approval/pending')
