@@ -1,6 +1,6 @@
 'use client'
 
-import { useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { useRouter } from 'next/navigation'
@@ -18,6 +18,17 @@ const SUPPLY_STATUS: Record<string, { label: string; className: string }> = {
   CANCELLED: { label: '취소',      className: 'bg-gray-100 text-gray-400' },
 }
 
+type StatusFilter = 'all' | 'REJECTED' | 'PENDING' | 'APPROVED' | 'COMPLETED' | 'CANCELLED'
+
+const STATUS_TABS: { id: StatusFilter; label: string }[] = [
+  { id: 'all',       label: '전체' },
+  { id: 'REJECTED',  label: '반려' },
+  { id: 'PENDING',   label: '결재대기' },
+  { id: 'APPROVED',  label: '결재완료' },
+  { id: 'COMPLETED', label: '처리완료' },
+  { id: 'CANCELLED', label: '취소' },
+]
+
 function getPendingClassName(label: string) {
   if (label.startsWith('관리자')) return 'bg-purple-50 text-purple-700'
   return 'bg-amber-50 text-amber-700'
@@ -26,7 +37,21 @@ function getPendingClassName(label: string) {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function SupplyManageClient({ supplyRequests }: { supplyRequests: any[] }) {
   const [isPending, startTransition] = useTransition()
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const router = useRouter()
+
+  const counts: Record<StatusFilter, number> = {
+    all: supplyRequests.length,
+    REJECTED:  supplyRequests.filter(r => r.status === 'REJECTED').length,
+    PENDING:   supplyRequests.filter(r => r.status === 'PENDING').length,
+    APPROVED:  supplyRequests.filter(r => r.status === 'APPROVED').length,
+    COMPLETED: supplyRequests.filter(r => r.status === 'COMPLETED').length,
+    CANCELLED: supplyRequests.filter(r => r.status === 'CANCELLED').length,
+  }
+
+  const filtered = statusFilter === 'all'
+    ? supplyRequests
+    : supplyRequests.filter(r => r.status === statusFilter)
 
   function handleComplete(requestId: string) {
     if (!confirm('처리 완료로 변경하시겠습니까?')) return
@@ -42,14 +67,45 @@ export default function SupplyManageClient({ supplyRequests }: { supplyRequests:
     <div className="max-w-3xl space-y-4">
       <h1 className="text-xl font-semibold text-gray-900">비품/소모품 관리</h1>
 
+      {/* Status filter tabs */}
+      <div className="flex gap-1.5 flex-wrap">
+        {STATUS_TABS.filter(t => t.id === 'all' || counts[t.id] > 0).map(t => {
+          const isActive = statusFilter === t.id
+          return (
+            <button
+              key={t.id}
+              onClick={() => setStatusFilter(t.id)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                isActive
+                  ? t.id === 'REJECTED'  ? 'bg-red-500 text-white'
+                  : t.id === 'PENDING'   ? 'bg-amber-500 text-white'
+                  : t.id === 'APPROVED'  ? 'bg-green-600 text-white'
+                  : t.id === 'COMPLETED' ? 'bg-blue-600 text-white'
+                  : t.id === 'CANCELLED' ? 'bg-gray-500 text-white'
+                  : 'bg-gray-700 text-white'
+                  : t.id === 'REJECTED'  ? 'bg-red-50 text-red-500 hover:bg-red-100'
+                  : t.id === 'PENDING'   ? 'bg-amber-50 text-amber-600 hover:bg-amber-100'
+                  : t.id === 'APPROVED'  ? 'bg-green-50 text-green-600 hover:bg-green-100'
+                  : t.id === 'COMPLETED' ? 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                  : t.id === 'CANCELLED' ? 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
+            >
+              {t.label}
+              {t.id !== 'all' && <span className="ml-1 opacity-70">{counts[t.id]}</span>}
+            </button>
+          )
+        })}
+      </div>
+
       <div className="space-y-3">
-        {supplyRequests.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-100 py-12 text-center text-sm text-gray-400">
             비품/소모품 신청 내역이 없습니다.
           </div>
         ) : (
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          supplyRequests.map((req: any) => {
+          filtered.map((req: any) => {
             const emp = req.employees
             const empLabel = [emp?.position, emp?.name].filter(Boolean).join(' ')
             const pendingLabel: string | null = req.pendingApproverLabel ?? null
