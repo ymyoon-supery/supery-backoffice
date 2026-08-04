@@ -97,7 +97,7 @@ export async function listDocumentRequests() {
   const { data, error } = await admin
     .from('document_requests')
     .select(`
-      id, doc_type, status, purpose, completed_at, created_at,
+      id, doc_type, status, purpose, completed_at, created_at, doc_number,
       employees!employee_id ( name, position )
     `)
     .order('created_at', { ascending: false })
@@ -113,7 +113,7 @@ export async function listSupplyRequests() {
   const { data, error } = await admin
     .from('supply_requests')
     .select(`
-      id, status, created_at,
+      id, status, created_at, doc_number,
       employees ( name, position ),
       supply_request_items ( id, category, description, estimated_amount, note, sort_order ),
       supply_approval_steps ( id, approver_id, step_order, status, comment, acted_at )

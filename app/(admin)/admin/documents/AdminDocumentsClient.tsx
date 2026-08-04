@@ -171,6 +171,7 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests,
                       <td className="px-5 py-3 text-gray-800">{empLabel}</td>
                       <td className="px-4 py-3">
                         <p className="text-gray-700">{DOC_TYPE_LABELS[req.doc_type] ?? req.doc_type}</p>
+                        {req.doc_number && <p className="text-xs text-gray-400 mt-0.5">{req.doc_number}</p>}
                         {req.purpose && <p className="text-xs text-gray-400 mt-0.5">{req.purpose}</p>}
                       </td>
                       <td className="px-4 py-3 text-gray-400 text-xs">{format(new Date(req.created_at), 'yyyy.MM.dd')}</td>
@@ -238,7 +239,7 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests,
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-gray-900">{empLabel}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{format(new Date(req.created_at), 'yyyy.MM.dd HH:mm')}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{format(new Date(req.created_at), 'yyyy.MM.dd HH:mm')}{req.doc_number ? ` · ${req.doc_number}` : ''}</p>
                     </div>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusInfo.className}`}>
                       {statusInfo.label}
