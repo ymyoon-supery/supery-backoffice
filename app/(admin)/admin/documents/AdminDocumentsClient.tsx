@@ -29,6 +29,25 @@ const SUPPLY_STATUS: Record<string, { label: string; className: string }> = {
   CANCELLED: { label: '취소',     className: 'bg-gray-100 text-gray-400' },
 }
 
+type DocStatusFilter = 'all' | 'PENDING' | 'COMPLETED' | 'CANCELLED'
+type SupplyStatusFilter = 'all' | 'REJECTED' | 'PENDING' | 'APPROVED' | 'COMPLETED' | 'CANCELLED'
+
+const DOC_STATUS_TABS: { id: DocStatusFilter; label: string }[] = [
+  { id: 'all',       label: '전체' },
+  { id: 'PENDING',   label: '대기중' },
+  { id: 'COMPLETED', label: '완료' },
+  { id: 'CANCELLED', label: '취소' },
+]
+
+const SUPPLY_STATUS_TABS: { id: SupplyStatusFilter; label: string }[] = [
+  { id: 'all',       label: '전체' },
+  { id: 'REJECTED',  label: '반려' },
+  { id: 'PENDING',   label: '대기중' },
+  { id: 'APPROVED',  label: '승인완료' },
+  { id: 'COMPLETED', label: '처리완료' },
+  { id: 'CANCELLED', label: '취소' },
+]
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function AdminDocumentsClient({ documentRequests, supplyRequests, initialTab }: { documentRequests: any[]; supplyRequests: any[]; initialTab?: Tab }) {
   const PAGE_SIZE = 20
@@ -38,14 +57,36 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests,
   const [rejectComment, setRejectComment] = useState('')
   const [docPage, setDocPage] = useState(1)
   const [supplyPage, setSupplyPage] = useState(1)
+  const [docStatusFilter, setDocStatusFilter] = useState<DocStatusFilter>('all')
+  const [supplyStatusFilter, setSupplyStatusFilter] = useState<SupplyStatusFilter>('all')
   const router = useRouter()
 
-  useEffect(() => { setDocPage(1); setSupplyPage(1) }, [tab])
+  useEffect(() => { setDocPage(1); setSupplyPage(1); setDocStatusFilter('all'); setSupplyStatusFilter('all') }, [tab])
+  useEffect(() => { setDocPage(1) }, [docStatusFilter])
+  useEffect(() => { setSupplyPage(1) }, [supplyStatusFilter])
 
-  const docTotalPages = Math.max(1, Math.ceil(documentRequests.length / PAGE_SIZE))
-  const supplyTotalPages = Math.max(1, Math.ceil(supplyRequests.length / PAGE_SIZE))
-  const pagedDocs = documentRequests.slice((docPage - 1) * PAGE_SIZE, docPage * PAGE_SIZE)
-  const pagedSupply = supplyRequests.slice((supplyPage - 1) * PAGE_SIZE, supplyPage * PAGE_SIZE)
+  const filteredDocs = docStatusFilter === 'all' ? documentRequests : documentRequests.filter(r => r.status === docStatusFilter)
+  const filteredSupply = supplyStatusFilter === 'all' ? supplyRequests : supplyRequests.filter(r => r.status === supplyStatusFilter)
+
+  const docCounts: Record<DocStatusFilter, number> = {
+    all: documentRequests.length,
+    PENDING:   documentRequests.filter(r => r.status === 'PENDING').length,
+    COMPLETED: documentRequests.filter(r => r.status === 'COMPLETED').length,
+    CANCELLED: documentRequests.filter(r => r.status === 'CANCELLED').length,
+  }
+  const supplyCounts: Record<SupplyStatusFilter, number> = {
+    all: supplyRequests.length,
+    REJECTED:  supplyRequests.filter(r => r.status === 'REJECTED').length,
+    PENDING:   supplyRequests.filter(r => r.status === 'PENDING').length,
+    APPROVED:  supplyRequests.filter(r => r.status === 'APPROVED').length,
+    COMPLETED: supplyRequests.filter(r => r.status === 'COMPLETED').length,
+    CANCELLED: supplyRequests.filter(r => r.status === 'CANCELLED').length,
+  }
+
+  const docTotalPages = Math.max(1, Math.ceil(filteredDocs.length / PAGE_SIZE))
+  const supplyTotalPages = Math.max(1, Math.ceil(filteredSupply.length / PAGE_SIZE))
+  const pagedDocs = filteredDocs.slice((docPage - 1) * PAGE_SIZE, docPage * PAGE_SIZE)
+  const pagedSupply = filteredSupply.slice((supplyPage - 1) * PAGE_SIZE, supplyPage * PAGE_SIZE)
 
   function Pagination({ page, totalPages, setPage }: { page: number; totalPages: number; setPage: (p: number) => void }) {
     if (totalPages <= 1) return null
@@ -146,8 +187,31 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests,
 
       {/* 서류 신청 tab */}
       {tab === 'documents' && (
+        <>
+        {/* Doc status filter */}
+        <div className="flex gap-1.5 flex-wrap">
+          {DOC_STATUS_TABS.filter(t => t.id === 'all' || docCounts[t.id] > 0).map(t => {
+            const isActive = docStatusFilter === t.id
+            return (
+              <button key={t.id} onClick={() => setDocStatusFilter(t.id)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                  isActive
+                    ? t.id === 'PENDING'   ? 'bg-amber-500 text-white'
+                    : t.id === 'COMPLETED' ? 'bg-green-600 text-white'
+                    : t.id === 'CANCELLED' ? 'bg-gray-500 text-white'
+                    : 'bg-gray-700 text-white'
+                    : t.id === 'PENDING'   ? 'bg-amber-50 text-amber-600 hover:bg-amber-100'
+                    : t.id === 'COMPLETED' ? 'bg-green-50 text-green-600 hover:bg-green-100'
+                    : t.id === 'CANCELLED' ? 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                }`}>
+                {t.label}{t.id !== 'all' && <span className="ml-1 opacity-70">{docCounts[t.id]}</span>}
+              </button>
+            )
+          })}
+        </div>
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-          {documentRequests.length === 0 ? (
+          {filteredDocs.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-12">서류 신청 내역이 없습니다.</p>
           ) : (
             <table className="w-full text-sm">
@@ -209,12 +273,40 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests,
           )}
           <Pagination page={docPage} totalPages={docTotalPages} setPage={setDocPage} />
         </div>
+        </>
       )}
 
       {/* 비품/소모품 신청 tab */}
       {tab === 'supply' && (
+        <>
+        {/* Supply status filter */}
+        <div className="flex gap-1.5 flex-wrap">
+          {SUPPLY_STATUS_TABS.filter(t => t.id === 'all' || supplyCounts[t.id] > 0).map(t => {
+            const isActive = supplyStatusFilter === t.id
+            return (
+              <button key={t.id} onClick={() => setSupplyStatusFilter(t.id)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                  isActive
+                    ? t.id === 'REJECTED'  ? 'bg-red-500 text-white'
+                    : t.id === 'PENDING'   ? 'bg-amber-500 text-white'
+                    : t.id === 'APPROVED'  ? 'bg-green-600 text-white'
+                    : t.id === 'COMPLETED' ? 'bg-blue-600 text-white'
+                    : t.id === 'CANCELLED' ? 'bg-gray-500 text-white'
+                    : 'bg-gray-700 text-white'
+                    : t.id === 'REJECTED'  ? 'bg-red-50 text-red-500 hover:bg-red-100'
+                    : t.id === 'PENDING'   ? 'bg-amber-50 text-amber-600 hover:bg-amber-100'
+                    : t.id === 'APPROVED'  ? 'bg-green-50 text-green-600 hover:bg-green-100'
+                    : t.id === 'COMPLETED' ? 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                    : t.id === 'CANCELLED' ? 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                }`}>
+                {t.label}{t.id !== 'all' && <span className="ml-1 opacity-70">{supplyCounts[t.id]}</span>}
+              </button>
+            )
+          })}
+        </div>
         <div className="space-y-3">
-          {supplyRequests.length === 0 ? (
+          {filteredSupply.length === 0 ? (
             <div className="bg-white rounded-xl border border-gray-100 py-12 text-center text-sm text-gray-400">
               비품/소모품 신청 내역이 없습니다.
             </div>
@@ -353,6 +445,7 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests,
             </>
           )}
         </div>
+        </>
       )}
     </div>
   )
