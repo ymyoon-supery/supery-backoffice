@@ -117,6 +117,7 @@ export default function AdminApprovalClient({
   }
 
   function handleFullApprove(item: ApprovalItem) {
+    if (item.kind === 'home_location') return
     startTransition(async () => {
       const res = item.kind === 'leave'
         ? await fullApproveLeave(item.requestId)
@@ -145,6 +146,7 @@ export default function AdminApprovalClient({
   }
 
   function handleFullReject(item: ApprovalItem, reason?: string) {
+    if (item.kind === 'home_location') { handleReject(item, reason); return }
     startTransition(async () => {
       const res = item.kind === 'leave'
         ? await fullRejectLeave(item.requestId, reason)
@@ -266,7 +268,7 @@ export default function AdminApprovalClient({
                     : id === 'home_location' ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
                     : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                 }`}>
-                {label}{id !== 'all' && <span className="ml-1 opacity-70">{count}</span>}
+                {label}
               </button>
             )
           })}

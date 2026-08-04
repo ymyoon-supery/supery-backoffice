@@ -448,10 +448,18 @@ export default async function AdminApprovalPage({
     return sort === 'asc' ? diff : -diff
   })
 
-  const total      = all.length
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
-  const curPage    = Math.min(page, totalPages)
-  const items      = all.slice((curPage - 1) * PAGE_SIZE, curPage * PAGE_SIZE)
+  const total = all.length
+  let totalPages: number, curPage: number, items: ApprovalItem[]
+  if (tab === 'done') {
+    // done 탭은 클라이언트 필터(상태/유형)가 전체 데이터에 적용되어야 하므로 페이지네이션 없이 전달
+    totalPages = 1
+    curPage    = 1
+    items      = all
+  } else {
+    totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+    curPage    = Math.min(page, totalPages)
+    items      = all.slice((curPage - 1) * PAGE_SIZE, curPage * PAGE_SIZE)
+  }
 
   return (
     <AdminApprovalClient

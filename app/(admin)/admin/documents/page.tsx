@@ -21,7 +21,8 @@ export default async function AdminDocumentsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [docRes, supplyRes] = await Promise.all([
+  const [{ data: adminEmp }, docRes, supplyRes] = await Promise.all([
+    supabase.from('employees').select('id').eq('auth_user_id', user.id).single(),
     listDocumentRequests(),
     listSupplyRequests(),
   ])
@@ -34,6 +35,7 @@ export default async function AdminDocumentsPage() {
     <AdminDocumentsClient
       documentRequests={sortAdminList(docRes.data ?? [], DOC_STATUS_ORDER)}
       supplyRequests={sortAdminList(supplyRes.data ?? [], SUPPLY_STATUS_ORDER)}
+      adminEmployeeId={adminEmp?.id ?? null}
     />
   )
 }

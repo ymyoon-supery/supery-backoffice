@@ -49,7 +49,7 @@ const SUPPLY_STATUS_TABS: { id: SupplyStatusFilter; label: string }[] = [
 ]
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export default function AdminDocumentsClient({ documentRequests, supplyRequests, initialTab }: { documentRequests: any[]; supplyRequests: any[]; initialTab?: Tab }) {
+export default function AdminDocumentsClient({ documentRequests, supplyRequests, initialTab, adminEmployeeId }: { documentRequests: any[]; supplyRequests: any[]; initialTab?: Tab; adminEmployeeId?: string | null }) {
   const PAGE_SIZE = 20
   const [tab, setTab] = useState<Tab>(initialTab ?? 'documents')
   const [isPending, startTransition] = useTransition()
@@ -158,11 +158,14 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests,
     })
   }
 
-  // Determine which supply requests have an admin-pending step
+  // Only show approve/reject when the admin's own step is the current pending step
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function hasPendingStep(req: any): boolean {
+    if (!adminEmployeeId) return false
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (req.supply_approval_steps ?? []).some((s: any) => s.status === 'PENDING')
+    return (req.supply_approval_steps ?? []).some((s: any) =>
+      s.approver_id === adminEmployeeId && s.status === 'PENDING'
+    )
   }
 
   return (
