@@ -64,7 +64,14 @@ export default async function SupplyManagePage() {
     return { ...r, pendingApproverLabel, rejectionComment }
   })
 
+  const STATUS_ORDER: Record<string, number> = { REJECTED: 0, PENDING: 1, APPROVED: 2, COMPLETED: 3, CANCELLED: 4 }
+  const sortedRequests = [...supplyRequests].sort((a, b) => {
+    const dateDiff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    if (dateDiff !== 0) return dateDiff
+    return (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99)
+  })
+
   return (
-    <SupplyManageClient supplyRequests={supplyRequests} />
+    <SupplyManageClient supplyRequests={sortedRequests} />
   )
 }
