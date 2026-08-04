@@ -68,8 +68,9 @@ export default function AdminApprovalClient({
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [selectedExpense, setSelectedExpense] = useState<ApprovalItem | null>(null)
   const [statusFilter, setStatusFilter] = useState<'all' | 'APPROVED' | 'REJECTED'>('all')
+  const [dateSort, setDateSort] = useState<'desc' | 'asc'>('desc')
 
-  useEffect(() => { setStatusFilter('all') }, [tab])
+  useEffect(() => { setStatusFilter('all'); setDateSort('desc') }, [tab])
 
   useEffect(() => {
     if (!paymentDropdownId) return
@@ -162,6 +163,14 @@ export default function AdminApprovalClient({
     ? allItems.filter(i => i.status === statusFilter)
     : allItems
 
+  const sortedFilteredItems = tab === 'done'
+    ? [...filteredItems].sort((a, b) => {
+        const ta = a.requestDate ? new Date(a.requestDate).getTime() : 0
+        const tb = b.requestDate ? new Date(b.requestDate).getTime() : 0
+        return dateSort === 'desc' ? tb - ta : ta - tb
+      })
+    : filteredItems
+
   const doneCounts = {
     all:      allItems.length,
     APPROVED: allItems.filter(i => i.status === 'APPROVED').length,
@@ -222,9 +231,9 @@ export default function AdminApprovalClient({
         )}
       </div>
 
-      {/* Done tab status filter */}
+      {/* Done tab status filter + date sort */}
       {tab === 'done' && (
-        <div className="flex gap-1.5 flex-wrap">
+        <div className="flex gap-1.5 flex-wrap items-center">
           {([['all', '전체'], ['REJECTED', '반려'], ['APPROVED', '승인']] as const).map(([id, label]) => {
             const isActive = statusFilter === id
             const count = doneCounts[id]
@@ -244,6 +253,12 @@ export default function AdminApprovalClient({
               </button>
             )
           })}
+          <button
+            onClick={() => setDateSort(d => d === 'desc' ? 'asc' : 'desc')}
+            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50 transition-colors">
+            <ArrowUpDown size={12} />
+            {dateSort === 'desc' ? '최신순' : '오래된순'}
+          </button>
         </div>
       )}
 
@@ -266,7 +281,7 @@ export default function AdminApprovalClient({
 
         {/* ── Mobile card list ── */}
         <div className="md:hidden divide-y divide-gray-50">
-          {filteredItems.map(item => {
+          {sortedFilteredItems.map(item => {
             const isFullApprove = item.managerName != null
             const isPendingRow = item.status === 'PENDING' && !isFullApprove
             const cfg = STATUS_CFG[item.status]
@@ -473,7 +488,7 @@ export default function AdminApprovalClient({
             )
           })}
 
-          {filteredItems.length === 0 && (
+          {sortedFilteredItems.length === 0 && (
             <div className="px-4 py-14 text-center text-sm text-gray-400">
               {tab === 'pending' ? '미결재 항목이 없습니다.' : '결재 내역이 없습니다.'}
             </div>
@@ -492,7 +507,7 @@ export default function AdminApprovalClient({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {filteredItems.map(item => {
+            {sortedFilteredItems.map(item => {
               const isFullApprove = item.managerName != null
               const isPendingRow = item.status === 'PENDING' && !isFullApprove
               const cfg = STATUS_CFG[item.status]
@@ -713,7 +728,7 @@ export default function AdminApprovalClient({
               )
             })}
 
-            {filteredItems.length === 0 && (
+            {sortedFilteredItems.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-14 text-center text-sm text-gray-400">
                   {tab === 'pending' ? '미결재 항목이 없습니다.' : '결재 내역이 없습니다.'}
