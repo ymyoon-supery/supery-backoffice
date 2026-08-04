@@ -465,6 +465,9 @@ export default function MyRequestsClient({
         {visibleItems.length === 0 && (activeTab === 'leave' || activeTab === 'expense') && (
           <div className="py-12 text-center text-sm text-gray-400">신청 내역이 없습니다.</div>
         )}
+        {visibleItems.length === 0 && activeTab === 'all' && sortedDocuments.length === 0 && sortedSupply.length === 0 && (
+          <div className="py-12 text-center text-sm text-gray-400">신청 내역이 없습니다.</div>
+        )}
         {activeTab === 'leave' && leaveTotalPages > 1 && (
           <div className="flex items-center justify-center gap-3 pt-2">
             {catPage > 1 ? <Link href={buildTabUrl('leave', catPage - 1)} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">이전</Link> : <span className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-400 opacity-40 cursor-not-allowed">이전</span>}
