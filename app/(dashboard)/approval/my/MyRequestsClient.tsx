@@ -187,7 +187,9 @@ export default function MyRequestsClient({
   const validTabs: Tab[] = ['all', 'leave', 'expense', 'document', 'supply']
   const activeTab: Tab = validTabs.includes(catTab as Tab) && catTab !== 'all'
     ? catTab as Tab
-    : (expenseType || month || dateFrom || dateTo || keyword) ? 'expense' : 'all'
+    : catTab === 'all'
+      ? 'all'
+      : (expenseType || month || dateFrom || dateTo || keyword) ? 'expense' : 'all'
 
   const statusFilter = (statusFilterProp as StatusFilter) ?? 'all'
 
@@ -333,7 +335,7 @@ export default function MyRequestsClient({
 
       {/* Status filter chips */}
       <div className="flex gap-1.5 flex-wrap">
-        {STATUS_FILTERS.map(f => {
+        {STATUS_FILTERS.filter(f => !(f.id === 'rejected' && activeTab === 'document')).map(f => {
           const isActive = statusFilter === f.id
           return (
             <Link
@@ -459,9 +461,6 @@ export default function MyRequestsClient({
             </div>
           )
         })}
-        {visibleItems.length === 0 && !showDocument && !showSupply && (
-          <div className="py-12 text-center text-sm text-gray-400">신청 내역이 없습니다.</div>
-        )}
         {visibleItems.length === 0 && (activeTab === 'leave' || activeTab === 'expense') && (
           <div className="py-12 text-center text-sm text-gray-400">신청 내역이 없습니다.</div>
         )}

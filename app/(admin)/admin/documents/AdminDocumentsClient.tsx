@@ -49,7 +49,7 @@ const SUPPLY_STATUS_TABS: { id: SupplyStatusFilter; label: string }[] = [
 ]
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export default function AdminDocumentsClient({ documentRequests, supplyRequests, initialTab, adminEmployeeId }: { documentRequests: any[]; supplyRequests: any[]; initialTab?: Tab; adminEmployeeId?: string | null }) {
+export default function AdminDocumentsClient({ documentRequests, supplyRequests, initialTab, adminEmployeeId, supplyManagerId }: { documentRequests: any[]; supplyRequests: any[]; initialTab?: Tab; adminEmployeeId?: string | null; supplyManagerId?: string | null }) {
   const PAGE_SIZE = 20
   const [tab, setTab] = useState<Tab>(initialTab ?? 'documents')
   const [isDocPending, startDocTransition] = useTransition()
@@ -62,7 +62,10 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests,
   const [supplyStatusFilter, setSupplyStatusFilter] = useState<SupplyStatusFilter>('all')
   const router = useRouter()
 
-  useEffect(() => { setDocPage(1); setSupplyPage(1); setDocStatusFilter('all'); setSupplyStatusFilter('all') }, [tab])
+  useEffect(() => {
+    if (tab === 'documents') { setDocPage(1); setDocStatusFilter('all') }
+    else { setSupplyPage(1); setSupplyStatusFilter('all') }
+  }, [tab])
   useEffect(() => { setDocPage(1) }, [docStatusFilter])
   useEffect(() => { setSupplyPage(1) }, [supplyStatusFilter])
 
@@ -432,7 +435,7 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests,
                     )
                   )}
 
-                  {!canAct && req.status === 'APPROVED' && (
+                  {!canAct && req.status === 'APPROVED' && adminEmployeeId === supplyManagerId && (
                     <button
                       type="button"
                       onClick={() => handlePurchaseConfirm(req.id)}

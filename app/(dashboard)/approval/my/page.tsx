@@ -314,12 +314,14 @@ export default async function MyRequestsPage({
 
   const pagedDocuments = (() => {
     const sorted = sortByStatusDate(documentResult.data ?? [])
-    return catTab === 'document' ? sorted.slice(offset, offset + PAGE_SIZE) : sorted
+    if (catTab === 'document') return sorted.slice(offset, offset + PAGE_SIZE)
+    return sorted.slice(0, PAGE_SIZE)
   })()
 
   const pagedSupply = (() => {
     const sorted = sortByStatusDate(supplyRequests)
-    return catTab === 'supply' ? sorted.slice(offset, offset + PAGE_SIZE) : sorted
+    if (catTab === 'supply') return sorted.slice(offset, offset + PAGE_SIZE)
+    return sorted.slice(0, PAGE_SIZE)
   })()
 
   return (

@@ -205,6 +205,7 @@ export default async function PendingApprovalsPage({
         pendingItems={pagedItems as PendingItem[]} doneItems={[]}
         expenseType={expenseType} month={month} dateFrom={dateFrom} dateTo={dateTo}
         keyword={keyword} employeeName={employeeName}
+        isTeamLead={isTeamLead} isSupplyManager={isSupplyManager}
       />
     )
   }
@@ -327,7 +328,9 @@ export default async function PendingApprovalsPage({
   }
 
   doneItems.sort((a, b) => {
-    const dateDiff = new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime()
+    const aTime = a.actedAt ? new Date(a.actedAt).getTime() : new Date(a.requestDate).getTime()
+    const bTime = b.actedAt ? new Date(b.actedAt).getTime() : new Date(b.requestDate).getTime()
+    const dateDiff = bTime - aTime
     if (dateDiff !== 0) return dateDiff
     return (KIND_ORDER[a.kind] ?? 99) - (KIND_ORDER[b.kind] ?? 99)
   })
@@ -342,6 +345,7 @@ export default async function PendingApprovalsPage({
       pendingItems={[]} doneItems={doneItems}
       expenseType={expenseType} month={month} dateFrom={dateFrom} dateTo={dateTo}
       keyword={keyword} employeeName={employeeName}
+      isTeamLead={isTeamLead} isSupplyManager={isSupplyManager}
     />
   )
 }

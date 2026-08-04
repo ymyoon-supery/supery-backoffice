@@ -63,12 +63,15 @@ interface Props {
   dateTo: string
   keyword: string
   employeeName: string
+  isTeamLead: boolean
+  isSupplyManager: boolean
 }
 
 export default function PendingApprovalsClient({
   viewTab, type, page, totalPages,
   pendingItems, doneItems,
   expenseType, month, dateFrom, dateTo, keyword, employeeName,
+  isTeamLead, isSupplyManager,
 }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -185,10 +188,9 @@ export default function PendingApprovalsClient({
   ]
   const TYPE_TABS = [
     { id: 'all',     label: '전체' },
-    { id: 'leave',   label: '연차' },
-    { id: 'expense', label: '지출결의' },
+    ...(isTeamLead ? [{ id: 'leave', label: '연차' }, { id: 'expense', label: '지출결의' }] : []),
     { id: 'supply',  label: '비품' },
-  ]
+  ] as { id: string; label: string }[]
 
   const showFilter = type === 'expense' || type === 'all'
 
@@ -430,7 +432,11 @@ export default function PendingApprovalsClient({
           {doneItems.map(item => {
             const cfg = STATUS_CFG[item.status]
             const isExpanded = expandedDoneId === item.id
-            const hasDetail = item.kind === 'expense' ? !!item.expenseDetail : true
+            const hasDetail = item.kind === 'expense'
+              ? !!item.expenseDetail
+              : item.kind === 'supply'
+                ? (item.supplyItems?.length ?? 0) > 0
+                : true
             const sortedSupplyItems = [...(item.supplyItems ?? [])].sort((a, b) => a.sort_order - b.sort_order)
 
             function handleDoneClick() {

@@ -25,10 +25,12 @@ export default async function AdminDocumentsPage() {
     .from('employees').select('id, role').eq('auth_user_id', user.id).single()
   if (!adminEmp?.id || adminEmp.role !== 'ADMIN') redirect('/')
 
-  const [docRes, supplyRes] = await Promise.all([
+  const [docRes, supplyRes, settingsRes] = await Promise.all([
     listDocumentRequests(),
     listSupplyRequests(),
+    supabase.from('company_settings').select('supply_manager_id').single(),
   ])
+  const supplyManagerId = settingsRes.data?.supply_manager_id ?? null
 
   if (docRes.error) {
     return <div className="p-6 text-red-600 text-sm">서류 조회 오류: {docRes.error}</div>
@@ -42,6 +44,7 @@ export default async function AdminDocumentsPage() {
       documentRequests={sortAdminList(docRes.data ?? [], DOC_STATUS_ORDER)}
       supplyRequests={sortAdminList(supplyRes.data ?? [], SUPPLY_STATUS_ORDER)}
       adminEmployeeId={adminEmp?.id ?? null}
+      supplyManagerId={supplyManagerId}
     />
   )
 }
