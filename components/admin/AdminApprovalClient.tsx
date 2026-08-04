@@ -67,6 +67,9 @@ export default function AdminApprovalClient({
   const [paymentDropdownId, setPaymentDropdownId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [selectedExpense, setSelectedExpense] = useState<ApprovalItem | null>(null)
+  const [statusFilter, setStatusFilter] = useState<'all' | 'APPROVED' | 'REJECTED'>('all')
+
+  useEffect(() => { setStatusFilter('all') }, [tab])
 
   useEffect(() => {
     if (!paymentDropdownId) return
@@ -155,6 +158,15 @@ export default function AdminApprovalClient({
 
   const pageNums = getPageNums(page, totalPages)
   const allItems = [...fullApproveItems, ...items]
+  const filteredItems = tab === 'done' && statusFilter !== 'all'
+    ? allItems.filter(i => i.status === statusFilter)
+    : allItems
+
+  const doneCounts = {
+    all:      allItems.length,
+    APPROVED: allItems.filter(i => i.status === 'APPROVED').length,
+    REJECTED: allItems.filter(i => i.status === 'REJECTED').length,
+  }
 
   return (
     <div className="space-y-4 max-w-5xl">
@@ -210,6 +222,31 @@ export default function AdminApprovalClient({
         )}
       </div>
 
+      {/* Done tab status filter */}
+      {tab === 'done' && (
+        <div className="flex gap-1.5 flex-wrap">
+          {([['all', '전체'], ['REJECTED', '반려'], ['APPROVED', '승인']] as const).map(([id, label]) => {
+            const isActive = statusFilter === id
+            const count = doneCounts[id]
+            if (id !== 'all' && count === 0) return null
+            return (
+              <button key={id} onClick={() => setStatusFilter(id)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                  isActive
+                    ? id === 'REJECTED' ? 'bg-red-500 text-white'
+                    : id === 'APPROVED' ? 'bg-green-600 text-white'
+                    : 'bg-gray-700 text-white'
+                    : id === 'REJECTED' ? 'bg-red-50 text-red-500 hover:bg-red-100'
+                    : id === 'APPROVED' ? 'bg-green-50 text-green-600 hover:bg-green-100'
+                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                }`}>
+                {label}{id !== 'all' && <span className="ml-1 opacity-70">{count}</span>}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       {/* Expense Search Filter */}
       {(type === 'expense' || type === 'all') && (
         <ExpenseSearchFilter
@@ -229,7 +266,7 @@ export default function AdminApprovalClient({
 
         {/* ── Mobile card list ── */}
         <div className="md:hidden divide-y divide-gray-50">
-          {allItems.map(item => {
+          {filteredItems.map(item => {
             const isFullApprove = item.managerName != null
             const isPendingRow = item.status === 'PENDING' && !isFullApprove
             const cfg = STATUS_CFG[item.status]
@@ -436,7 +473,7 @@ export default function AdminApprovalClient({
             )
           })}
 
-          {allItems.length === 0 && (
+          {filteredItems.length === 0 && (
             <div className="px-4 py-14 text-center text-sm text-gray-400">
               {tab === 'pending' ? '미결재 항목이 없습니다.' : '결재 내역이 없습니다.'}
             </div>
@@ -455,7 +492,7 @@ export default function AdminApprovalClient({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {allItems.map(item => {
+            {filteredItems.map(item => {
               const isFullApprove = item.managerName != null
               const isPendingRow = item.status === 'PENDING' && !isFullApprove
               const cfg = STATUS_CFG[item.status]
@@ -676,7 +713,7 @@ export default function AdminApprovalClient({
               )
             })}
 
-            {allItems.length === 0 && (
+            {filteredItems.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-14 text-center text-sm text-gray-400">
                   {tab === 'pending' ? '미결재 항목이 없습니다.' : '결재 내역이 없습니다.'}
