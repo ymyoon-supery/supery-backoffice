@@ -26,9 +26,9 @@ const PAYMENT_STATUS_CFG = {
 }
 
 const PAYMENT_STATUS_NEXT: Record<string, Array<{ value: 'PENDING_PAYMENT' | 'PAID' | 'SETTLED'; label: string }>> = {
-  PENDING_PAYMENT: [{ value: 'PAID',    label: '지급완료로 변경' }, { value: 'SETTLED', label: '정산완료로 변경' }],
-  PAID:            [{ value: 'SETTLED', label: '정산완료로 변경' }, { value: 'PENDING_PAYMENT', label: '지급대기로 변경' }],
-  SETTLED:         [{ value: 'PAID',    label: '지급완료로 변경' }, { value: 'PENDING_PAYMENT', label: '지급대기로 변경' }],
+  PENDING_PAYMENT: [{ value: 'PAID',    label: '지급완료로 변경' }],
+  PAID:            [{ value: 'SETTLED', label: '정산완료로 변경' }],
+  SETTLED:         [],
 }
 
 function getPageNums(cur: number, total: number): number[] {
@@ -69,9 +69,9 @@ export default function AdminApprovalClient({
   const [selectedExpense, setSelectedExpense] = useState<ApprovalItem | null>(null)
   const [statusFilter, setStatusFilter] = useState<'all' | 'APPROVED' | 'REJECTED'>('all')
   const [kindFilter, setKindFilter] = useState<'all' | 'leave' | 'expense' | 'home_location'>('all')
-  const [dateSort, setDateSort] = useState<'desc' | 'asc'>('desc')
+  const [dateSort, setDateSort] = useState<'desc' | 'asc'>(sort === 'asc' ? 'asc' : 'desc')
 
-  useEffect(() => { setStatusFilter('all'); setKindFilter('all'); setDateSort('desc') }, [tab])
+  useEffect(() => { setStatusFilter('all'); setKindFilter('all') }, [tab])
 
   useEffect(() => {
     if (!paymentDropdownId) return
@@ -231,12 +231,6 @@ export default function AdminApprovalClient({
             </Link>
           ))}
         </div>
-
-        <Link href={buildUrl({ sort: sort === 'desc' ? 'asc' : 'desc', page: '1' })}
-          className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50 transition-colors">
-          <ArrowUpDown size={12} />
-          {sort === 'desc' ? '최신순' : '오래된순'}
-        </Link>
 
         {total > 0 && (
           <span className="ml-auto text-xs text-gray-400">전체 {total}건</span>
@@ -466,7 +460,7 @@ export default function AdminApprovalClient({
                           {item.status === 'REJECTED' && item.comment && (
                             <span className="text-xs text-gray-400 max-w-[120px] truncate">{item.comment}</span>
                           )}
-                          {item.status === 'APPROVED' && item.kind === 'expense' && item.paymentStatus && (
+                          {item.status === 'APPROVED' && item.kind === 'expense' && item.paymentStatus && (PAYMENT_STATUS_NEXT[item.paymentStatus]?.length ?? 0) > 0 && (
                             <div className="relative">
                               <button
                                 onClick={(e) => { e.stopPropagation(); setPaymentDropdownId(paymentDropdownId === item.stepId ? null : item.stepId) }}
@@ -699,7 +693,7 @@ export default function AdminApprovalClient({
                           {item.status === 'REJECTED' && item.comment && (
                             <span className="text-xs text-gray-400 max-w-[160px] truncate">{item.comment}</span>
                           )}
-                          {item.status === 'APPROVED' && item.kind === 'expense' && item.paymentStatus && (
+                          {item.status === 'APPROVED' && item.kind === 'expense' && item.paymentStatus && (PAYMENT_STATUS_NEXT[item.paymentStatus]?.length ?? 0) > 0 && (
                             <div className="relative">
                               <button
                                 onClick={(e) => { e.stopPropagation(); setPaymentDropdownId(
