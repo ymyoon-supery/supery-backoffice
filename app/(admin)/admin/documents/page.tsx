@@ -21,13 +21,14 @@ export default async function AdminDocumentsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [{ data: adminEmp }, docRes, supplyRes] = await Promise.all([
-    supabase.from('employees').select('id, role').eq('auth_user_id', user.id).single(),
+  const { data: adminEmp } = await supabase
+    .from('employees').select('id, role').eq('auth_user_id', user.id).single()
+  if (!adminEmp?.id || adminEmp.role !== 'ADMIN') redirect('/')
+
+  const [docRes, supplyRes] = await Promise.all([
     listDocumentRequests(),
     listSupplyRequests(),
   ])
-
-  if (!adminEmp || adminEmp.role !== 'ADMIN') redirect('/')
 
   if (docRes.error) {
     return <div className="p-6 text-red-600 text-sm">서류 조회 오류: {docRes.error}</div>

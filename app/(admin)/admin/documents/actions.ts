@@ -52,42 +52,16 @@ export async function approveSupplyRequest(
     .select('id, role')
     .eq('auth_user_id', user.id)
     .single()
-  if (adminEmp?.role !== 'ADMIN') return { error: 'Unauthorized' }
+  if (!adminEmp?.id || adminEmp.role !== 'ADMIN') return { error: 'Unauthorized' }
 
-  const admin = getAdmin()
-  const now = new Date().toISOString()
-
-  if (approved) {
-    // 승인: 관리자 본인 스텝만 처리 (선행 스텝이 아직 PENDING인 경우 오염 방지)
-    const { error: stepErr } = await admin
-      .from('supply_approval_steps')
-      .update({ status: 'APPROVED', acted_at: now })
-      .eq('supply_request_id', requestId)
-      .eq('approver_id', adminEmp.id)
-      .eq('status', 'PENDING')
-    if (stepErr) return { error: stepErr.message }
-  } else {
-    // 반려: 모든 미처리 스텝을 반려 처리 후 이전 승인자에게도 사유 전파
-    const { error: stepErr } = await admin
-      .from('supply_approval_steps')
-      .update({ status: 'REJECTED', comment: comment ?? null, acted_at: now })
-      .eq('supply_request_id', requestId)
-      .in('status', ['PENDING', 'WAITING'])
-    if (stepErr) return { error: stepErr.message }
-
-    await admin
-      .from('supply_approval_steps')
-      .update({ status: 'REJECTED', comment: comment ?? null })
-      .eq('supply_request_id', requestId)
-      .eq('status', 'APPROVED')
-  }
-
-  const { error: reqErr } = await admin
-    .from('supply_requests')
-    .update({ status: approved ? 'APPROVED' : 'REJECTED' })
-    .eq('id', requestId)
-
-  if (reqErr) return { error: reqErr.message }
+  // RPC가 원자적으로 처리: 본인 스텝 승인/반려, 다음 스텝 활성화,
+  // 마지막 스텝일 때만 request.status 변경, FOR UPDATE 락, 반려 사유 전파
+  const { error } = await supabase.rpc('approve_supply_step', {
+    p_request_id: requestId,
+    p_approved: approved,
+    p_comment: comment ?? null,
+  })
+  if (error) return { error: error.message }
 
   revalidatePath('/admin/documents')
   return { error: null }
