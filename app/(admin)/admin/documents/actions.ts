@@ -57,21 +57,24 @@ export async function approveSupplyRequest(
   const admin = getAdmin()
   const now = new Date().toISOString()
 
-  const { error: stepErr } = await admin
-    .from('supply_approval_steps')
-    .update({
-      status: approved ? 'APPROVED' : 'REJECTED',
-      comment: comment ?? null,
-      acted_at: now,
-    })
-    .eq('supply_request_id', requestId)
-    .in('status', ['PENDING', 'WAITING'])
+  if (approved) {
+    // 승인: 관리자 본인 스텝만 처리 (선행 스텝이 아직 PENDING인 경우 오염 방지)
+    const { error: stepErr } = await admin
+      .from('supply_approval_steps')
+      .update({ status: 'APPROVED', acted_at: now })
+      .eq('supply_request_id', requestId)
+      .eq('approver_id', adminEmp.id)
+      .eq('status', 'PENDING')
+    if (stepErr) return { error: stepErr.message }
+  } else {
+    // 반려: 모든 미처리 스텝을 반려 처리 후 이전 승인자에게도 사유 전파
+    const { error: stepErr } = await admin
+      .from('supply_approval_steps')
+      .update({ status: 'REJECTED', comment: comment ?? null, acted_at: now })
+      .eq('supply_request_id', requestId)
+      .in('status', ['PENDING', 'WAITING'])
+    if (stepErr) return { error: stepErr.message }
 
-  if (stepErr) return { error: stepErr.message }
-
-  // When rejecting, propagate reason to previously APPROVED steps so prior
-  // approvers can see the rejection reason in their 결재완료 list.
-  if (!approved) {
     await admin
       .from('supply_approval_steps')
       .update({ status: 'REJECTED', comment: comment ?? null })

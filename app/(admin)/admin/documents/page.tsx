@@ -22,13 +22,18 @@ export default async function AdminDocumentsPage() {
   if (!user) redirect('/login')
 
   const [{ data: adminEmp }, docRes, supplyRes] = await Promise.all([
-    supabase.from('employees').select('id').eq('auth_user_id', user.id).single(),
+    supabase.from('employees').select('id, role').eq('auth_user_id', user.id).single(),
     listDocumentRequests(),
     listSupplyRequests(),
   ])
 
+  if (!adminEmp || adminEmp.role !== 'ADMIN') redirect('/')
+
   if (docRes.error) {
     return <div className="p-6 text-red-600 text-sm">서류 조회 오류: {docRes.error}</div>
+  }
+  if (supplyRes.error) {
+    return <div className="p-6 text-red-600 text-sm">비품 조회 오류: {supplyRes.error}</div>
   }
 
   return (
