@@ -194,7 +194,7 @@ export default function ApprovalInboxClient({ leaveSteps, expenseSteps, myLeave,
                       <p className="text-sm font-medium text-gray-900">
                         {item.kind === 'leave'
                           ? `${LEAVE_LABELS[item.leave_type]} ${item.days_used}일`
-                          : `${item.title} — ${item.amount?.toLocaleString()}원`}
+                          : `${item.title} — ${(Number(item.amount) || 0).toLocaleString()}원`}
                       </p>
                       <p className="text-xs text-gray-400 mt-0.5">{format(new Date(item.created_at), 'yyyy.MM.dd')}</p>
                     </div>

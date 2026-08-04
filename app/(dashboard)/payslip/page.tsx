@@ -70,19 +70,25 @@ export default async function PayslipPage() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <a
-                  href={signedUrls[i]}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1.5 border border-gray-200 text-gray-600 text-xs font-medium rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  보기
-                </a>
-                <PayslipDownloadButton
-                  url={signedUrls[i]}
-                  fileName={slip.file_name ?? `${slip.year_month}_급여명세서.pdf`}
-                  className="px-3 py-1.5 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
-                />
+                {signedUrls[i] ? (
+                  <>
+                    <a
+                      href={signedUrls[i]}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 border border-gray-200 text-gray-600 text-xs font-medium rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      보기
+                    </a>
+                    <PayslipDownloadButton
+                      url={signedUrls[i]}
+                      fileName={slip.file_name ?? `${slip.year_month}_급여명세서.pdf`}
+                      className="px-3 py-1.5 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                    />
+                  </>
+                ) : (
+                  <span className="text-xs text-red-400">파일 없음</span>
+                )}
               </div>
             </div>
           ))}

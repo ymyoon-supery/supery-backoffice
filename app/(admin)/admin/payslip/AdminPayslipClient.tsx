@@ -76,6 +76,7 @@ export default function AdminPayslipClient({ employees }: { employees: Employee[
       if (res.error) { toast.error(res.error); return }
 
       toast.success('급여명세서가 업로드되었습니다.')
+      refreshUploadMonth(yearMonth)
       setSelectedEmployeeId('')
       setYearMonth('')
       setFile(null)
@@ -216,12 +217,18 @@ export default function AdminPayslipClient({ employees }: { employees: Employee[
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <a href={slip.fileUrl} target="_blank" rel="noopener noreferrer"
-                        className="text-xs px-2.5 py-1 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors">
-                        보기
-                      </a>
-                      <PayslipDownloadButton url={slip.fileUrl} fileName={slip.fileName ?? `${slip.yearMonth}_급여명세서.pdf`}
-                        className="text-xs px-2.5 py-1 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors" />
+                      {slip.fileUrl ? (
+                        <>
+                          <a href={slip.fileUrl} target="_blank" rel="noopener noreferrer"
+                            className="text-xs px-2.5 py-1 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors">
+                            보기
+                          </a>
+                          <PayslipDownloadButton url={slip.fileUrl} fileName={slip.fileName ?? `${slip.yearMonth}_급여명세서.pdf`}
+                            className="text-xs px-2.5 py-1 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors" />
+                        </>
+                      ) : (
+                        <span className="text-xs text-red-400">파일 없음</span>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -278,12 +285,18 @@ export default function AdminPayslipClient({ employees }: { employees: Employee[
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <a href={slip.fileUrl} target="_blank" rel="noopener noreferrer"
-                      className="text-xs px-2.5 py-1 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors">
-                      보기
-                    </a>
-                    <PayslipDownloadButton url={slip.fileUrl} fileName={slip.fileName ?? `${slip.yearMonth}_${slip.employeeName}_급여명세서.pdf`}
-                      className="text-xs px-2.5 py-1 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors" />
+                    {slip.fileUrl ? (
+                      <>
+                        <a href={slip.fileUrl} target="_blank" rel="noopener noreferrer"
+                          className="text-xs px-2.5 py-1 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors">
+                          보기
+                        </a>
+                        <PayslipDownloadButton url={slip.fileUrl} fileName={slip.fileName ?? `${slip.yearMonth}_${slip.employeeName}_급여명세서.pdf`}
+                          className="text-xs px-2.5 py-1 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors" />
+                      </>
+                    ) : (
+                      <span className="text-xs text-red-400">파일 없음</span>
+                    )}
                     <button
                       type="button"
                       disabled={replacingId === slip.id}
