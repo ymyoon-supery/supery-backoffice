@@ -68,9 +68,10 @@ export default function AdminApprovalClient({
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [selectedExpense, setSelectedExpense] = useState<ApprovalItem | null>(null)
   const [statusFilter, setStatusFilter] = useState<'all' | 'APPROVED' | 'REJECTED'>('all')
+  const [kindFilter, setKindFilter] = useState<'all' | 'leave' | 'expense' | 'home_location'>('all')
   const [dateSort, setDateSort] = useState<'desc' | 'asc'>('desc')
 
-  useEffect(() => { setStatusFilter('all'); setDateSort('desc') }, [tab])
+  useEffect(() => { setStatusFilter('all'); setKindFilter('all'); setDateSort('desc') }, [tab])
 
   useEffect(() => {
     if (!paymentDropdownId) return
@@ -161,7 +162,16 @@ export default function AdminApprovalClient({
   const allItems = [...fullApproveItems, ...items]
   const filteredItems = tab === 'done' && statusFilter !== 'all'
     ? allItems.filter(i => i.status === statusFilter)
+    : tab === 'pending' && kindFilter !== 'all'
+    ? allItems.filter(i => i.kind === kindFilter)
     : allItems
+
+  const pendingKindCounts = {
+    all:           allItems.length,
+    leave:         allItems.filter(i => i.kind === 'leave').length,
+    expense:       allItems.filter(i => i.kind === 'expense').length,
+    home_location: allItems.filter(i => i.kind === 'home_location').length,
+  }
 
   const sortedFilteredItems = [...filteredItems].sort((a, b) => {
     const ta = a.requestDate ? new Date(a.requestDate).getTime() : 0
@@ -229,12 +239,38 @@ export default function AdminApprovalClient({
         )}
       </div>
 
-      {/* Pending tab date sort */}
+      {/* Pending tab kind filter + date sort */}
       {tab === 'pending' && (
-        <div className="flex justify-end">
+        <div className="flex gap-1.5 flex-wrap items-center">
+          {([
+            ['all',           '전체',    null],
+            ['leave',         '연차',    'bg-blue-50 text-blue-600 hover:bg-blue-100 active:bg-blue-500'],
+            ['expense',       '지결서',  'bg-violet-50 text-violet-600 hover:bg-violet-100 active:bg-violet-600'],
+            ['home_location', '재택변경','bg-emerald-50 text-emerald-600 hover:bg-emerald-100 active:bg-emerald-600'],
+          ] as const).map(([id, label]) => {
+            const count = pendingKindCounts[id]
+            if (id !== 'all' && count === 0) return null
+            const isActive = kindFilter === id
+            return (
+              <button key={id} onClick={() => setKindFilter(id)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                  isActive
+                    ? id === 'leave'         ? 'bg-blue-500 text-white'
+                    : id === 'expense'       ? 'bg-violet-600 text-white'
+                    : id === 'home_location' ? 'bg-emerald-600 text-white'
+                    : 'bg-gray-700 text-white'
+                    : id === 'leave'         ? 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                    : id === 'expense'       ? 'bg-violet-50 text-violet-600 hover:bg-violet-100'
+                    : id === 'home_location' ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                }`}>
+                {label}{id !== 'all' && <span className="ml-1 opacity-70">{count}</span>}
+              </button>
+            )
+          })}
           <button
             onClick={() => setDateSort(d => d === 'desc' ? 'asc' : 'desc')}
-            className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50 transition-colors">
+            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50 transition-colors">
             <ArrowUpDown size={12} />
             {dateSort === 'desc' ? '최신순' : '오래된순'}
           </button>
