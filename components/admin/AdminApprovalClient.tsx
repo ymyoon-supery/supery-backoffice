@@ -163,13 +163,11 @@ export default function AdminApprovalClient({
     ? allItems.filter(i => i.status === statusFilter)
     : allItems
 
-  const sortedFilteredItems = tab === 'done'
-    ? [...filteredItems].sort((a, b) => {
-        const ta = a.requestDate ? new Date(a.requestDate).getTime() : 0
-        const tb = b.requestDate ? new Date(b.requestDate).getTime() : 0
-        return dateSort === 'desc' ? tb - ta : ta - tb
-      })
-    : filteredItems
+  const sortedFilteredItems = [...filteredItems].sort((a, b) => {
+    const ta = a.requestDate ? new Date(a.requestDate).getTime() : 0
+    const tb = b.requestDate ? new Date(b.requestDate).getTime() : 0
+    return dateSort === 'desc' ? tb - ta : ta - tb
+  })
 
   const doneCounts = {
     all:      allItems.length,
@@ -230,6 +228,18 @@ export default function AdminApprovalClient({
           <span className="ml-auto text-xs text-gray-400">전체 {total}건</span>
         )}
       </div>
+
+      {/* Pending tab date sort */}
+      {tab === 'pending' && (
+        <div className="flex justify-end">
+          <button
+            onClick={() => setDateSort(d => d === 'desc' ? 'asc' : 'desc')}
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50 transition-colors">
+            <ArrowUpDown size={12} />
+            {dateSort === 'desc' ? '최신순' : '오래된순'}
+          </button>
+        </div>
+      )}
 
       {/* Done tab status filter + date sort */}
       {tab === 'done' && (
