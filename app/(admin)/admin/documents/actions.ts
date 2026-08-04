@@ -68,7 +68,18 @@ export async function approveSupplyRequest(
 }
 
 
+async function requireAdmin() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+  const { data: emp } = await supabase
+    .from('employees').select('role').eq('auth_user_id', user.id).single()
+  return emp?.role === 'ADMIN' ? true : null
+}
+
 export async function listDocumentRequests() {
+  if (!await requireAdmin()) return { error: 'Unauthorized', data: null }
+
   const admin = getAdmin()
 
   const { data, error } = await admin
@@ -85,6 +96,8 @@ export async function listDocumentRequests() {
 }
 
 export async function listSupplyRequests() {
+  if (!await requireAdmin()) return { error: 'Unauthorized', data: null }
+
   const admin = getAdmin()
 
   const { data, error } = await admin
