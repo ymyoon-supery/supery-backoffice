@@ -228,6 +228,10 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests,
               const isRejecting = rejectingId === req.id
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const sortedItems = [...(req.supply_request_items ?? [])].sort((a: any, b: any) => a.sort_order - b.sort_order)
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const rejectionComment = req.status === 'REJECTED'
+                ? ((req.supply_approval_steps ?? []) as any[]).find((s: any) => s.status === 'REJECTED' && s.comment)?.comment ?? null
+                : null
 
               return (
                 <div key={req.id} className="bg-white rounded-xl border border-gray-100 p-5 space-y-3">
@@ -273,6 +277,12 @@ export default function AdminDocumentsClient({ documentRequests, supplyRequests,
                       </tbody>
                     </table>
                   </div>
+
+                  {rejectionComment && (
+                    <p className="text-xs text-red-500">
+                      <span className="text-red-400">반려사유</span> {rejectionComment}
+                    </p>
+                  )}
 
                   {canAct && (
                     isRejecting ? (
