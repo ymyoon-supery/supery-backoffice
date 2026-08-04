@@ -110,7 +110,7 @@ export default function EmployeesClient({ employees: init, groups, teams }: {
             role: form.role,
             hired_at: form.hiredAt || null,
             annual_leave_days: newAnnual ?? e.annual_leave_days,
-            remaining_leaves: parsedRemaining !== null ? parsedRemaining : e.remaining_leaves,
+            remaining_leaves: parsedRemaining !== null ? parsedRemaining : (newAnnual !== undefined ? newAnnual : e.remaining_leaves),
           } : e))
           toast.success('직원 정보가 수정됐습니다.')
         }

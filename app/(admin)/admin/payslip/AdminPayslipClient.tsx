@@ -81,7 +81,6 @@ export default function AdminPayslipClient({ employees }: { employees: Employee[
       setYearMonth('')
       setFile(null)
       if (fileRef.current) fileRef.current.value = ''
-      refreshUploadMonth()
     } finally {
       setUploading(false)
     }
@@ -199,15 +198,15 @@ export default function AdminPayslipClient({ employees }: { employees: Employee[
             </button>
           </div>
 
-          {/* 이번 달 업로드 내역 */}
+          {/* 선택 월 업로드 내역 */}
           <div className="space-y-2">
             <h2 className="text-sm font-semibold text-gray-800">
-              이번 달 업로드 내역 <span className="text-gray-400 font-normal">({formatYearMonth(thisMonth())})</span>
+              {formatYearMonth(yearMonth || thisMonth())} 업로드 내역
             </h2>
             {loadingUploadList ? (
               <p className="text-sm text-gray-400 py-4 text-center">불러오는 중...</p>
             ) : uploadMonthSlips.length === 0 ? (
-              <p className="text-sm text-gray-400 py-6 text-center">이번 달 업로드된 급여명세서가 없습니다.</p>
+              <p className="text-sm text-gray-400 py-6 text-center">{formatYearMonth(yearMonth || thisMonth())} 업로드된 급여명세서가 없습니다.</p>
             ) : (
               <div className="space-y-2">
                 {uploadMonthSlips.map(slip => (
