@@ -69,6 +69,12 @@ const EVIDENCE_TYPE_OPTIONS = [
 
 function getToday() { return format(new Date(), 'yyyy-MM-dd') }
 
+function extractUserNote(rawNote: string | null | undefined, skipParts: number): string {
+  if (!rawNote) return ''
+  const parts = rawNote.split(' / ')
+  return parts.slice(skipParts).join(' / ')
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type CardLineItem = {
@@ -1127,19 +1133,21 @@ function BusinessIncomeTab({
   employeePosition,
   departmentName,
   onSuccess,
-}: Props & { onSuccess: () => void }) {
+  initialData,
+}: Props & { onSuccess: () => void; initialData?: ExpenseInitialData | null }) {
   const [isPending, startTransition] = useTransition()
-  const [title, setTitle] = useState('')
+  const li0 = initialData?.lineItems?.[0]
+  const [title, setTitle] = useState(initialData?.title ?? '')
   const [fields, setFields] = useState<BusinessIncomeFields>({
-    recipientName: '',
+    recipientName: initialData?.payee ?? '',
     ssn: '',
-    grossAmountRaw: '',
-    description: '',
-    bankName: '',
-    accountNumber: '',
-    note: '',
+    grossAmountRaw: li0?.amount ? li0.amount.toLocaleString('ko-KR') : '',
+    description: li0?.item ?? '',
+    bankName: initialData?.bankName ?? '',
+    accountNumber: initialData?.accountNumber ?? '',
+    note: extractUserNote(li0?.note, 2),
   })
-  const [paymentRequestDate, setPaymentRequestDate] = useState(getToday())
+  const [paymentRequestDate, setPaymentRequestDate] = useState(initialData?.paymentRequestDate ?? getToday())
   const [attachments, setAttachments] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
 
@@ -1361,25 +1369,29 @@ function PrizeTab({
   employeePosition,
   departmentName,
   onSuccess,
-}: Props & { onSuccess: () => void }) {
+  initialData,
+}: Props & { onSuccess: () => void; initialData?: ExpenseInitialData | null }) {
   const [isPending, startTransition] = useTransition()
-  const [title, setTitle] = useState('')
-  const [isOver50k, setIsOver50k] = useState(false)
+  const li0 = initialData?.lineItems?.[0]
+  const hasWithholding = initialData?.taxType === 'WITHHOLDING_OTHER_WITHOUT' || initialData?.taxType === 'WITHHOLDING_OTHER_WITH'
+  const initPaymentType = initialData?.paymentMethod === 'CARD' ? 'GIFT_CARD' : 'CASH'
+  const [title, setTitle] = useState(initialData?.title ?? '')
+  const [isOver50k, setIsOver50k] = useState(hasWithholding)
   const [fields, setFields] = useState<PrizeFields>({
-    recipientName: '',
+    recipientName: initialData?.payee ?? '',
     ssn: '',
-    prizeAmountRaw: '',
-    taxPaymentType: 'SELF',
-    paymentType: 'CASH',
-    giftCardEvidence: 'CORPORATE_CARD',
-    giftCardCardCompany: '',
+    prizeAmountRaw: li0?.amount ? li0.amount.toLocaleString('ko-KR') : '',
+    taxPaymentType: initialData?.taxType === 'WITHHOLDING_OTHER_WITH' ? 'COMPANY' : 'SELF',
+    paymentType: initPaymentType,
+    giftCardEvidence: (initialData?.evidenceType as 'CORPORATE_CARD' | 'PERSONAL_CARD' | null) ?? 'CORPORATE_CARD',
+    giftCardCardCompany: initialData?.cardCompany ?? '',
     giftCardCardNumber: '',
-    bankName: '',
-    accountNumber: '',
-    description: '',
-    note: '',
+    bankName: initialData?.bankName ?? '',
+    accountNumber: initialData?.accountNumber ?? '',
+    description: li0?.item ?? '',
+    note: extractUserNote(li0?.note, hasWithholding ? 1 : 0),
   })
-  const [paymentRequestDate, setPaymentRequestDate] = useState(getToday())
+  const [paymentRequestDate, setPaymentRequestDate] = useState(initialData?.paymentRequestDate ?? getToday())
   const [attachments, setAttachments] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
 
@@ -1802,8 +1814,8 @@ export default function ExpenseForm(props: Props) {
       {activeTab === 'EXPENSE' && <ExpenseTab {...tabProps} initialData={initialData} onSuccess={onSuccess} />}
       {activeTab === 'CORPORATE_CARD' && <CorporateCardTab {...tabProps} initialData={initialData} onSuccess={onSuccess} />}
       {activeTab === 'TRANSPORTATION' && <TransportationTab {...tabProps} initialData={initialData} onSuccess={onSuccess} />}
-      {activeTab === 'BUSINESS_INCOME' && <BusinessIncomeTab {...tabProps} onSuccess={onSuccess} />}
-      {activeTab === 'PRIZE' && <PrizeTab {...tabProps} onSuccess={onSuccess} />}
+      {activeTab === 'BUSINESS_INCOME' && <BusinessIncomeTab {...tabProps} initialData={initialData} onSuccess={onSuccess} />}
+      {activeTab === 'PRIZE' && <PrizeTab {...tabProps} initialData={initialData} onSuccess={onSuccess} />}
     </div>
   )
 }
