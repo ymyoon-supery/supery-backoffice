@@ -5,6 +5,7 @@ import { format } from 'date-fns'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { Plus, Trash2, X } from 'lucide-react'
 import ExpenseDetailModal from '@/components/approval/ExpenseDetailModal'
 import type { ExpenseViewData } from '@/components/approval/ExpenseDetailView'
 import ExpenseSearchFilter from '@/components/approval/ExpenseSearchFilter'
@@ -14,6 +15,7 @@ import {
   cancelDocumentRequest,
   cancelSupplyRequest,
 } from './actions'
+import { submitSupplyRequest } from '@/app/(dashboard)/documents/actions'
 
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   PENDING:   { label: '대기',   className: 'bg-yellow-50 text-yellow-700' },
@@ -33,6 +35,20 @@ const CATEGORY_LABELS: Record<string, string> = {
   CONSUMABLE: '소모품',
   SOFTWARE: '소프트웨어',
   OTHER: '기타',
+}
+
+const CATEGORIES = ['EQUIPMENT', 'CONSUMABLE', 'SOFTWARE', 'OTHER'] as const
+
+interface EditableItem {
+  category: 'EQUIPMENT' | 'CONSUMABLE' | 'SOFTWARE' | 'OTHER'
+  description: string
+  estimatedAmount: string
+  note: string
+}
+
+function formatKRWInput(value: string) {
+  const n = value.replace(/[^0-9]/g, '')
+  return n ? Number(n).toLocaleString('ko-KR') : ''
 }
 
 const EXPENSE_TYPE_LABELS: Record<string, string> = {
@@ -182,7 +198,44 @@ export default function MyRequestsClient({
   const [selectedExpense, setSelectedExpense] = useState<ExpenseViewData | null>(null)
   const [expandedSupplyId, setExpandedSupplyId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [resubmitSupply, setResubmitSupply] = useState<SupplyRequest | null>(null)
+  const [resubmitItems, setResubmitItems] = useState<EditableItem[]>([])
   const router = useRouter()
+
+  function openResubmit(req: SupplyRequest) {
+    const sorted = [...(req.supply_request_items ?? [])].sort((a, b) => a.sort_order - b.sort_order)
+    setResubmitItems(sorted.map(it => ({
+      category: it.category as EditableItem['category'],
+      description: it.description,
+      estimatedAmount: it.estimated_amount != null ? Number(it.estimated_amount).toLocaleString('ko-KR') : '',
+      note: it.note ?? '',
+    })))
+    setResubmitSupply(req)
+  }
+
+  function updateResubmitItem(index: number, field: keyof EditableItem, value: string) {
+    setResubmitItems(prev => prev.map((it, i) => i === index ? { ...it, [field]: value } : it))
+  }
+
+  function handleResubmit() {
+    const valid = resubmitItems.every(it => it.description.trim())
+    if (!valid) { toast.error('내역을 모두 입력해주세요.'); return }
+    if (!confirm('수정된 내용으로 새로 신청하시겠습니까?')) return
+    startTransition(async () => {
+      const res = await submitSupplyRequest({
+        items: resubmitItems.map(it => ({
+          category: it.category,
+          description: it.description.trim(),
+          estimatedAmount: it.estimatedAmount ? parseInt(it.estimatedAmount.replace(/,/g, ''), 10) : null,
+          note: it.note.trim() || null,
+        })),
+      })
+      if (res.error) { toast.error(res.error); return }
+      toast.success('재신청이 접수되었습니다.')
+      setResubmitSupply(null)
+      router.refresh()
+    })
+  }
 
   const validTabs: Tab[] = ['all', 'leave', 'expense', 'document', 'supply']
   const activeTab: Tab = validTabs.includes(catTab as Tab) && catTab !== 'all'
@@ -597,6 +650,16 @@ export default function MyRequestsClient({
                         취소
                       </button>
                     )}
+                    {req.status === 'REJECTED' && (
+                      <button
+                        type="button"
+                        onClick={() => openResubmit(req)}
+                        disabled={isPending}
+                        className="text-xs px-2 py-1 rounded-full border border-primary/30 text-primary hover:bg-primary/5 disabled:opacity-50 transition-colors"
+                      >
+                        수정 후 재신청
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -646,6 +709,93 @@ export default function MyRequestsClient({
         data={selectedExpense}
         onClose={() => setSelectedExpense(null)}
       />
+
+      {/* 비품 재신청 모달 */}
+      {resubmitSupply && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setResubmitSupply(null)} />
+          <div className="relative bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[85vh] flex flex-col shadow-xl">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h2 className="text-sm font-semibold text-gray-900">비품/소모품 재신청</h2>
+              <button type="button" onClick={() => setResubmitSupply(null)} className="text-gray-400 hover:text-gray-600">
+                <X size={18} />
+              </button>
+            </div>
+
+            {resubmitSupply.rejectionComment && (
+              <div className="px-5 pt-3">
+                <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">
+                  반려 사유: {resubmitSupply.rejectionComment}
+                </p>
+              </div>
+            )}
+
+            <div className="overflow-y-auto flex-1 px-5 py-4 space-y-3">
+              {resubmitItems.map((item, idx) => (
+                <div key={idx} className="rounded-xl border border-gray-100 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <select
+                      value={item.category}
+                      onChange={e => updateResubmitItem(idx, 'category', e.target.value)}
+                      className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 bg-white"
+                    >
+                      {CATEGORIES.map(c => (
+                        <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>
+                      ))}
+                    </select>
+                    {resubmitItems.length > 1 && (
+                      <button type="button" onClick={() => setResubmitItems(prev => prev.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-red-400">
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="내역 *"
+                    value={item.description}
+                    onChange={e => updateResubmitItem(idx, 'description', e.target.value)}
+                    className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 placeholder-gray-300"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      placeholder="예상금액"
+                      value={item.estimatedAmount}
+                      onChange={e => updateResubmitItem(idx, 'estimatedAmount', formatKRWInput(e.target.value))}
+                      className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 placeholder-gray-300"
+                    />
+                    <input
+                      type="text"
+                      placeholder="비고"
+                      value={item.note}
+                      onChange={e => updateResubmitItem(idx, 'note', e.target.value)}
+                      className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 placeholder-gray-300"
+                    />
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => setResubmitItems(prev => [...prev, { category: 'EQUIPMENT', description: '', estimatedAmount: '', note: '' }])}
+                className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 px-1"
+              >
+                <Plus size={13} /> 항목 추가
+              </button>
+            </div>
+
+            <div className="px-5 py-4 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={handleResubmit}
+                disabled={isPending}
+                className="w-full bg-primary text-white text-sm font-medium rounded-xl py-3 disabled:opacity-50 hover:bg-primary/90 transition-colors"
+              >
+                {isPending ? '제출 중...' : '재신청하기'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
