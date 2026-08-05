@@ -14,8 +14,8 @@ import {
   cancelExpenseRequest,
   cancelDocumentRequest,
   cancelSupplyRequest,
+  resubmitSupplyRequest,
 } from './actions'
-import { submitSupplyRequest } from '@/app/(dashboard)/documents/actions'
 
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   PENDING:   { label: '대기',   className: 'bg-yellow-50 text-yellow-700' },
@@ -218,18 +218,20 @@ export default function MyRequestsClient({
   }
 
   function handleResubmit() {
+    if (!resubmitSupply) return
     const valid = resubmitItems.every(it => it.description.trim())
     if (!valid) { toast.error('내역을 모두 입력해주세요.'); return }
-    if (!confirm('수정된 내용으로 새로 신청하시겠습니까?')) return
+    if (!confirm('수정된 내용으로 재신청하시겠습니까?')) return
     startTransition(async () => {
-      const res = await submitSupplyRequest({
-        items: resubmitItems.map(it => ({
+      const res = await resubmitSupplyRequest(
+        resubmitSupply.id,
+        resubmitItems.map(it => ({
           category: it.category,
           description: it.description.trim(),
-          estimatedAmount: it.estimatedAmount ? parseInt(it.estimatedAmount.replace(/,/g, ''), 10) : null,
+          estimated_amount: it.estimatedAmount ? parseInt(it.estimatedAmount.replace(/,/g, ''), 10) : null,
           note: it.note.trim() || null,
-        })),
-      })
+        }))
+      )
       if (res.error) { toast.error(res.error); return }
       toast.success('재신청이 접수되었습니다.')
       setResubmitSupply(null)

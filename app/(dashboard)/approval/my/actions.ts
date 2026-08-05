@@ -59,3 +59,26 @@ export async function cancelSupplyRequest(id: string) {
   revalidatePath('/approval/pending')
   return { error: null }
 }
+
+export async function resubmitSupplyRequest(
+  id: string,
+  items: Array<{
+    category: string
+    description: string
+    estimated_amount: number | null
+    note: string | null
+  }>
+) {
+  const { supabase, employeeId } = await getEmployeeId()
+  if (!employeeId) return { error: '로그인이 필요합니다.' }
+
+  const { error } = await supabase.rpc('resubmit_supply_request', {
+    p_request_id: id,
+    p_items: items,
+  })
+
+  if (error) return { error: error.message }
+  revalidatePath('/approval/my')
+  revalidatePath('/approval/pending')
+  return { error: null }
+}
