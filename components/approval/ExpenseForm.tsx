@@ -7,6 +7,9 @@ import {
   submitExpense,
   submitBusinessIncomeExpense,
   submitPrizeExpense,
+  resubmitExpense,
+  resubmitBusinessIncomeExpense,
+  resubmitPrizeExpense,
   type LineItem,
 } from '@/app/(dashboard)/approval/expense/actions'
 import { createClient } from '@/lib/supabase/client'
@@ -386,7 +389,7 @@ function ExpenseTab({
         }
       })
 
-      const result = await submitExpense({
+      const expenseInput = {
         title: title.trim(),
         payee: payee.trim(),
         paymentMethod,
@@ -403,10 +406,13 @@ function ExpenseTab({
         cardNumber: evidenceType === 'PERSONAL_CARD' ? cardNumber.trim() || null : null,
         category: 'OTHER',
         expenseType: 'EXPENSE',
-      })
+      }
+      const result = initialData?.id
+        ? await resubmitExpense(initialData.id, expenseInput)
+        : await submitExpense(expenseInput)
 
       if (result.error) { toast.error(result.error); return }
-      toast.success('지출결의서가 제출되었습니다.')
+      toast.success(initialData?.id ? '재신청이 접수되었습니다.' : '지출결의서가 제출되었습니다.')
       onSuccess()
     })
   }
@@ -774,10 +780,10 @@ function CorporateCardTab({
       }))
 
       const cardDisplay = representativeCard ? `(${representativeCard})` : ''
-      const result = await submitExpense({
+      const cardInput = {
         title: `법인카드${cardDisplay} 사용내역`,
         payee: `법인카드 ${representativeCard}`.trim(),
-        paymentMethod: 'CARD',
+        paymentMethod: 'CARD' as const,
         bankName: null,
         accountNumber: null,
         accountHolder: null,
@@ -789,10 +795,13 @@ function CorporateCardTab({
         evidenceType: 'CORPORATE_CARD',
         category: 'OTHER',
         expenseType: 'CORPORATE_CARD',
-      })
+      }
+      const result = initialData?.id
+        ? await resubmitExpense(initialData.id, cardInput)
+        : await submitExpense(cardInput)
 
       if (result.error) { toast.error(result.error); return }
-      toast.success('법인카드 사용내역서가 제출되었습니다.')
+      toast.success(initialData?.id ? '재신청이 접수되었습니다.' : '법인카드 사용내역서가 제출되었습니다.')
       onSuccess()
     })
   }
@@ -996,10 +1005,10 @@ function TransportationTab({
         note: r.note.trim() || undefined,
       }))
 
-      const result = await submitExpense({
+      const transportInput = {
         title: `교통비 사용내역 — ${employeeName}`,
         payee: employeeName,
-        paymentMethod: 'CASH',
+        paymentMethod: 'CASH' as const,
         bankName: null,
         accountNumber: null,
         accountHolder: null,
@@ -1011,10 +1020,13 @@ function TransportationTab({
         evidenceType: 'OTHER_RECEIPT',
         category: 'OTHER',
         expenseType: 'TRANSPORTATION',
-      })
+      }
+      const result = initialData?.id
+        ? await resubmitExpense(initialData.id, transportInput)
+        : await submitExpense(transportInput)
 
       if (result.error) { toast.error(result.error); return }
-      toast.success('교통비 사용내역서가 제출되었습니다.')
+      toast.success(initialData?.id ? '재신청이 접수되었습니다.' : '교통비 사용내역서가 제출되었습니다.')
       onSuccess()
     })
   }
@@ -1181,7 +1193,7 @@ function BusinessIncomeTab({
         if (attachmentUrls.length !== attachments.length) return
       }
 
-      const result = await submitBusinessIncomeExpense({
+      const biInput = {
         title: title.trim(),
         recipientName: fields.recipientName.trim(),
         ssn: ssnClean,
@@ -1192,7 +1204,10 @@ function BusinessIncomeTab({
         note: fields.note.trim(),
         attachmentUrls,
         paymentRequestDate,
-      })
+      }
+      const result = initialData?.id
+        ? await resubmitBusinessIncomeExpense(initialData.id, biInput)
+        : await submitBusinessIncomeExpense(biInput)
 
       if (result.error) { toast.error(result.error); return }
       toast.success('사업소득 지급요청서가 제출되었습니다.')
@@ -1431,7 +1446,7 @@ function PrizeTab({
         if (attachmentUrls.length !== attachments.length) return
       }
 
-      const result = await submitPrizeExpense({
+      const prizeInput = {
         title: title.trim(),
         description: fields.description.trim(),
         recipientName: fields.recipientName.trim(),
@@ -1448,10 +1463,13 @@ function PrizeTab({
         attachmentUrls,
         paymentRequestDate,
         isOver50k,
-      })
+      }
+      const result = initialData?.id
+        ? await resubmitPrizeExpense(initialData.id, prizeInput)
+        : await submitPrizeExpense(prizeInput)
 
       if (result.error) { toast.error(result.error); return }
-      toast.success('경품비 지급요청서가 제출되었습니다.')
+      toast.success(initialData?.id ? '재신청이 접수되었습니다.' : '경품비 지급요청서가 제출되었습니다.')
       onSuccess()
     })
   }

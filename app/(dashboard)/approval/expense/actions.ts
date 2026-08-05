@@ -257,6 +257,133 @@ export async function submitPrizeExpense(input: PrizeInput) {
   return { error: null, id: expenseResult.id }
 }
 
+// ─── 재신청 (반려된 건 in-place 수정) ────────────────────────────────────────
+
+export async function resubmitExpense(reportId: string, input: SubmitExpenseInput) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: '인증이 필요합니다.' }
+
+  const totalAmount = input.lineItems.reduce((sum, li) => sum + (li.amount ?? 0), 0)
+
+  const { error } = await supabase.rpc('resubmit_expense_report', {
+    p_report_id:            reportId,
+    p_title:                input.title,
+    p_amount:               totalAmount,
+    p_category:             input.category ?? 'OTHER',
+    p_expense_date:         input.paymentRequestDate,
+    p_payee:                input.payee,
+    p_payment_method:       input.paymentMethod,
+    p_bank_name:            input.bankName,
+    p_account_number:       input.accountNumber,
+    p_account_holder:       input.accountHolder,
+    p_payment_request_date: input.paymentRequestDate,
+    p_settlement_date:      input.settlementDate,
+    p_line_items:           input.lineItems,
+    p_attachment_urls:      input.attachmentUrls,
+    p_tax_type:             input.taxType,
+    p_evidence_type:        input.evidenceType,
+    p_expense_type:         input.expenseType ?? 'EXPENSE',
+    p_card_company:         input.cardCompany ?? null,
+  })
+
+  if (error) return { error: error.message }
+
+  if (input.cardNumber) {
+    const { encrypted, iv } = encryptCardNumber(input.cardNumber)
+    await serviceClient().from('expense_card_sensitive_data').delete().eq('expense_report_id', reportId)
+    await serviceClient().from('expense_card_sensitive_data')
+      .insert({ expense_report_id: reportId, encrypted_card_number: encrypted, iv })
+  }
+
+  revalidateTag(CACHE_TAGS.approvalInbox)
+  revalidateTag(CACHE_TAGS.expenseList)
+  return { error: null, id: reportId }
+}
+
+export async function resubmitBusinessIncomeExpense(reportId: string, input: BusinessIncomeInput) {
+  const withholding = Math.floor(input.grossAmount * 0.033)
+  const netAmount   = input.grossAmount - withholding
+
+  const lineItems: LineItem[] = [{
+    item:   input.description,
+    date:   input.paymentRequestDate,
+    amount: input.grossAmount,
+    note: [
+      `원천징수: ${withholding.toLocaleString('ko-KR')}원`,
+      `실지급: ${netAmount.toLocaleString('ko-KR')}원`,
+      input.note || null,
+    ].filter(Boolean).join(' / '),
+  }]
+
+  const result = await resubmitExpense(reportId, {
+    title: input.title, payee: input.recipientName, paymentMethod: 'TRANSFER',
+    bankName: input.bankName, accountNumber: input.accountNumber, accountHolder: input.recipientName,
+    paymentRequestDate: input.paymentRequestDate, settlementDate: null,
+    lineItems, attachmentUrls: input.attachmentUrls,
+    taxType: 'WITHHOLDING_BUSINESS', evidenceType: null,
+    category: 'BUSINESS_INCOME', expenseType: 'BUSINESS_INCOME',
+  })
+  if (result.error) return result
+
+  const { encrypted, iv } = encryptSSN(input.ssn)
+  await serviceClient().from('expense_sensitive_data').delete().eq('expense_report_id', reportId)
+  const { error: ssnError } = await serviceClient()
+    .from('expense_sensitive_data')
+    .insert({ expense_report_id: reportId, encrypted_ssn: encrypted, iv })
+  if (ssnError) return { error: ssnError.message }
+
+  return { error: null, id: reportId }
+}
+
+export async function resubmitPrizeExpense(reportId: string, input: PrizeInput) {
+  let taxAmount = 0
+  let taxType: string | null = null
+  if (input.isOver50k && input.taxPaymentType) {
+    taxAmount = input.taxPaymentType === 'SELF'
+      ? Math.floor(input.prizeAmount * 0.22)
+      : Math.floor(input.prizeAmount * 0.22 / 0.78)
+    taxType = input.taxPaymentType === 'SELF' ? 'WITHHOLDING_OTHER_WITHOUT' : 'WITHHOLDING_OTHER_WITH'
+  }
+
+  const paymentMethod = input.paymentMethod === 'CASH' ? 'TRANSFER' : 'CARD'
+  const evidenceType  = input.paymentMethod === 'GIFT_CARD' ? input.giftCardEvidence : null
+  const noteParts = [
+    input.isOver50k && input.taxPaymentType
+      ? `제세공과금: ${taxAmount.toLocaleString('ko-KR')}원 (${input.taxPaymentType === 'SELF' ? '본인납부' : '대납'})`
+      : null,
+    input.note || null,
+  ].filter(Boolean) as string[]
+
+  const lineItems: LineItem[] = [{
+    item: input.description, date: input.paymentRequestDate, amount: input.prizeAmount,
+    note: noteParts.join(' / ') || undefined,
+  }]
+
+  const result = await resubmitExpense(reportId, {
+    title: input.title, payee: input.recipientName, paymentMethod,
+    bankName: input.bankName, accountNumber: input.accountNumber,
+    accountHolder: input.paymentMethod === 'CASH' ? input.recipientName : null,
+    paymentRequestDate: input.paymentRequestDate, settlementDate: null,
+    lineItems, attachmentUrls: input.attachmentUrls,
+    taxType, evidenceType,
+    cardCompany: input.giftCardEvidence === 'PERSONAL_CARD' ? input.giftCardCardCompany ?? null : null,
+    category: 'PRIZE_INCOME', expenseType: 'PRIZE',
+  })
+  if (result.error) return result
+
+  if (input.isOver50k && input.ssn) {
+    const { encrypted, iv } = encryptSSN(input.ssn)
+    await serviceClient().from('expense_sensitive_data').delete().eq('expense_report_id', reportId)
+    const { error: ssnError } = await serviceClient()
+      .from('expense_sensitive_data')
+      .insert({ expense_report_id: reportId, encrypted_ssn: encrypted, iv })
+    if (ssnError) return { error: ssnError.message }
+  }
+
+  return { error: null, id: reportId }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function approveExpense(reportId: string, approved: boolean, comment?: string) {
