@@ -103,6 +103,13 @@ export default function DiaryEditorClient({ date, initialDiary }: { date: string
         {/* 서식 툴바 */}
         <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-gray-100 flex-wrap">
           <ToolbarBtn
+            onClick={() => editor?.chain().focus().setParagraph().run()}
+            active={editor?.isActive('paragraph')}
+            title="기본 텍스트"
+          >
+            <span className="text-xs">기본</span>
+          </ToolbarBtn>
+          <ToolbarBtn
             onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
             active={editor?.isActive('heading', { level: 1 })}
             title="제목 1 (큰 글씨)"
