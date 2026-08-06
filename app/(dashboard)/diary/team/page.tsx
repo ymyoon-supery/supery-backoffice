@@ -34,7 +34,7 @@ export default async function DiaryTeamPage({ searchParams }: { searchParams: Pr
   // Team members in same department (exclude self)
   const { data: rawEmployees } = await supabase
     .from('employees')
-    .select('id, name, departments(name)')
+    .select('id, name')
     .eq('department_id', me.department_id)
     .eq('is_active', true)
     .neq('id', me.id)
@@ -43,7 +43,7 @@ export default async function DiaryTeamPage({ searchParams }: { searchParams: Pr
   const employees = (rawEmployees ?? []).map(e => ({
     id: e.id,
     name: e.name,
-    department_name: (e.departments as unknown as { name: string } | null)?.name ?? null,
+    department_name: null,
   }))
 
   if (employees.length === 0) redirect('/diary')

@@ -23,14 +23,14 @@ export default async function AdminDiaryPage({ searchParams }: { searchParams: P
 
   const { data: rawEmployees } = await supabase
     .from('employees')
-    .select('id, name, departments(name)')
+    .select('id, name')
     .eq('is_active', true)
     .order('name')
 
   const employees = (rawEmployees ?? []).map(e => ({
     id: e.id,
     name: e.name,
-    department_name: (e.departments as unknown as { name: string } | null)?.name ?? null,
+    department_name: null,
   }))
 
   if (employees.length === 0) {
