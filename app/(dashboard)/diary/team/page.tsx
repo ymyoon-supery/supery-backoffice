@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import DiaryViewerClient from '@/components/diary/DiaryViewerClient'
 
-type SP = { employeeId?: string; tab?: string; date?: string; weekStart?: string }
+type SP = { employeeId?: string; tab?: string; date?: string; weekStart?: string; keyword?: string }
 
 function getMondayISO(date = new Date()): string {
   const d = new Date(date)
@@ -31,7 +31,6 @@ export default async function DiaryTeamPage({ searchParams }: { searchParams: Pr
 
   if (!me || (me.position !== '팀장' && me.role !== 'ADMIN')) redirect('/diary')
 
-  // Team members in same department (exclude self)
   const [{ data: rawEmployees }, { data: depts }] = await Promise.all([
     supabase.from('employees').select('id, name, department_id')
       .eq('department_id', me.department_id).eq('is_active', true).neq('id', me.id).order('name'),
@@ -54,11 +53,21 @@ export default async function DiaryTeamPage({ searchParams }: { searchParams: Pr
   const today = new Date().toISOString().split('T')[0]
   const dateParam = sp.date ?? today
   const weekStartParam = sp.weekStart ?? getMondayISO()
+  const keyword = sp.keyword?.trim() ?? ''
 
   let diary = null
   let weekDiaries: { diary_date: string; content: string | null }[] = []
+  let searchResults: { diary_date: string; content: string; created_at: string }[] = []
 
-  if (tab === 'daily') {
+  if (keyword) {
+    const { data } = await supabase
+      .from('work_diaries')
+      .select('diary_date, content, created_at')
+      .eq('employee_id', selectedId)
+      .ilike('content', `%${keyword}%`)
+      .order('diary_date', { ascending: false })
+    searchResults = data ?? []
+  } else if (tab === 'daily') {
     const { data } = await supabase
       .from('work_diaries')
       .select('diary_date, content, created_at, updated_at')
@@ -85,8 +94,10 @@ export default async function DiaryTeamPage({ searchParams }: { searchParams: Pr
       tab={tab}
       date={dateParam}
       weekStart={weekStartParam}
+      keyword={keyword}
       diary={diary}
       weekDiaries={weekDiaries}
+      searchResults={searchResults}
     />
   )
 }
