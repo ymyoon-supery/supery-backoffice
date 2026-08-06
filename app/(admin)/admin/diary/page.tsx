@@ -21,16 +21,16 @@ export default async function AdminDiaryPage({ searchParams }: { searchParams: P
   const sp = await searchParams
   const supabase = await createClient()
 
-  const { data: rawEmployees } = await supabase
-    .from('employees')
-    .select('id, name')
-    .eq('is_active', true)
-    .order('name')
+  const [{ data: rawEmployees }, { data: depts }] = await Promise.all([
+    supabase.from('employees').select('id, name, department_id').eq('is_active', true).order('name'),
+    supabase.from('departments').select('id, name'),
+  ])
 
+  const deptMap = Object.fromEntries((depts ?? []).map(d => [d.id, d.name]))
   const employees = (rawEmployees ?? []).map(e => ({
     id: e.id,
     name: e.name,
-    department_name: null,
+    department_name: e.department_id ? (deptMap[e.department_id] ?? null) : null,
   }))
 
   if (employees.length === 0) {

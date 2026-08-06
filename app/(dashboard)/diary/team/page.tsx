@@ -32,18 +32,17 @@ export default async function DiaryTeamPage({ searchParams }: { searchParams: Pr
   if (!me || (me.position !== '팀장' && me.role !== 'ADMIN')) redirect('/diary')
 
   // Team members in same department (exclude self)
-  const { data: rawEmployees } = await supabase
-    .from('employees')
-    .select('id, name')
-    .eq('department_id', me.department_id)
-    .eq('is_active', true)
-    .neq('id', me.id)
-    .order('name')
+  const [{ data: rawEmployees }, { data: depts }] = await Promise.all([
+    supabase.from('employees').select('id, name, department_id')
+      .eq('department_id', me.department_id).eq('is_active', true).neq('id', me.id).order('name'),
+    supabase.from('departments').select('id, name'),
+  ])
 
+  const deptMap = Object.fromEntries((depts ?? []).map(d => [d.id, d.name]))
   const employees = (rawEmployees ?? []).map(e => ({
     id: e.id,
     name: e.name,
-    department_name: null,
+    department_name: e.department_id ? (deptMap[e.department_id] ?? null) : null,
   }))
 
   if (employees.length === 0) redirect('/diary')
