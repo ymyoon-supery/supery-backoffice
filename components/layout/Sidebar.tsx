@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import {
   Clock, FileText, BarChart2, Users, ClipboardList, Home,
   Bell, FilePlus, CalendarDays, Settings, Megaphone, Inbox,
-  Receipt, Package, Loader2, X,
+  Receipt, Package, Loader2, X, BookOpen,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useMobileSidebar } from './MobileSidebarContext'
@@ -25,6 +25,7 @@ const adminNavGroups = [
       { href: '/admin/employees', label: '출퇴근 현황', icon: Users },
       { href: '/admin/attendance', label: '근태 현황', icon: Clock },
       { href: '/admin/reports', label: '52시간 리포트', icon: BarChart2 },
+      { href: '/admin/diary', label: '업무 다이어리', icon: BookOpen },
     ],
   },
   {
@@ -67,11 +68,13 @@ export default function Sidebar({
   position,
   pendingCount,
   isSupplyManager = false,
+  hasTeamMembers = false,
 }: {
   role: string
   position: string | null
   pendingCount: number
   isSupplyManager?: boolean
+  hasTeamMembers?: boolean
 }) {
   const pathname = usePathname()
   const [pendingHref, setPendingHref] = useState<string | null>(null)
@@ -101,7 +104,13 @@ export default function Sidebar({
     },
     {
       label: '근태',
-      items: [{ href: '/attendance', label: '근태등록', icon: Clock, exact: false }],
+      items: [
+        { href: '/attendance', label: '근태등록', icon: Clock, exact: false },
+        { href: '/diary', label: '업무 다이어리', icon: BookOpen, exact: false },
+        ...(isTeamLead && hasTeamMembers && !isAdmin
+          ? [{ href: '/diary/team', label: '팀원 다이어리', icon: BookOpen, exact: false }]
+          : []),
+      ],
     },
     {
       label: '연차',

@@ -30,6 +30,17 @@ export default async function DashboardLayout({
   const isSupplyManager = settings?.supply_manager_id === employee.id
   const isTeamLead = employee.position === '팀장'
 
+  let hasTeamMembers = false
+  if (isTeamLead && employee.role !== 'ADMIN' && employee.department_id) {
+    const { count } = await supabase
+      .from('employees')
+      .select('id', { count: 'exact', head: true })
+      .eq('department_id', employee.department_id)
+      .eq('is_active', true)
+      .neq('id', employee.id)
+    hasTeamMembers = (count ?? 0) > 0
+  }
+
   let pendingCount = 0
   if ((isTeamLead || isSupplyManager) && employee.role !== 'ADMIN') {
     const [leaveRes, expenseRes, supplyRes] = await Promise.all([
@@ -58,6 +69,7 @@ export default async function DashboardLayout({
           position={employee.position ?? null}
           pendingCount={pendingCount}
           isSupplyManager={isSupplyManager}
+          hasTeamMembers={hasTeamMembers}
         />
         <div className="flex flex-col flex-1 overflow-hidden min-w-0">
           <Header employee={employee} leftSlot={<MobileMenuButton />} />
