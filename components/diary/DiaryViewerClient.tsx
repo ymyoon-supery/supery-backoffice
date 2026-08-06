@@ -3,7 +3,6 @@
 import { useRouter } from 'next/navigation'
 import { format, parseISO, addDays } from 'date-fns'
 import { ko } from 'date-fns/locale'
-import { marked } from 'marked'
 import { ChevronLeft, ChevronRight, BookOpen } from 'lucide-react'
 
 type Employee = { id: string; name: string; department_name: string | null }
@@ -21,6 +20,10 @@ type Props = {
   weekDiaries: WeekRow[]
 }
 
+function stripHtml(html: string) {
+  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
 export default function DiaryViewerClient({
   basePath, employees, selectedEmployeeId, tab, date, weekStart, diary, weekDiaries,
 }: Props) {
@@ -35,15 +38,13 @@ export default function DiaryViewerClient({
   const nextWeek = format(addDays(parseISO(weekStart), 7), 'yyyy-MM-dd')
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(parseISO(weekStart), i))
 
-  const selectedEmployee = employees.find(e => e.id === selectedEmployeeId)
-
   return (
     <div>
       <div className="flex items-center justify-between mb-5">
         <h1 className="text-xl font-bold text-gray-900">업무 다이어리 조회</h1>
       </div>
 
-      {/* employee selector */}
+      {/* 직원 선택 */}
       <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4 flex items-center gap-3">
         <span className="text-sm text-gray-600 whitespace-nowrap font-medium">직원 선택</span>
         <select
@@ -59,8 +60,8 @@ export default function DiaryViewerClient({
         </select>
       </div>
 
-      {/* tabs */}
-      <div className="flex gap-0 mb-4 border border-gray-200 rounded-lg overflow-hidden bg-white w-fit">
+      {/* 탭 */}
+      <div className="flex mb-4 border border-gray-200 rounded-lg overflow-hidden bg-white w-fit">
         {(['daily', 'weekly'] as const).map(t => (
           <button key={t} onClick={() => nav({ tab: t })}
             className={`px-5 py-2 text-sm font-medium transition-colors ${
@@ -96,7 +97,7 @@ export default function DiaryViewerClient({
               </div>
               <div
                 className="bg-white rounded-lg border border-gray-200 p-5 prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: marked.parse(diary.content) as string }}
+                dangerouslySetInnerHTML={{ __html: diary.content }}
               />
             </div>
           ) : (
@@ -136,8 +137,8 @@ export default function DiaryViewerClient({
                     {format(day, 'M/d (EEE)', { locale: ko })}
                   </div>
                   {entry?.content ? (
-                    <p className="text-xs text-gray-600 line-clamp-4 whitespace-pre-wrap">
-                      {entry.content.replace(/^#+\s*/gm, '').trim()}
+                    <p className="text-xs text-gray-600 line-clamp-4">
+                      {stripHtml(entry.content)}
                     </p>
                   ) : (
                     <p className="text-xs text-gray-300 italic">미작성</p>

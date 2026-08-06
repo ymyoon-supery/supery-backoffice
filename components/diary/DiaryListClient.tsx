@@ -102,7 +102,7 @@ export default function DiaryListClient({ diaries, total, page, from: initFrom, 
       ) : (
         <div className="space-y-2">
           {diaries.map(d => {
-            const lines = d.content.split('\n').filter(Boolean).slice(0, 2).join('\n')
+            const lines = d.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120)
             const isModified = d.updated_at > d.created_at
             return (
               <Link key={d.id} href={`/diary/${d.diary_date}`}

@@ -1,23 +1,30 @@
 'use client'
 
-import { useState, useTransition, useRef } from 'react'
+import { useEditor, EditorContent } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import { useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, parseISO } from 'date-fns'
 import { ko } from 'date-fns/locale'
-import { marked } from 'marked'
 import { Save, Trash2, ArrowLeft, Bold, Italic, Strikethrough, List, ListOrdered, Minus } from 'lucide-react'
 import { upsertDiary, deleteDiary } from '@/app/(dashboard)/diary/actions'
 import { toast } from 'sonner'
 
 type DiaryData = { content: string; created_at: string; updated_at: string } | null
 
-function ToolbarBtn({ onClick, title, children }: { onClick: () => void; title: string; children: React.ReactNode }) {
+function ToolbarBtn({
+  onClick, active, title, children,
+}: {
+  onClick: () => void; active?: boolean; title: string; children: React.ReactNode
+}) {
   return (
     <button
       type="button"
       onMouseDown={e => { e.preventDefault(); onClick() }}
       title={title}
-      className="px-2 py-1 rounded text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+      className={`px-2 py-1 rounded text-sm transition-colors ${
+        active ? 'bg-primary/10 text-primary' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+      }`}
     >
       {children}
     </button>
@@ -26,58 +33,26 @@ function ToolbarBtn({ onClick, title, children }: { onClick: () => void; title: 
 
 export default function DiaryEditorClient({ date, initialDiary }: { date: string; initialDiary: DiaryData }) {
   const router = useRouter()
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const [content, setContent] = useState(initialDiary?.content ?? '')
   const [isPending, startTransition] = useTransition()
 
   const dateLabel = format(parseISO(date), 'yyyy년 M월 d일 (EEEE)', { locale: ko })
   const isModified = initialDiary && initialDiary.updated_at > initialDiary.created_at
 
-  function applyInline(wrap: string, placeholder: string) {
-    const el = textareaRef.current
-    if (!el) return
-    const start = el.selectionStart
-    const end = el.selectionEnd
-    const selected = content.slice(start, end)
-    const text = selected || placeholder
-    const insert = `${wrap}${text}${wrap}`
-    const next = content.slice(0, start) + insert + content.slice(end)
-    setContent(next)
-    setTimeout(() => {
-      el.focus()
-      el.setSelectionRange(start + wrap.length, start + wrap.length + text.length)
-    }, 0)
-  }
-
-  function applyLinePrefix(prefix: string) {
-    const el = textareaRef.current
-    if (!el) return
-    const pos = el.selectionStart
-    const val = content
-    const lineStart = val.lastIndexOf('\n', pos - 1) + 1
-    const lineEnd = val.indexOf('\n', pos)
-    const line = val.slice(lineStart, lineEnd === -1 ? undefined : lineEnd)
-    const cleanLine = line.replace(/^(#{1,3} |[-*] |\d+\. )/, '')
-    const newLine = line.startsWith(prefix) ? cleanLine : prefix + cleanLine
-    const newVal = val.slice(0, lineStart) + newLine + (lineEnd === -1 ? '' : val.slice(lineEnd))
-    setContent(newVal)
-    const newCursor = lineStart + newLine.length
-    setTimeout(() => { el.focus(); el.setSelectionRange(newCursor, newCursor) }, 0)
-  }
-
-  function insertHR() {
-    const el = textareaRef.current
-    if (!el) return
-    const pos = el.selectionStart
-    const insert = '\n---\n'
-    setContent(content.slice(0, pos) + insert + content.slice(pos))
-    setTimeout(() => { el.focus(); el.setSelectionRange(pos + insert.length, pos + insert.length) }, 0)
-  }
+  const editor = useEditor({
+    extensions: [StarterKit],
+    content: initialDiary?.content ?? '',
+    editorProps: {
+      attributes: {
+        class: 'prose prose-sm max-w-none min-h-[420px] p-4 focus:outline-none',
+      },
+    },
+  })
 
   function handleSave() {
-    if (!content.trim()) { toast.error('내용을 입력해주세요.'); return }
+    if (!editor || editor.isEmpty) { toast.error('내용을 입력해주세요.'); return }
+    const html = editor.getHTML()
     startTransition(async () => {
-      const { error } = await upsertDiary(date, content)
+      const { error } = await upsertDiary(date, html)
       if (error) { toast.error(error); return }
       toast.success('저장되었습니다.')
       router.refresh()
@@ -96,7 +71,6 @@ export default function DiaryEditorClient({ date, initialDiary }: { date: string
 
   return (
     <div>
-      {/* 헤더 */}
       <div className="flex items-start justify-between mb-4 gap-4">
         <div>
           <button onClick={() => router.push('/diary')}
@@ -125,50 +99,70 @@ export default function DiaryEditorClient({ date, initialDiary }: { date: string
         </div>
       </div>
 
-      {/* 툴바 */}
-      <div className="flex items-center gap-0.5 px-2 py-1.5 bg-white border border-b-0 border-gray-200 rounded-t-lg flex-wrap">
-        <ToolbarBtn onClick={() => applyLinePrefix('# ')} title="제목 1">
-          <span className="text-xs font-bold">H1</span>
-        </ToolbarBtn>
-        <ToolbarBtn onClick={() => applyLinePrefix('## ')} title="제목 2">
-          <span className="text-xs font-bold">H2</span>
-        </ToolbarBtn>
-        <div className="w-px h-4 bg-gray-200 mx-1" />
-        <ToolbarBtn onClick={() => applyInline('**', '굵게')} title="굵게">
-          <Bold size={14} />
-        </ToolbarBtn>
-        <ToolbarBtn onClick={() => applyInline('*', '기울임')} title="기울임">
-          <Italic size={14} />
-        </ToolbarBtn>
-        <ToolbarBtn onClick={() => applyInline('~~', '취소선')} title="취소선">
-          <Strikethrough size={14} />
-        </ToolbarBtn>
-        <div className="w-px h-4 bg-gray-200 mx-1" />
-        <ToolbarBtn onClick={() => applyLinePrefix('- ')} title="글머리 목록">
-          <List size={14} />
-        </ToolbarBtn>
-        <ToolbarBtn onClick={() => applyLinePrefix('1. ')} title="번호 목록">
-          <ListOrdered size={14} />
-        </ToolbarBtn>
-        <div className="w-px h-4 bg-gray-200 mx-1" />
-        <ToolbarBtn onClick={insertHR} title="구분선">
-          <Minus size={14} />
-        </ToolbarBtn>
-      </div>
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        {/* 서식 툴바 */}
+        <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-gray-100 flex-wrap">
+          <ToolbarBtn
+            onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
+            active={editor?.isActive('heading', { level: 1 })}
+            title="제목 1 (큰 글씨)"
+          >
+            <span className="font-bold text-xs">H1</span>
+          </ToolbarBtn>
+          <ToolbarBtn
+            onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
+            active={editor?.isActive('heading', { level: 2 })}
+            title="제목 2 (중간 글씨)"
+          >
+            <span className="font-bold text-xs">H2</span>
+          </ToolbarBtn>
+          <div className="w-px h-4 bg-gray-200 mx-1" />
+          <ToolbarBtn
+            onClick={() => editor?.chain().focus().toggleBold().run()}
+            active={editor?.isActive('bold')}
+            title="굵게"
+          >
+            <Bold size={14} />
+          </ToolbarBtn>
+          <ToolbarBtn
+            onClick={() => editor?.chain().focus().toggleItalic().run()}
+            active={editor?.isActive('italic')}
+            title="기울임"
+          >
+            <Italic size={14} />
+          </ToolbarBtn>
+          <ToolbarBtn
+            onClick={() => editor?.chain().focus().toggleStrike().run()}
+            active={editor?.isActive('strike')}
+            title="취소선"
+          >
+            <Strikethrough size={14} />
+          </ToolbarBtn>
+          <div className="w-px h-4 bg-gray-200 mx-1" />
+          <ToolbarBtn
+            onClick={() => editor?.chain().focus().toggleBulletList().run()}
+            active={editor?.isActive('bulletList')}
+            title="글머리 목록"
+          >
+            <List size={14} />
+          </ToolbarBtn>
+          <ToolbarBtn
+            onClick={() => editor?.chain().focus().toggleOrderedList().run()}
+            active={editor?.isActive('orderedList')}
+            title="번호 목록"
+          >
+            <ListOrdered size={14} />
+          </ToolbarBtn>
+          <div className="w-px h-4 bg-gray-200 mx-1" />
+          <ToolbarBtn
+            onClick={() => editor?.chain().focus().setHorizontalRule().run()}
+            title="구분선"
+          >
+            <Minus size={14} />
+          </ToolbarBtn>
+        </div>
 
-      {/* 에디터 + 실시간 미리보기 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 border border-gray-200 rounded-b-lg overflow-hidden">
-        <textarea
-          ref={textareaRef}
-          value={content}
-          onChange={e => setContent(e.target.value)}
-          placeholder="오늘 업무 내용을 자유롭게 기록하세요."
-          className="min-h-[420px] p-4 text-sm resize-none focus:outline-none md:border-r md:border-gray-200 border-b border-gray-200 md:border-b-0"
-        />
-        <div
-          className="min-h-[420px] p-4 bg-gray-50 prose prose-sm max-w-none overflow-auto"
-          dangerouslySetInnerHTML={{ __html: marked.parse(content || ' ') as string }}
-        />
+        <EditorContent editor={editor} />
       </div>
     </div>
   )
