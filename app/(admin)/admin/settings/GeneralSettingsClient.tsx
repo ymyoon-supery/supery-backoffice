@@ -106,6 +106,7 @@ export default function GeneralSettingsClient({
   }
 
   function handleRemoveIp(ip: string) {
+    if (!confirm(`${ip} 을(를) 사무실 IP에서 삭제하시겠습니까?`)) return
     startTransition(async () => {
       const res = await removeOfficeIp(ip)
       if (res.error) { toast.error(res.error); return }
