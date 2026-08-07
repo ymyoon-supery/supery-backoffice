@@ -95,6 +95,7 @@ export default function ExpenseDetailSheet({
             onReject={canAct ? (isFullApprove ? onFullReject : onReject) : undefined}
             isPending={isPending}
             approveLabel={isFullApprove ? '전결' : '승인'}
+            isApproverView
           />
         </div>
       </div>

@@ -44,6 +44,7 @@ interface Props {
   onReject?: (reason?: string) => void
   isPending?: boolean
   approveLabel?: string
+  isApproverView?: boolean
 }
 
 const TAX_TYPE_LABELS: Record<string, string> = {
@@ -132,7 +133,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-export default function ExpenseDetailView({ data, onApprove, onReject, isPending, approveLabel = '승인' }: Props) {
+export default function ExpenseDetailView({ data, onApprove, onReject, isPending, approveLabel = '승인', isApproverView = false }: Props) {
   const [rejectReason, setRejectReason] = useState('')
   const [rejecting, setRejecting] = useState(false)
   const router = useRouter()
@@ -374,7 +375,7 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
             )}
 
             {/* 재신청 (직원용 — 반려된 건만) */}
-            {!onApprove && !onReject && data.status === 'REJECTED' && (
+            {!isApproverView && !onApprove && !onReject && data.status === 'REJECTED' && (
               <div className="pt-3 border-t border-gray-100 no-print">
                 <p className="text-xs text-gray-400 mb-2">
                   반려된 신청입니다. 내용을 수정한 후 재신청할 수 있습니다.
