@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
 import DiaryViewerClient from '@/components/diary/DiaryViewerClient'
 
 type SP = { employeeId?: string; tab?: string; date?: string; weekStart?: string; keyword?: string }
@@ -46,26 +45,53 @@ export default async function AdminDiaryPage({ searchParams }: { searchParams: P
   const weekStartParam = sp.weekStart ?? getMondayISO()
   const keyword = sp.keyword?.trim() ?? ''
 
-  let diary = null
+  type DailyDiary = {
+    employee_id: string; employee_name: string; department_name: string | null
+    content: string; created_at: string; updated_at: string
+  }
+
+  let dailyDiaries: DailyDiary[] = []
+  let noEntryEmployees: typeof employees = []
   let weekDiaries: { diary_date: string; content: string | null }[] = []
-  let searchResults: { diary_date: string; content: string; created_at: string }[] = []
+  let searchResults: { diary_date: string; content: string; created_at: string; employee_name: string; department_name: string | null }[] = []
 
   if (keyword) {
     const { data } = await supabase
       .from('work_diaries')
-      .select('diary_date, content, created_at')
-      .eq('employee_id', selectedId)
+      .select('diary_date, content, created_at, employee_id')
       .ilike('content', `%${keyword}%`)
       .order('diary_date', { ascending: false })
-    searchResults = data ?? []
+
+    searchResults = (data ?? []).map(r => {
+      const emp = employees.find(e => e.id === r.employee_id)
+      return {
+        diary_date: r.diary_date,
+        content: r.content,
+        created_at: r.created_at,
+        employee_name: emp?.name ?? '',
+        department_name: emp?.department_name ?? null,
+      }
+    })
   } else if (tab === 'daily') {
     const { data } = await supabase
       .from('work_diaries')
-      .select('diary_date, content, created_at, updated_at')
-      .eq('employee_id', selectedId)
+      .select('employee_id, content, created_at, updated_at')
       .eq('diary_date', dateParam)
-      .maybeSingle()
-    diary = data
+
+    const diaryMap = Object.fromEntries((data ?? []).map(d => [d.employee_id, d]))
+
+    dailyDiaries = employees
+      .filter(e => diaryMap[e.id])
+      .map(e => ({
+        employee_id: e.id,
+        employee_name: e.name,
+        department_name: e.department_name,
+        content: diaryMap[e.id].content,
+        created_at: diaryMap[e.id].created_at,
+        updated_at: diaryMap[e.id].updated_at,
+      }))
+
+    noEntryEmployees = employees.filter(e => !diaryMap[e.id])
   } else {
     const weekEnd = addDaysISO(weekStartParam, 6)
     const { data } = await supabase
@@ -86,7 +112,8 @@ export default async function AdminDiaryPage({ searchParams }: { searchParams: P
       date={dateParam}
       weekStart={weekStartParam}
       keyword={keyword}
-      diary={diary}
+      dailyDiaries={dailyDiaries}
+      noEntryEmployees={noEntryEmployees}
       weekDiaries={weekDiaries}
       searchResults={searchResults}
     />
