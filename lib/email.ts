@@ -1,8 +1,10 @@
 import { Resend } from 'resend'
 import { createClient } from '@supabase/supabase-js'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-const FROM = process.env.EMAIL_FROM ?? 'Supery 결재 <noreply@supery.co.kr>'
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY)
+}
+const FROM = process.env.EMAIL_FROM ?? 'Supery <noreply@supery.co.kr>'
 
 function db() {
   return createClient(
@@ -93,7 +95,7 @@ export async function notifyNewRequest({
     const to = [...new Set([...adminEmails, approverEmail].filter((e): e is string => !!e && e !== excludeEmail))]
     if (!to.length) return
 
-    await resend.emails.send({
+    await getResend().emails.send({
       from: FROM,
       to,
       subject: `[결재 요청] ${employeeName}님의 ${requestType}이 접수되었습니다`,
@@ -126,7 +128,7 @@ export async function notifyApprovalResult({
       ? `[결재 ${isFinal ? '최종 ' : ''}승인] ${requestType}`
       : `[결재 반려] ${requestType}`
 
-    await resend.emails.send({
+    await getResend().emails.send({
       from: FROM,
       to: email,
       subject,
