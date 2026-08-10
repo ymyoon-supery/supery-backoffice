@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidateTag } from 'next/cache'
 import { CACHE_TAGS } from '@/lib/cache/tags'
+import { notifyNewRequest, notifyApprovalResult } from '@/lib/email'
 
 type SubmitLeaveInput = {
   leaveType: string
@@ -32,6 +33,12 @@ export async function submitLeave(input: SubmitLeaveInput) {
     return { error: error.message }
   }
 
+  const { data: emp } = await supabase
+    .from('employees').select('name, department_id').eq('auth_user_id', user.id).single()
+  if (emp) {
+    await notifyNewRequest({ requestType: '연차신청', employeeName: emp.name, departmentId: emp.department_id, excludeAuthUserId: user.id })
+  }
+
   revalidateTag(CACHE_TAGS.approvalInbox)
   revalidateTag(CACHE_TAGS.leaveBalance)
   return { error: null, id: data as string }
@@ -49,6 +56,12 @@ export async function approveLeave(requestId: string, approved: boolean, comment
   })
 
   if (error) return { error: error.message }
+
+  const { data: req } = await supabase
+    .from('leave_requests').select('employee_id').eq('id', requestId).single()
+  if (req) {
+    await notifyApprovalResult({ employeeId: req.employee_id, requestType: '연차신청', approved, comment })
+  }
 
   revalidateTag(CACHE_TAGS.approvalInbox)
   return { error: null }

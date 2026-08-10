@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
+import { notifyApprovalResult } from '@/lib/email'
 
 function getAdmin() {
   return createServiceClient(
@@ -24,6 +25,9 @@ export async function completeDocumentRequest(id: string) {
   if (adminEmp?.role !== 'ADMIN') return { error: 'Unauthorized' }
 
   const admin = getAdmin()
+  const { data: docReq } = await admin
+    .from('document_requests').select('employee_id').eq('id', id).single()
+
   const { error } = await admin
     .from('document_requests')
     .update({
@@ -34,6 +38,11 @@ export async function completeDocumentRequest(id: string) {
     .eq('id', id)
 
   if (error) return { error: error.message }
+
+  if (docReq) {
+    await notifyApprovalResult({ employeeId: docReq.employee_id, requestType: '서류신청', approved: true, isFinal: true })
+  }
+
   revalidatePath('/admin/documents')
   return { error: null }
 }
@@ -62,6 +71,12 @@ export async function approveSupplyRequest(
     p_comment: comment ?? null,
   })
   if (error) return { error: error.message }
+
+  const { data: req } = await supabase
+    .from('supply_requests').select('employee_id').eq('id', requestId).single()
+  if (req) {
+    await notifyApprovalResult({ employeeId: req.employee_id, requestType: '비품/소모품 신청', approved, comment })
+  }
 
   revalidatePath('/admin/documents')
   return { error: null }

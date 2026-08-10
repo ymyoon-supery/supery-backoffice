@@ -5,6 +5,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { revalidateTag } from 'next/cache'
 import { CACHE_TAGS } from '@/lib/cache/tags'
 import { encryptSSN, encryptCardNumber } from '@/lib/crypto/ssn'
+import { notifyNewRequest, notifyApprovalResult } from '@/lib/email'
 
 function serviceClient() {
   return createServiceClient(
@@ -82,6 +83,12 @@ export async function submitExpense(input: SubmitExpenseInput) {
       await serviceClient().from('expense_reports').delete().eq('id', reportId)
       return { error: cardError.message }
     }
+  }
+
+  const { data: emp } = await supabase
+    .from('employees').select('name, department_id').eq('auth_user_id', user.id).single()
+  if (emp) {
+    await notifyNewRequest({ requestType: '지출결의서', employeeName: emp.name, departmentId: emp.department_id, excludeAuthUserId: user.id })
   }
 
   revalidateTag(CACHE_TAGS.approvalInbox)
@@ -398,6 +405,12 @@ export async function approveExpense(reportId: string, approved: boolean, commen
   })
 
   if (error) return { error: error.message }
+
+  const { data: report } = await supabase
+    .from('expense_reports').select('employee_id').eq('id', reportId).single()
+  if (report) {
+    await notifyApprovalResult({ employeeId: report.employee_id, requestType: '지출결의서', approved, comment })
+  }
 
   revalidateTag(CACHE_TAGS.approvalInbox)
   return { error: null }
