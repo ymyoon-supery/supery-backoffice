@@ -167,7 +167,13 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
 <html><head>
   <meta charset="utf-8" />
   ${links}
-  <style>body { background: white; padding: 24px; } .no-print { display: none !important; }</style>
+  <style>
+    body { background: white; padding: 24px; }
+    .no-print { display: none !important; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    table { border-collapse: collapse; width: 100%; }
+    td, th { border: 1px solid #d1d5db !important; }
+  </style>
 </head><body>
   ${el.innerHTML}
   <script>window.addEventListener('load', function() { setTimeout(function() { window.print(); window.close(); }, 300); });<\/script>
