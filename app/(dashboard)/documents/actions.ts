@@ -25,7 +25,7 @@ export async function submitDocumentRequest(input: {
 
   if (error) return { error: error.message }
 
-  await notifyNewRequest({ requestType: '서류신청', employeeName: employee.name, departmentId: employee.department_id, excludeAuthUserId: user.id })
+  await notifyNewRequest({ requestType: '서류신청', employeeName: employee.name, departmentId: null, excludeAuthUserId: user.id })
 
   revalidatePath('/admin/documents')
   return { error: null }
