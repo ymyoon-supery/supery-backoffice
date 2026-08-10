@@ -141,6 +141,14 @@ export async function notifyApprovalResult({
 
 // ─── HTML Templates ───────────────────────────────────────────────────────────
 
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://office.supery.co.kr'
+
+function ctaButton(label: string, url: string) {
+  return `<div style="margin-top:24px">
+    <a href="${url}" style="display:inline-block;background:#111827;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 24px;border-radius:6px">${label}</a>
+  </div>`
+}
+
 function emailWrapper(title: string, body: string) {
   return `<!DOCTYPE html>
 <html lang="ko">
@@ -186,7 +194,7 @@ function newRequestHtml(requestType: RequestType, employeeName: string) {
         </tr>
       </table>
     </div>
-    <p style="margin:0;font-size:13px;color:#9ca3af">Supery 백오피스 결재 관리 메뉴에서 확인하실 수 있습니다.</p>
+    ${ctaButton('결재하러 가기', `${APP_URL}/admin/approval`)}
   `)
 }
 
@@ -213,6 +221,6 @@ function approvalResultHtml(
       <p style="margin:0 0 6px;font-size:12px;color:#9ca3af;font-weight:600">결재 의견</p>
       <p style="margin:0;font-size:14px;color:#374151;line-height:1.6">${comment}</p>
     </div>` : ''}
-    <p style="margin:0;font-size:13px;color:#9ca3af">Supery 백오피스에서 신청 내역을 확인하세요.</p>
+    ${ctaButton('내 신청 확인하기', `${APP_URL}/approval/my`)}
   `)
 }
