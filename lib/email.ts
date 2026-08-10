@@ -92,15 +92,28 @@ export async function notifyNewRequest({
       excludeAuthUserId ? getAuthEmail(excludeAuthUserId) : null,
     ])
 
-    const to = [...new Set([...adminEmails, approverEmail].filter((e): e is string => !!e && e !== excludeEmail))]
-    if (!to.length) return
+    const filteredAdminEmails = adminEmails.filter(e => e !== excludeEmail)
+    const filteredApproverEmail = approverEmail && approverEmail !== excludeEmail ? approverEmail : null
 
-    await getResend().emails.send({
-      from: FROM,
-      to,
-      subject: `[결재 요청] ${employeeName}님의 ${requestType}이 접수되었습니다`,
-      html: newRequestHtml(requestType, employeeName),
-    })
+    // 관리자와 팀장/총무팀장에게 각각 다른 URL로 발송
+    const sends: Promise<unknown>[] = []
+    if (filteredAdminEmails.length) {
+      sends.push(getResend().emails.send({
+        from: FROM,
+        to: filteredAdminEmails,
+        subject: `[결재 요청] ${employeeName}님의 ${requestType}이 접수되었습니다`,
+        html: newRequestHtml(requestType, employeeName, `${APP_URL}/admin/approval`),
+      }))
+    }
+    if (filteredApproverEmail) {
+      sends.push(getResend().emails.send({
+        from: FROM,
+        to: filteredApproverEmail,
+        subject: `[결재 요청] ${employeeName}님의 ${requestType}이 접수되었습니다`,
+        html: newRequestHtml(requestType, employeeName, `${APP_URL}/approval/pending`),
+      }))
+    }
+    await Promise.all(sends)
   } catch {
     // 이메일 실패가 메인 액션에 영향 없음
   }
@@ -175,7 +188,7 @@ function emailWrapper(title: string, body: string) {
 </html>`
 }
 
-function newRequestHtml(requestType: RequestType, employeeName: string) {
+function newRequestHtml(requestType: RequestType, employeeName: string, approvalUrl: string) {
   return emailWrapper(`새 ${requestType} 결재 요청`, `
     <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6">
       <strong style="color:#111827">${employeeName}</strong>님이 새로운
@@ -194,7 +207,7 @@ function newRequestHtml(requestType: RequestType, employeeName: string) {
         </tr>
       </table>
     </div>
-    ${ctaButton('결재하러 가기', `${APP_URL}/admin/approval`)}
+    ${ctaButton('결재하러 가기', approvalUrl)}
   `)
 }
 
