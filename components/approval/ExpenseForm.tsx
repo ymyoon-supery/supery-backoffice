@@ -16,7 +16,7 @@ import { createClient } from '@/lib/supabase/client'
 import { format } from 'date-fns'
 import { Plus, Trash2, Paperclip, X, FileSpreadsheet } from 'lucide-react'
 
-type ActiveTab = 'EXPENSE' | 'CORPORATE_CARD' | 'TRANSPORTATION' | 'BUSINESS_INCOME' | 'PRIZE'
+type ActiveTab = 'EXPENSE' | 'CORPORATE_CARD' | 'TRANSPORTATION' | 'PERSONAL_CARD' | 'OTHER_RECEIPT' | 'BUSINESS_INCOME' | 'PRIZE'
 type PaymentMethod = 'CASH' | 'CARD' | 'TRANSFER'
 
 export interface ExpenseInitialData {
@@ -51,6 +51,8 @@ const TABS: { id: ActiveTab; label: string }[] = [
   { id: 'EXPENSE',         label: '지출결의서' },
   { id: 'CORPORATE_CARD',  label: '법인카드' },
   { id: 'TRANSPORTATION',  label: '교통비' },
+  { id: 'PERSONAL_CARD',   label: '개인카드영수증' },
+  { id: 'OTHER_RECEIPT',   label: '기타-개별영수증' },
   { id: 'BUSINESS_INCOME', label: '사업소득(프리랜서 등)' },
   { id: 'PRIZE',           label: '기타소득(경품비 직접지급)' },
 ]
@@ -319,10 +321,12 @@ function ExpenseTab({
   departmentName,
   onSuccess,
   initialData,
-}: Props & { onSuccess: () => void; initialData?: ExpenseInitialData | null }) {
+  lockedEvidenceType,
+  excludeEvidenceTypes,
+}: Props & { onSuccess: () => void; initialData?: ExpenseInitialData | null; lockedEvidenceType?: string; excludeEvidenceTypes?: string[] }) {
   const [isPending, startTransition] = useTransition()
   const [title, setTitle] = useState(initialData?.title ?? '')
-  const [evidenceType, setEvidenceType] = useState(initialData?.evidenceType ?? '')
+  const [evidenceType, setEvidenceType] = useState(lockedEvidenceType ?? initialData?.evidenceType ?? '')
   const [cardCompany, setCardCompany] = useState(initialData?.cardCompany ?? '')
   const [cardNumber, setCardNumber] = useState(initialData?.cardNumber ?? '')
   const [payee, setPayee] = useState(initialData?.payee ?? '')
@@ -434,22 +438,28 @@ function ExpenseTab({
       {/* 증빙 */}
       <div className="space-y-2">
         <SectionLabel>증빙</SectionLabel>
-        <div className="flex flex-wrap gap-2">
-          {EVIDENCE_TYPE_OPTIONS.map(opt => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => setEvidenceType(opt.value)}
-              className={`px-3 py-2 rounded-lg text-sm border transition-colors ${
-                evidenceType === opt.value
-                  ? 'bg-primary text-white border-primary'
-                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+        {lockedEvidenceType ? (
+          <div className="px-3 py-2 rounded-lg text-sm border bg-primary/10 text-primary border-primary/30 inline-block">
+            {EVIDENCE_TYPE_OPTIONS.find(o => o.value === lockedEvidenceType)?.label ?? lockedEvidenceType}
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {EVIDENCE_TYPE_OPTIONS.filter(opt => !excludeEvidenceTypes?.includes(opt.value)).map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setEvidenceType(opt.value)}
+                className={`px-3 py-2 rounded-lg text-sm border transition-colors ${
+                  evidenceType === opt.value
+                    ? 'bg-primary text-white border-primary'
+                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 개인카드 정보 (개인카드영수증 선택 시) */}
@@ -1774,6 +1784,8 @@ const TAB_TITLES: Record<ActiveTab, string> = {
   EXPENSE:         '지 출 결 의 서',
   CORPORATE_CARD:  '법인카드 사용 내역서',
   TRANSPORTATION:  '교통비 사용내역서',
+  PERSONAL_CARD:   '개인카드영수증 지출결의서',
+  OTHER_RECEIPT:   '기타-개별영수증 지출결의서',
   BUSINESS_INCOME: '사업소득(원천징수) 지급요청서',
   PRIZE:           '현금성 경품비(기타소득) 지급요청서',
 }
@@ -1783,7 +1795,9 @@ export default function ExpenseForm(props: Props) {
   const visibleTabs = allowedTabs ? TABS.filter(t => allowedTabs.includes(t.id)) : TABS
   const router = useRouter()
   const initialTab = initialData?.expenseType
-    ? (visibleTabs.find(t => t.id === initialData.expenseType)?.id ?? visibleTabs[0]?.id ?? 'EXPENSE')
+    ? (visibleTabs.find(t => t.id === initialData.expenseType)?.id
+      ?? (initialData.evidenceType ? visibleTabs.find(t => t.id === initialData.evidenceType)?.id : undefined)
+      ?? visibleTabs[0]?.id ?? 'EXPENSE')
     : (visibleTabs[0]?.id ?? 'EXPENSE')
   const [activeTab, setActiveTab] = useState<ActiveTab>(initialTab)
 
@@ -1829,9 +1843,11 @@ export default function ExpenseForm(props: Props) {
       </div>
 
       {/* 탭 콘텐츠 */}
-      {activeTab === 'EXPENSE' && <ExpenseTab {...tabProps} initialData={initialData} onSuccess={onSuccess} />}
+      {activeTab === 'EXPENSE' && <ExpenseTab {...tabProps} initialData={initialData} onSuccess={onSuccess} excludeEvidenceTypes={['PERSONAL_CARD', 'OTHER_RECEIPT']} />}
       {activeTab === 'CORPORATE_CARD' && <CorporateCardTab {...tabProps} initialData={initialData} onSuccess={onSuccess} />}
       {activeTab === 'TRANSPORTATION' && <TransportationTab {...tabProps} initialData={initialData} onSuccess={onSuccess} />}
+      {activeTab === 'PERSONAL_CARD' && <ExpenseTab {...tabProps} initialData={initialData} onSuccess={onSuccess} lockedEvidenceType="PERSONAL_CARD" />}
+      {activeTab === 'OTHER_RECEIPT' && <ExpenseTab {...tabProps} initialData={initialData} onSuccess={onSuccess} lockedEvidenceType="OTHER_RECEIPT" />}
       {activeTab === 'BUSINESS_INCOME' && <BusinessIncomeTab {...tabProps} initialData={initialData} onSuccess={onSuccess} />}
       {activeTab === 'PRIZE' && <PrizeTab {...tabProps} initialData={initialData} onSuccess={onSuccess} />}
     </div>

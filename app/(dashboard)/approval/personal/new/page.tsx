@@ -68,13 +68,13 @@ export default async function NewPersonalPage({
 
   return (
     <div className="max-w-4xl">
-      <h1 className="text-xl font-semibold text-gray-900 mb-6">개인정산</h1>
+      <h1 className="text-xl font-semibold text-gray-900 mb-6">경비정산</h1>
       <ExpenseForm
         employeeId={employee.id}
         employeeName={employee.name}
         employeePosition={employee.position ?? ''}
         departmentName={deptName}
-        allowedTabs={['CORPORATE_CARD', 'TRANSPORTATION']}
+        allowedTabs={['CORPORATE_CARD', 'TRANSPORTATION', 'PERSONAL_CARD', 'OTHER_RECEIPT']}
         initialData={initialData}
       />
     </div>
