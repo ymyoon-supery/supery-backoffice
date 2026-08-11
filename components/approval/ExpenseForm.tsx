@@ -524,22 +524,28 @@ function ExpenseTab({
       {/* 지급방식 */}
       <div className="space-y-3">
         <SectionLabel>지급방식</SectionLabel>
-        <div className="flex gap-2">
-          {PAYMENT_METHODS.filter(m => allowedPaymentMethods.includes(m.value)).map(({ value, label }) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setPaymentMethod(value)}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                paymentMethod === value
-                  ? 'bg-primary text-white border-primary'
-                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        {allowedPaymentMethods.length === 1 ? (
+          <div className="px-3 py-2 rounded-lg text-sm border bg-primary/10 text-primary border-primary/30 inline-block">
+            {PAYMENT_METHODS.find(m => m.value === allowedPaymentMethods[0])?.label}
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            {PAYMENT_METHODS.filter(m => allowedPaymentMethods.includes(m.value)).map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setPaymentMethod(value)}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                  paymentMethod === value
+                    ? 'bg-primary text-white border-primary'
+                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
         {paymentMethod === 'TRANSFER' && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
             {[
