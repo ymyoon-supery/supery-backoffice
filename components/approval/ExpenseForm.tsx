@@ -457,7 +457,7 @@ function ExpenseTab({
       <div className="space-y-2">
         <SectionLabel>증빙</SectionLabel>
         {lockedEvidenceType ? (
-          <div className="px-3 py-2 rounded-lg text-sm border bg-primary/10 text-primary border-primary/30 inline-block">
+          <div className="ml-2 px-3 py-2 rounded-lg text-sm border bg-primary/10 text-primary border-primary/30 inline-block">
             {EVIDENCE_TYPE_OPTIONS.find(o => o.value === lockedEvidenceType)?.label ?? lockedEvidenceType}
           </div>
         ) : (
