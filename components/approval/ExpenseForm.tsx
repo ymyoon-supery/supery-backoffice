@@ -63,6 +63,16 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
   { value: 'CASH', label: '현금' },
 ]
 
+const NO_CARD_EVIDENCE_TYPES = ['TAX_INVOICE', 'ELECTRONIC_INVOICE', 'BUSINESS_RECEIPT']
+const CARD_ONLY_EVIDENCE_TYPES = ['CORPORATE_CARD']
+
+function getAllowedPaymentMethods(evidenceType: string, lockedEvidence?: string): PaymentMethod[] {
+  if (lockedEvidence) return ['TRANSFER', 'CASH']
+  if (NO_CARD_EVIDENCE_TYPES.includes(evidenceType)) return ['TRANSFER', 'CASH']
+  if (CARD_ONLY_EVIDENCE_TYPES.includes(evidenceType)) return ['CARD']
+  return ['TRANSFER', 'CARD', 'CASH']
+}
+
 const EVIDENCE_TYPE_OPTIONS = [
   { value: 'TAX_INVOICE',        label: '세금계산서' },
   { value: 'ELECTRONIC_INVOICE', label: '전자계산서(또는 인보이스)' },
@@ -365,6 +375,14 @@ function ExpenseTab({
     lineItems.every(r => r.item.trim() && r.date) &&
     !uploading
 
+  const allowedPaymentMethods = getAllowedPaymentMethods(evidenceType, lockedEvidenceType)
+
+  function handleEvidenceTypeChange(val: string) {
+    setEvidenceType(val)
+    const allowed = getAllowedPaymentMethods(val, lockedEvidenceType)
+    if (!allowed.includes(paymentMethod)) setPaymentMethod(allowed[0])
+  }
+
   function updateRow(idx: number, key: string, value: string) {
     setLineItems(prev => prev.map((r, i) => (i === idx ? { ...r, [key]: value } : r)))
   }
@@ -448,7 +466,7 @@ function ExpenseTab({
               <button
                 key={opt.value}
                 type="button"
-                onClick={() => setEvidenceType(opt.value)}
+                onClick={() => handleEvidenceTypeChange(opt.value)}
                 className={`px-3 py-2 rounded-lg text-sm border transition-colors ${
                   evidenceType === opt.value
                     ? 'bg-primary text-white border-primary'
@@ -507,7 +525,7 @@ function ExpenseTab({
       <div className="space-y-3">
         <SectionLabel>지급방식</SectionLabel>
         <div className="flex gap-2">
-          {PAYMENT_METHODS.filter(m => !lockedEvidenceType || m.value !== 'CARD').map(({ value, label }) => (
+          {PAYMENT_METHODS.filter(m => allowedPaymentMethods.includes(m.value)).map(({ value, label }) => (
             <button
               key={value}
               type="button"
