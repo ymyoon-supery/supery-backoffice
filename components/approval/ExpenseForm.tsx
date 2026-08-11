@@ -525,7 +525,7 @@ function ExpenseTab({
       <div className="space-y-3">
         <SectionLabel>지급방식</SectionLabel>
         {allowedPaymentMethods.length === 1 ? (
-          <div className="px-3 py-2 rounded-lg text-sm border bg-primary/10 text-primary border-primary/30 inline-block">
+          <div className="ml-2 px-3 py-2 rounded-lg text-sm border bg-primary/10 text-primary border-primary/30 inline-block">
             {PAYMENT_METHODS.find(m => m.value === allowedPaymentMethods[0])?.label}
           </div>
         ) : (
