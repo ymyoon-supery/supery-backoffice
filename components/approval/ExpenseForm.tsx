@@ -507,7 +507,7 @@ function ExpenseTab({
       <div className="space-y-3">
         <SectionLabel>지급방식</SectionLabel>
         <div className="flex gap-2">
-          {PAYMENT_METHODS.map(({ value, label }) => (
+          {PAYMENT_METHODS.filter(m => !lockedEvidenceType || m.value !== 'CARD').map(({ value, label }) => (
             <button
               key={value}
               type="button"
