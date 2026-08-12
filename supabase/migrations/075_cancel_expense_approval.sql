@@ -53,12 +53,13 @@ BEGIN
     updated_at     = now()
   WHERE id = p_report_id;
 
-  -- step1 → PENDING, step2+ → WAITING, clear acted info
+  -- 관리자 본인의 결재 단계만 PENDING으로 되돌림 (팀장 결재는 유지)
   UPDATE expense_approval_steps
   SET
-    status   = CASE WHEN step_order = 1 THEN 'PENDING' ELSE 'WAITING' END,
+    status   = 'PENDING',
     comment  = NULL,
     acted_at = NULL
-  WHERE expense_report_id = p_report_id;
+  WHERE expense_report_id = p_report_id
+    AND approver_id = v_admin_id;
 END;
 $$;
