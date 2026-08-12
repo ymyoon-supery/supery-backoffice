@@ -58,9 +58,9 @@ export async function approveLeave(requestId: string, approved: boolean, comment
   if (error) return { error: error.message }
 
   const { data: req } = await supabase
-    .from('leave_requests').select('employee_id').eq('id', requestId).single()
+    .from('leave_requests').select('employee_id, created_at').eq('id', requestId).single()
   if (req) {
-    await notifyApprovalResult({ employeeId: req.employee_id, requestType: '연차신청', approved, comment })
+    await notifyApprovalResult({ employeeId: req.employee_id, requestType: '연차신청', approved, comment, requestedAt: req.created_at })
   }
 
   revalidateTag(CACHE_TAGS.approvalInbox)

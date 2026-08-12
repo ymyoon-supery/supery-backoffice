@@ -69,6 +69,11 @@ async function getEmployeeEmailById(employeeId: string): Promise<string | null> 
 
 export type RequestType = '지출결의서' | '연차신청' | '비품/소모품 신청' | '서류신청'
 
+function formatKoreanDate(isoString: string) {
+  const d = new Date(isoString)
+  return `${d.getMonth() + 1}월${d.getDate()}일`
+}
+
 // 신청 시 → 결재자에게 알림
 // isSupply=true: 총무팀장+관리자 / false: 팀장+관리자
 // excludeAuthUserId: 신청자 본인 이메일 제외 (팀장이 직접 신청하는 경우)
@@ -78,12 +83,14 @@ export async function notifyNewRequest({
   departmentId,
   isSupply = false,
   excludeAuthUserId,
+  title,
 }: {
   requestType: RequestType
   employeeName: string
   departmentId: string | null
   isSupply?: boolean
   excludeAuthUserId?: string
+  title?: string
 }) {
   try {
     const [adminEmails, approverEmail, excludeEmail] = await Promise.all([
@@ -102,7 +109,7 @@ export async function notifyNewRequest({
         from: FROM,
         to: filteredAdminEmails,
         subject: `[결재 요청] ${employeeName}님의 ${requestType}이 접수되었습니다`,
-        html: newRequestHtml(requestType, employeeName, `${APP_URL}/admin/approval`),
+        html: newRequestHtml(requestType, employeeName, `${APP_URL}/admin/approval`, title),
       }))
     }
     if (filteredApproverEmail) {
@@ -110,7 +117,7 @@ export async function notifyNewRequest({
         from: FROM,
         to: filteredApproverEmail,
         subject: `[결재 요청] ${employeeName}님의 ${requestType}이 접수되었습니다`,
-        html: newRequestHtml(requestType, employeeName, `${APP_URL}/approval/pending`),
+        html: newRequestHtml(requestType, employeeName, `${APP_URL}/approval/pending`, title),
       }))
     }
     await Promise.all(sends)
@@ -126,12 +133,16 @@ export async function notifyApprovalResult({
   approved,
   isFinal = false,
   comment,
+  title,
+  requestedAt,
 }: {
   employeeId: string
   requestType: RequestType
   approved: boolean
   isFinal?: boolean
   comment?: string | null
+  title?: string
+  requestedAt?: string
 }) {
   try {
     const email = await getEmployeeEmailById(employeeId)
@@ -145,7 +156,7 @@ export async function notifyApprovalResult({
       from: FROM,
       to: email,
       subject,
-      html: approvalResultHtml(requestType, approved, isFinal, comment),
+      html: approvalResultHtml(requestType, approved, isFinal, comment, title, requestedAt),
     })
   } catch {
     // 이메일 실패가 메인 액션에 영향 없음
@@ -188,7 +199,7 @@ function emailWrapper(title: string, body: string) {
 </html>`
 }
 
-function newRequestHtml(requestType: RequestType, employeeName: string, approvalUrl: string) {
+function newRequestHtml(requestType: RequestType, employeeName: string, approvalUrl: string, title?: string) {
   return emailWrapper(`새 ${requestType} 결재 요청`, `
     <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6">
       <strong style="color:#111827">${employeeName}</strong>님이 새로운
@@ -198,13 +209,17 @@ function newRequestHtml(requestType: RequestType, employeeName: string, approval
     <div style="background:#f3f4f6;border-radius:6px;padding:16px 20px;margin-bottom:20px">
       <table width="100%" cellpadding="0" cellspacing="4">
         <tr>
-          <td style="font-size:13px;color:#6b7280;width:80px;padding:4px 0">신청 유형</td>
+          <td style="font-size:13px;color:#6b7280;width:80px;padding:4px 0">결재 구분</td>
           <td style="font-size:13px;color:#111827;font-weight:600;padding:4px 0">${requestType}</td>
         </tr>
         <tr>
           <td style="font-size:13px;color:#6b7280;padding:4px 0">신청자</td>
           <td style="font-size:13px;color:#111827;padding:4px 0">${employeeName}</td>
         </tr>
+        ${title ? `<tr>
+          <td style="font-size:13px;color:#6b7280;padding:4px 0">제목</td>
+          <td style="font-size:13px;color:#111827;padding:4px 0">${title}</td>
+        </tr>` : ''}
       </table>
     </div>
     ${ctaButton('결재하러 가기', approvalUrl)}
@@ -216,6 +231,8 @@ function approvalResultHtml(
   approved: boolean,
   isFinal: boolean,
   comment?: string | null,
+  title?: string,
+  requestedAt?: string,
 ) {
   const color = approved ? '#059669' : '#dc2626'
   const bg = approved ? '#ecfdf5' : '#fef2f2'
@@ -223,10 +240,16 @@ function approvalResultHtml(
     ? (isFinal ? '최종 승인되었습니다' : '승인되었습니다')
     : '반려되었습니다'
 
+  const descText = title && requestedAt
+    ? `<strong>${formatKoreanDate(requestedAt)}</strong>에 신청한 <strong>'${title}'</strong>의 ${requestType}이 ${statusText}.`
+    : title
+      ? `<strong>'${title}'</strong> ${requestType}이 ${statusText}.`
+      : `${requestType}이 ${statusText}.`
+
   return emailWrapper(`${requestType} 결재 결과`, `
     <div style="background:${bg};border-left:4px solid ${color};border-radius:0 6px 6px 0;padding:14px 18px;margin-bottom:20px">
       <p style="margin:0;font-size:15px;color:${color};font-weight:600">
-        ${requestType}이 ${statusText}.
+        ${descText}
       </p>
     </div>
     ${comment ? `

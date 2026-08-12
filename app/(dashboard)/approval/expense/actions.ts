@@ -88,7 +88,7 @@ export async function submitExpense(input: SubmitExpenseInput) {
   const { data: emp } = await supabase
     .from('employees').select('name, department_id').eq('auth_user_id', user.id).single()
   if (emp) {
-    await notifyNewRequest({ requestType: '지출결의서', employeeName: emp.name, departmentId: emp.department_id, excludeAuthUserId: user.id })
+    await notifyNewRequest({ requestType: '지출결의서', employeeName: emp.name, departmentId: emp.department_id, excludeAuthUserId: user.id, title: input.title })
   }
 
   revalidateTag(CACHE_TAGS.approvalInbox)
@@ -407,9 +407,9 @@ export async function approveExpense(reportId: string, approved: boolean, commen
   if (error) return { error: error.message }
 
   const { data: report } = await supabase
-    .from('expense_reports').select('employee_id').eq('id', reportId).single()
+    .from('expense_reports').select('employee_id, title, created_at').eq('id', reportId).single()
   if (report) {
-    await notifyApprovalResult({ employeeId: report.employee_id, requestType: '지출결의서', approved, comment })
+    await notifyApprovalResult({ employeeId: report.employee_id, requestType: '지출결의서', approved, comment, title: report.title, requestedAt: report.created_at })
   }
 
   revalidateTag(CACHE_TAGS.approvalInbox)

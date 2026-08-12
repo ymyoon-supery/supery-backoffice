@@ -20,8 +20,8 @@ export async function fullApproveLeave(requestId: string) {
   if (!supabase) return { error: '권한이 없습니다.' }
   const { error } = await supabase.rpc('admin_full_approve_leave', { p_request_id: requestId })
   if (error) return { error: error.message }
-  const { data: req } = await supabase.from('leave_requests').select('employee_id').eq('id', requestId).single()
-  if (req) await notifyApprovalResult({ employeeId: req.employee_id, requestType: '연차신청', approved: true, isFinal: true })
+  const { data: req } = await supabase.from('leave_requests').select('employee_id, created_at').eq('id', requestId).single()
+  if (req) await notifyApprovalResult({ employeeId: req.employee_id, requestType: '연차신청', approved: true, isFinal: true, requestedAt: req.created_at })
   revalidateTag(CACHE_TAGS.approvalInbox)
   return { error: null }
 }
@@ -31,8 +31,8 @@ export async function fullApproveExpense(reportId: string) {
   if (!supabase) return { error: '권한이 없습니다.' }
   const { error } = await supabase.rpc('admin_full_approve_expense', { p_report_id: reportId })
   if (error) return { error: error.message }
-  const { data: rep } = await supabase.from('expense_reports').select('employee_id').eq('id', reportId).single()
-  if (rep) await notifyApprovalResult({ employeeId: rep.employee_id, requestType: '지출결의서', approved: true, isFinal: true })
+  const { data: rep } = await supabase.from('expense_reports').select('employee_id, title, created_at').eq('id', reportId).single()
+  if (rep) await notifyApprovalResult({ employeeId: rep.employee_id, requestType: '지출결의서', approved: true, isFinal: true, title: rep.title, requestedAt: rep.created_at })
   revalidateTag(CACHE_TAGS.approvalInbox)
   return { error: null }
 }
@@ -45,8 +45,8 @@ export async function fullRejectLeave(requestId: string, comment?: string) {
     p_comment: comment ?? null,
   })
   if (error) return { error: error.message }
-  const { data: req } = await supabase.from('leave_requests').select('employee_id').eq('id', requestId).single()
-  if (req) await notifyApprovalResult({ employeeId: req.employee_id, requestType: '연차신청', approved: false, comment })
+  const { data: req } = await supabase.from('leave_requests').select('employee_id, created_at').eq('id', requestId).single()
+  if (req) await notifyApprovalResult({ employeeId: req.employee_id, requestType: '연차신청', approved: false, comment, requestedAt: req.created_at })
   revalidateTag(CACHE_TAGS.approvalInbox)
   return { error: null }
 }
@@ -59,8 +59,8 @@ export async function fullRejectExpense(reportId: string, comment?: string) {
     p_comment: comment ?? null,
   })
   if (error) return { error: error.message }
-  const { data: rep } = await supabase.from('expense_reports').select('employee_id').eq('id', reportId).single()
-  if (rep) await notifyApprovalResult({ employeeId: rep.employee_id, requestType: '지출결의서', approved: false, comment })
+  const { data: rep } = await supabase.from('expense_reports').select('employee_id, title, created_at').eq('id', reportId).single()
+  if (rep) await notifyApprovalResult({ employeeId: rep.employee_id, requestType: '지출결의서', approved: false, comment, title: rep.title, requestedAt: rep.created_at })
   revalidateTag(CACHE_TAGS.approvalInbox)
   return { error: null }
 }
