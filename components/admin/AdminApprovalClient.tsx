@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import { AlertCircle, ChevronLeft, ChevronRight, ArrowUpDown, ChevronDown } from 'lucide-react'
 import { approveLeave } from '@/app/(dashboard)/approval/leave/actions'
 import { approveExpense } from '@/app/(dashboard)/approval/expense/actions'
-import { approveHomeLocationRequest, updateExpensePaymentStatus, fullApproveLeave, fullApproveExpense, fullRejectLeave, fullRejectExpense } from '@/app/(admin)/admin/approval/actions'
+import { approveHomeLocationRequest, updateExpensePaymentStatus, fullApproveLeave, fullApproveExpense, fullRejectLeave, fullRejectExpense, cancelExpenseApproval } from '@/app/(admin)/admin/approval/actions'
 import type { ApprovalItem } from '@/app/(admin)/admin/approval/page'
 import ExpenseDetailSheet from '@/components/admin/ExpenseDetailSheet'
 import ExpenseSearchFilter from '@/components/approval/ExpenseSearchFilter'
@@ -65,6 +65,8 @@ export default function AdminApprovalClient({
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [paymentDropdownId, setPaymentDropdownId] = useState<string | null>(null)
+  const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [selectedExpense, setSelectedExpense] = useState<ApprovalItem | null>(null)
   const [statusFilter, setStatusFilter] = useState<'all' | 'APPROVED' | 'REJECTED'>('all')
@@ -141,6 +143,18 @@ export default function AdminApprovalClient({
       setRejectingId(null)
       setRejectReason('')
       setSelectedExpense(null)
+      router.refresh()
+    })
+  }
+
+  function handleCancelApproval(item: ApprovalItem) {
+    if (!cancelReason.trim()) { toast.error('취소 사유를 입력해주세요.'); return }
+    startTransition(async () => {
+      const res = await cancelExpenseApproval(item.requestId, cancelReason.trim())
+      if (res.error) { toast.error(res.error); return }
+      toast.success('승인이 취소되었습니다.')
+      setCancellingId(null)
+      setCancelReason('')
       router.refresh()
     })
   }
@@ -482,11 +496,45 @@ export default function AdminApprovalClient({
                               )}
                             </div>
                           )}
+                          {item.status === 'APPROVED' && item.kind === 'expense' && item.paymentStatus === 'PENDING_PAYMENT' && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setCancellingId(item.stepId); setCancelReason('') }}
+                              disabled={isPending}
+                              className="text-xs text-orange-500 hover:text-orange-700 underline"
+                            >
+                              승인취소
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
                   </div>
                 </div>
+
+                {/* Inline cancel form */}
+                {cancellingId === item.stepId && item.kind === 'expense' && (
+                  <div className="bg-orange-50/30 border-l-[3px] border-l-orange-300 px-4 py-3">
+                    <p className="text-xs text-orange-700 font-medium mb-2">승인취소 사유 (필수)</p>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={cancelReason}
+                        onChange={e => setCancelReason(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && cancelReason.trim() && handleCancelApproval(item)}
+                        placeholder="취소 사유를 입력하세요"
+                        autoFocus
+                        className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-orange-200"
+                      />
+                      <button onClick={() => handleCancelApproval(item)} disabled={isPending || !cancelReason.trim()}
+                        className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 whitespace-nowrap">
+                        취소 확인
+                      </button>
+                      <button onClick={() => setCancellingId(null)} className="px-3 py-1.5 text-xs text-gray-500">
+                        닫기
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Inline expansion (leave only) */}
                 {expandedId === item.stepId && item.kind !== 'expense' && item.kind !== 'home_location' && (
@@ -720,10 +768,46 @@ export default function AdminApprovalClient({
                               )}
                             </div>
                           )}
+                          {item.status === 'APPROVED' && item.kind === 'expense' && item.paymentStatus === 'PENDING_PAYMENT' && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setCancellingId(item.stepId); setCancelReason('') }}
+                              disabled={isPending}
+                              className="text-xs text-orange-500 hover:text-orange-700 underline transition-colors"
+                            >
+                              승인취소
+                            </button>
+                          )}
                         </div>
                       )}
                     </td>
                   </tr>
+
+                  {/* Inline cancel form */}
+                  {cancellingId === item.stepId && item.kind === 'expense' && (
+                    <tr className="bg-orange-50/30 border-l-[3px] border-l-orange-300">
+                      <td colSpan={5} className="px-6 py-3">
+                        <p className="text-xs text-orange-700 font-medium mb-2">승인취소 사유 (필수)</p>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={cancelReason}
+                            onChange={e => setCancelReason(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && cancelReason.trim() && handleCancelApproval(item)}
+                            placeholder="취소 사유를 입력하세요"
+                            autoFocus
+                            className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-orange-200"
+                          />
+                          <button onClick={() => handleCancelApproval(item)} disabled={isPending || !cancelReason.trim()}
+                            className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 whitespace-nowrap transition-colors">
+                            취소 확인
+                          </button>
+                          <button onClick={() => setCancellingId(null)} className="px-3 py-1.5 text-xs text-gray-500">
+                            닫기
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
 
                   {/* Inline expansion for leave / home_location only */}
                   {expandedId === item.stepId && item.kind !== 'expense' && item.kind !== 'home_location' && (

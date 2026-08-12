@@ -114,6 +114,20 @@ export async function updateExpensePaymentStatus(
   return { error: null }
 }
 
+export async function cancelExpenseApproval(reportId: string, comment: string) {
+  const supabase = await requireAdminClient()
+  if (!supabase) return { error: '권한이 없습니다.' }
+
+  const { error } = await supabase.rpc('admin_cancel_expense_approval', {
+    p_report_id: reportId,
+    p_comment: comment,
+  })
+  if (error) return { error: error.message }
+
+  revalidateTag(CACHE_TAGS.approvalInbox)
+  return { error: null }
+}
+
 export async function approveHomeLocationRequest(
   requestId: string,
   approved: boolean,
