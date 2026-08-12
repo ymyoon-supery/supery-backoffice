@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import {
   Clock, FileText, BarChart2, Users, ClipboardList, Home,
   Bell, FilePlus, CalendarDays, Settings, Megaphone, Inbox,
-  Receipt, Package, Loader2, X, BookOpen,
+  Receipt, Package, Loader2, X, BookOpen, FileBarChart,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useMobileSidebar } from './MobileSidebarContext'
@@ -17,6 +17,7 @@ const adminNavGroups = [
     items: [
       { href: '/admin/approval', label: '결재관리', icon: ClipboardList },
       { href: '/admin/documents', label: '서류/비품 관리', icon: Package },
+      { href: '/admin/vat-report', label: '부가세 신고자료', icon: FileBarChart, exact: false },
     ],
   },
   {
