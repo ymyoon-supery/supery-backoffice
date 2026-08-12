@@ -236,8 +236,8 @@ function AttachmentSection({
   attachments,
   onAdd,
   onRemove,
-  accept = 'image/*,application/pdf',
-  label = '파일 첨부 (이미지, PDF)',
+  accept = 'image/*,application/pdf,.xlsx,.xls',
+  label = '파일 첨부 (이미지, PDF, 엑셀)',
 }: {
   attachments: File[]
   onAdd: (files: File[]) => void
