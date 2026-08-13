@@ -303,6 +303,12 @@ export async function resubmitExpense(reportId: string, input: SubmitExpenseInpu
       .insert({ expense_report_id: reportId, encrypted_card_number: encrypted, iv })
   }
 
+  const { data: emp } = await supabase
+    .from('employees').select('name, department_id').eq('auth_user_id', user.id).single()
+  if (emp) {
+    await notifyNewRequest({ requestType: '지출결의서', employeeName: emp.name, departmentId: emp.department_id, excludeAuthUserId: user.id, title: input.title })
+  }
+
   revalidateTag(CACHE_TAGS.approvalInbox)
   revalidateTag(CACHE_TAGS.expenseList)
   return { error: null, id: reportId }
