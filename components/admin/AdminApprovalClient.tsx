@@ -193,7 +193,7 @@ export default function AdminApprovalClient({
     : statusFilteredItems
 
   const filteredItems = paymentFilter !== 'all'
-    ? kindFilteredItems.filter(i => i.kind === 'expense' && i.paymentStatus === paymentFilter)
+    ? kindFilteredItems.filter(i => i.kind === 'expense' && i.status === 'APPROVED' && i.paymentStatus === paymentFilter)
     : kindFilteredItems
 
   const sortedFilteredItems = [...filteredItems].sort((a, b) => {
