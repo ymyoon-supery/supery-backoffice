@@ -71,9 +71,10 @@ export default function AdminApprovalClient({
   const [selectedExpense, setSelectedExpense] = useState<ApprovalItem | null>(null)
   const [statusFilter, setStatusFilter] = useState<'all' | 'APPROVED' | 'REJECTED'>('all')
   const [kindFilter, setKindFilter] = useState<'all' | 'leave' | 'expense' | 'home_location'>('all')
+  const [paymentFilter, setPaymentFilter] = useState<'all' | 'PENDING_PAYMENT' | 'PAID' | 'SETTLED'>('all')
   const [dateSort, setDateSort] = useState<'desc' | 'asc'>(sort === 'asc' ? 'asc' : 'desc')
 
-  useEffect(() => { setStatusFilter('all'); setKindFilter('all') }, [tab])
+  useEffect(() => { setStatusFilter('all'); setKindFilter('all'); setPaymentFilter('all') }, [tab])
 
   useEffect(() => {
     if (!paymentDropdownId) return
@@ -187,9 +188,13 @@ export default function AdminApprovalClient({
     home_location: statusFilteredItems.filter(i => i.kind === 'home_location').length,
   }
 
-  const filteredItems = kindFilter !== 'all'
+  const kindFilteredItems = kindFilter !== 'all'
     ? statusFilteredItems.filter(i => i.kind === kindFilter)
     : statusFilteredItems
+
+  const filteredItems = paymentFilter !== 'all'
+    ? kindFilteredItems.filter(i => i.kind === 'expense' && i.paymentStatus === paymentFilter)
+    : kindFilteredItems
 
   const sortedFilteredItems = [...filteredItems].sort((a, b) => {
     const ta = a.requestDate ? new Date(a.requestDate).getTime() : 0
@@ -330,7 +335,7 @@ export default function AdminApprovalClient({
               if (id !== 'all' && count === 0) return null
               const isActive = kindFilter === id
               return (
-                <button key={id} onClick={() => setKindFilter(id)}
+                <button key={id} onClick={() => { setKindFilter(id); setPaymentFilter('all') }}
                   className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
                     isActive
                       ? id === 'leave'         ? 'bg-blue-500 text-white'
@@ -343,6 +348,25 @@ export default function AdminApprovalClient({
                       : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                   }`}>
                   {label}{id !== 'all' && <span className="ml-1 opacity-70">{count}</span>}
+                </button>
+              )
+            })}
+          </div>
+          <div className="flex gap-1.5 flex-wrap items-center">
+            <span className="text-xs text-gray-400 font-medium">지급상태</span>
+            {([
+              ['all',             '전체',    'bg-gray-700',   'bg-gray-100 text-gray-500 hover:bg-gray-200'],
+              ['PENDING_PAYMENT', '지급대기', 'bg-amber-500',  'bg-amber-50 text-amber-600 hover:bg-amber-100'],
+              ['PAID',            '지급완료', 'bg-blue-600',   'bg-blue-50 text-blue-600 hover:bg-blue-100'],
+              ['SETTLED',         '정산완료', 'bg-green-600',  'bg-green-50 text-green-600 hover:bg-green-100'],
+            ] as const).map(([id, label, activeCls, inactiveCls]) => {
+              const isActive = paymentFilter === id
+              return (
+                <button key={id} onClick={() => setPaymentFilter(id)}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                    isActive ? `${activeCls} text-white` : inactiveCls
+                  }`}>
+                  {label}
                 </button>
               )
             })}
