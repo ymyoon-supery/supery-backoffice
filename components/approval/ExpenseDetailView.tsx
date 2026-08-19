@@ -77,6 +77,12 @@ const STATUS_CFG: Record<string, { label: string; cls: string }> = {
   COMPLETED: { label: '완료',   cls: 'bg-blue-100 text-blue-700' },
 }
 const PERSONAL_EXPENSE_TYPES = ['CORPORATE_CARD', 'TRANSPORTATION']
+const WITHHOLDING_EXPENSE_TYPES = ['BUSINESS_INCOME', 'PRIZE']
+
+const EXPENSE_TYPE_DOC_TITLE: Record<string, string> = {
+  BUSINESS_INCOME: '사업소득 지급의뢰서',
+  PRIZE:           '기타소득 지급의뢰서',
+}
 
 function formatKRW(n: number) {
   return n.toLocaleString('ko-KR') + '원'
@@ -142,7 +148,12 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
     ? '/approval/personal/new'
     : '/approval/expense/new'
 
-  const rowVats = data.lineItems.map(li => parseVatFromNote(li.note, li.amount))
+  const isWithholding = WITHHOLDING_EXPENSE_TYPES.includes(data.expenseType ?? '')
+  const docTitle = EXPENSE_TYPE_DOC_TITLE[data.expenseType ?? ''] ?? '지  출  결  의  서'
+
+  const rowVats = isWithholding
+    ? data.lineItems.map(li => ({ supply: li.amount ?? 0, vat: 0, total: li.amount ?? 0, vatLabel: null as string | null, userNote: li.note ?? '' }))
+    : data.lineItems.map(li => parseVatFromNote(li.note, li.amount))
   const totalSupply = rowVats.reduce((s, r) => s + r.supply, 0)
   const totalVat    = rowVats.reduce((s, r) => s + r.vat, 0)
   const totalAmount = rowVats.reduce((s, r) => s + r.total, 0)
@@ -197,7 +208,7 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
         {/* Document header */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="bg-gray-50 border-b border-gray-200 px-4 md:px-6 py-4 md:py-5 text-center relative">
-            <h2 className="text-lg font-bold text-gray-900 tracking-[0.4em]">지  출  결  의  서</h2>
+            <h2 className="text-lg font-bold text-gray-900 tracking-[0.4em]">{docTitle}</h2>
             {data.docNumber && (
               <p className="text-xs text-gray-400 mt-1 font-mono tracking-wider">{data.docNumber}</p>
             )}
