@@ -698,9 +698,9 @@ export default function AdminApprovalClient({
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 overflow-hidden">
                       <div className="space-y-1">
-                        <span className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${
+                        <span className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium break-keep ${
                           item.kind === 'leave'
                             ? 'bg-blue-50 text-blue-600'
                             : item.kind === 'expense'
