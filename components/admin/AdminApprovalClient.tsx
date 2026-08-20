@@ -642,7 +642,14 @@ export default function AdminApprovalClient({
         </div>
 
         {/* ── Desktop table ── */}
-        <table className="hidden md:table w-full text-sm">
+        <table className="hidden md:table w-full text-sm table-fixed">
+          <colgroup>
+            <col style={{ width: '140px' }} />
+            <col style={{ width: '160px' }} />
+            <col />
+            <col style={{ width: '140px' }} />
+            <col style={{ width: '160px' }} />
+          </colgroup>
           <thead>
             <tr className="border-b border-gray-100 text-xs text-gray-400 font-medium text-left bg-gray-50/50">
               <th className="px-4 py-3">직원</th>
@@ -684,7 +691,7 @@ export default function AdminApprovalClient({
                           <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
                         ) : null}
                         <div>
-                          <p className="text-sm font-medium text-gray-900">{item.employeeName}</p>
+                          <p className="text-sm font-medium text-gray-900 whitespace-nowrap">{item.employeeName}</p>
                           {item.employeePosition && (
                             <p className="text-xs text-gray-400">{item.employeePosition}</p>
                           )}
