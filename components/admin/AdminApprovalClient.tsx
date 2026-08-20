@@ -644,11 +644,11 @@ export default function AdminApprovalClient({
         {/* ── Desktop table ── */}
         <table className="hidden md:table w-full text-sm table-fixed">
           <colgroup>
-            <col style={{ width: '140px' }} />
-            <col style={{ width: '160px' }} />
-            <col />
-            <col style={{ width: '140px' }} />
-            <col style={{ width: '160px' }} />
+            <col style={{ width: '17%' }} />
+            <col style={{ width: '19%' }} />
+            <col style={{ width: '28%' }} />
+            <col style={{ width: '18%' }} />
+            <col style={{ width: '18%' }} />
           </colgroup>
           <thead>
             <tr className="border-b border-gray-100 text-xs text-gray-400 font-medium text-left bg-gray-50/50">
