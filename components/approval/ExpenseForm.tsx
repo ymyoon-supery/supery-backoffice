@@ -1850,10 +1850,12 @@ function CondolenceTab({
     }
   }, [targetType])
 
+  function fmtDT(val: string) { return val.replace('T', ' ') }
+
   function getCeremonyDetail(): string {
     switch (ceremonyType) {
-      case '결혼': return [weddingDateTime && `결혼일시: ${weddingDateTime}`, weddingVenue && `결혼식장: ${weddingVenue}`].filter(Boolean).join(', ')
-      case '조위': return [funeralHall && `장례식장: ${funeralHall}`, intermentDateTime && `발인일시: ${intermentDateTime}`].filter(Boolean).join(', ')
+      case '결혼': return [weddingDateTime && `결혼일시: ${fmtDT(weddingDateTime)}`, weddingVenue && `결혼식장: ${weddingVenue}`].filter(Boolean).join(', ')
+      case '조위': return [funeralHall && `장례식장: ${funeralHall}`, intermentDateTime && `발인일시: ${fmtDT(intermentDateTime)}`].filter(Boolean).join(', ')
       case '출산': return birthDate ? `출산일: ${birthDate}` : ''
       case '회갑': return [hwegapDate && `회갑일자: ${hwegapDate}`, hwegapName && `성명: ${hwegapName}`].filter(Boolean).join(', ')
       case '기타': return memo ? `메모: ${memo}` : ''
