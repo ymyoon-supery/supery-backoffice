@@ -74,7 +74,7 @@ export default async function NewPersonalPage({
         employeeName={employee.name}
         employeePosition={employee.position ?? ''}
         departmentName={deptName}
-        allowedTabs={['CORPORATE_CARD', 'TRANSPORTATION', 'PERSONAL_CARD', 'OTHER_RECEIPT']}
+        allowedTabs={['CORPORATE_CARD', 'TRANSPORTATION', 'PERSONAL_CARD', 'OTHER_RECEIPT', 'CONDOLENCE']}
         initialData={initialData}
       />
     </div>

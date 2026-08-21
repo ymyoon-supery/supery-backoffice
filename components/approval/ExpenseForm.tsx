@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useTransition, useRef } from 'react'
+import { useState, useTransition, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   submitExpense,
   submitBusinessIncomeExpense,
   submitPrizeExpense,
+  submitCondolenceExpense,
   resubmitExpense,
   resubmitBusinessIncomeExpense,
   resubmitPrizeExpense,
@@ -16,7 +17,7 @@ import { createClient } from '@/lib/supabase/client'
 import { format } from 'date-fns'
 import { Plus, Trash2, Paperclip, X, FileSpreadsheet } from 'lucide-react'
 
-type ActiveTab = 'EXPENSE' | 'CORPORATE_CARD' | 'TRANSPORTATION' | 'PERSONAL_CARD' | 'OTHER_RECEIPT' | 'BUSINESS_INCOME' | 'PRIZE'
+type ActiveTab = 'EXPENSE' | 'CORPORATE_CARD' | 'TRANSPORTATION' | 'PERSONAL_CARD' | 'OTHER_RECEIPT' | 'CONDOLENCE' | 'BUSINESS_INCOME' | 'PRIZE'
 type PaymentMethod = 'CASH' | 'CARD' | 'TRANSFER'
 
 export interface ExpenseInitialData {
@@ -53,6 +54,7 @@ const TABS: { id: ActiveTab; label: string }[] = [
   { id: 'TRANSPORTATION',  label: '교통비' },
   { id: 'PERSONAL_CARD',   label: '개인카드영수증' },
   { id: 'OTHER_RECEIPT',   label: '기타-개별영수증' },
+  { id: 'CONDOLENCE',      label: '경조사' },
   { id: 'BUSINESS_INCOME', label: '사업소득(프리랜서 등)' },
   { id: 'PRIZE',           label: '기타소득(경품비 직접지급)' },
 ]
@@ -1802,6 +1804,409 @@ function PrizeTab({
   )
 }
 
+// ─── Tab 5: 경조사비 ──────────────────────────────────────────────────────────
+
+type CeremonyType = '결혼' | '조위' | '출산' | '회갑' | '기타'
+type TargetType = '직원' | '거래처' | '기타'
+
+function CondolenceTab({
+  employeeId,
+  employeeName,
+  employeePosition,
+  departmentName,
+  onSuccess,
+}: Props & { onSuccess: () => void }) {
+  const [isPending, startTransition] = useTransition()
+  const [title, setTitle] = useState('')
+  const [targetType, setTargetType] = useState<TargetType>('직원')
+  const [targetName, setTargetName] = useState('')
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState('')
+  const [employees, setEmployees] = useState<{ id: string; name: string; position: string | null }[]>([])
+  const [paymentMethod, setPaymentMethod] = useState<'TRANSFER' | 'CASH'>('TRANSFER')
+  const [bankName, setBankName] = useState('')
+  const [accountNumber, setAccountNumber] = useState('')
+  const [accountHolder, setAccountHolder] = useState('')
+  const [paymentRequestDate, setPaymentRequestDate] = useState(getToday())
+  const [ceremonyType, setCeremonyType] = useState<CeremonyType>('결혼')
+  const [weddingDateTime, setWeddingDateTime] = useState('')
+  const [weddingVenue, setWeddingVenue] = useState('')
+  const [funeralHall, setFuneralHall] = useState('')
+  const [intermentDateTime, setIntermentDateTime] = useState('')
+  const [birthDate, setBirthDate] = useState('')
+  const [hwegapDate, setHwegapDate] = useState('')
+  const [hwegapName, setHwegapName] = useState('')
+  const [memo, setMemo] = useState('')
+  const [description, setDescription] = useState('')
+  const [amountRaw, setAmountRaw] = useState('')
+  const [attachments, setAttachments] = useState<File[]>([])
+  const [uploading, setUploading] = useState(false)
+
+  useEffect(() => {
+    if (targetType === '직원') {
+      const supabase = createClient()
+      supabase.from('employees').select('id, name, position').eq('is_active', true).order('name').then(({ data }) => {
+        setEmployees(data ?? [])
+      })
+    }
+  }, [targetType])
+
+  function getCeremonyDetail(): string {
+    switch (ceremonyType) {
+      case '결혼': return [weddingDateTime && `결혼일시: ${weddingDateTime}`, weddingVenue && `결혼식장: ${weddingVenue}`].filter(Boolean).join(', ')
+      case '조위': return [funeralHall && `장례식장: ${funeralHall}`, intermentDateTime && `발인일시: ${intermentDateTime}`].filter(Boolean).join(', ')
+      case '출산': return birthDate ? `출산일: ${birthDate}` : ''
+      case '회갑': return [hwegapDate && `회갑일자: ${hwegapDate}`, hwegapName && `성명: ${hwegapName}`].filter(Boolean).join(', ')
+      case '기타': return memo ? `메모: ${memo}` : ''
+    }
+  }
+
+  const amount = Number(amountRaw.replace(/[^0-9]/g, '')) || 0
+
+  const canSubmit =
+    title.trim() &&
+    targetName.trim() &&
+    paymentRequestDate &&
+    description.trim() &&
+    amount > 0 &&
+    (paymentMethod !== 'TRANSFER' || (bankName.trim() && accountNumber.trim() && accountHolder.trim())) &&
+    !uploading
+
+  function handleSubmit() {
+    startTransition(async () => {
+      let attachmentUrls: string[] = []
+      if (attachments.length > 0) {
+        setUploading(true)
+        const supabase = createClient()
+        attachmentUrls = await uploadFiles(supabase, employeeId, attachments)
+        setUploading(false)
+        if (attachmentUrls.length !== attachments.length) return
+      }
+
+      const result = await submitCondolenceExpense({
+        title: title.trim(),
+        targetType,
+        targetName: targetName.trim(),
+        paymentMethod,
+        bankName: paymentMethod === 'TRANSFER' ? bankName.trim() : null,
+        accountNumber: paymentMethod === 'TRANSFER' ? accountNumber.trim() : null,
+        accountHolder: paymentMethod === 'TRANSFER' ? accountHolder.trim() : null,
+        paymentRequestDate,
+        ceremonyType,
+        ceremonyDetail: getCeremonyDetail(),
+        description: description.trim(),
+        amount,
+        attachmentUrls,
+      })
+
+      if (result.error) { toast.error(result.error); return }
+      toast.success('경조사비 지급요청서가 제출되었습니다.')
+      onSuccess()
+    })
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* 제목 */}
+      <div className="space-y-1.5">
+        <SectionLabel>제목</SectionLabel>
+        <input
+          type="text"
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          placeholder="예: 홍길동 결혼 경조사비"
+          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
+        />
+      </div>
+
+      {/* 대상 */}
+      <div className="space-y-3">
+        <SectionLabel>대상</SectionLabel>
+        <div className="flex gap-2">
+          {(['직원', '거래처', '기타'] as TargetType[]).map(t => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => { setTargetType(t); setTargetName(''); setSelectedEmployeeId('') }}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                targetType === t ? 'bg-primary text-white border-primary' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+        {targetType === '직원' ? (
+          <div className="space-y-2">
+            <select
+              value={selectedEmployeeId}
+              onChange={e => {
+                const emp = employees.find(emp => emp.id === e.target.value)
+                setSelectedEmployeeId(e.target.value)
+                setTargetName(emp?.name ?? '')
+              }}
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
+            >
+              <option value="">직원을 선택하세요</option>
+              {employees.map(emp => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.name}{emp.position ? ` (${emp.position})` : ''}
+                </option>
+              ))}
+            </select>
+            {targetName && (
+              <input
+                type="text"
+                value={targetName}
+                readOnly
+                className="w-full text-sm border border-gray-100 rounded-lg px-3 py-2.5 bg-gray-50 text-gray-600"
+              />
+            )}
+          </div>
+        ) : (
+          <input
+            type="text"
+            value={targetName}
+            onChange={e => setTargetName(e.target.value)}
+            placeholder={targetType === '거래처' ? '거래처명 입력' : '대상 입력'}
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        )}
+      </div>
+
+      {/* 지급방식 */}
+      <div className="space-y-3">
+        <SectionLabel>지급방식</SectionLabel>
+        <div className="flex gap-2">
+          {([{ value: 'TRANSFER', label: '계좌송금' }, { value: 'CASH', label: '현금' }] as const).map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setPaymentMethod(value)}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                paymentMethod === value ? 'bg-primary text-white border-primary' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {paymentMethod === 'TRANSFER' && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+            <div className="space-y-1.5">
+              <label className="text-xs text-gray-500">은행</label>
+              <input
+                type="text"
+                value={bankName}
+                onChange={e => setBankName(e.target.value)}
+                placeholder="국민은행"
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs text-gray-500">계좌번호</label>
+              <input
+                type="text"
+                value={accountNumber}
+                onChange={e => setAccountNumber(e.target.value)}
+                placeholder="000-0000-0000"
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs text-gray-500">예금주</label>
+              <input
+                type="text"
+                value={accountHolder}
+                onChange={e => setAccountHolder(e.target.value)}
+                placeholder="홍길동"
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 지급요청일 */}
+      <div className="space-y-1.5">
+        <SectionLabel>지급요청일</SectionLabel>
+        <input
+          type="date"
+          value={paymentRequestDate}
+          onChange={e => setPaymentRequestDate(e.target.value)}
+          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
+        />
+      </div>
+
+      {/* 경조사 유형 */}
+      <div className="space-y-3">
+        <SectionLabel>경조사 유형</SectionLabel>
+        <div className="flex flex-wrap gap-2">
+          {(['결혼', '조위', '출산', '회갑', '기타'] as CeremonyType[]).map(t => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setCeremonyType(t)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                ceremonyType === t ? 'bg-primary text-white border-primary' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+
+        {ceremonyType === '결혼' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs text-gray-500">결혼일시</label>
+              <input
+                type="datetime-local"
+                value={weddingDateTime}
+                onChange={e => setWeddingDateTime(e.target.value)}
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs text-gray-500">결혼식장</label>
+              <input
+                type="text"
+                value={weddingVenue}
+                onChange={e => setWeddingVenue(e.target.value)}
+                placeholder="예: 신라호텔 웨딩홀"
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+          </div>
+        )}
+        {ceremonyType === '조위' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs text-gray-500">장례식장</label>
+              <input
+                type="text"
+                value={funeralHall}
+                onChange={e => setFuneralHall(e.target.value)}
+                placeholder="예: 서울성모병원 장례식장"
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs text-gray-500">발인일시</label>
+              <input
+                type="datetime-local"
+                value={intermentDateTime}
+                onChange={e => setIntermentDateTime(e.target.value)}
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+          </div>
+        )}
+        {ceremonyType === '출산' && (
+          <div className="space-y-1.5">
+            <label className="text-xs text-gray-500">출산일</label>
+            <input
+              type="date"
+              value={birthDate}
+              onChange={e => setBirthDate(e.target.value)}
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
+        )}
+        {ceremonyType === '회갑' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs text-gray-500">회갑 일자</label>
+              <input
+                type="date"
+                value={hwegapDate}
+                onChange={e => setHwegapDate(e.target.value)}
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs text-gray-500">성명</label>
+              <input
+                type="text"
+                value={hwegapName}
+                onChange={e => setHwegapName(e.target.value)}
+                placeholder="해당자 성명"
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+          </div>
+        )}
+        {ceremonyType === '기타' && (
+          <div className="space-y-1.5">
+            <label className="text-xs text-gray-500">메모</label>
+            <textarea
+              value={memo}
+              onChange={e => setMemo(e.target.value)}
+              placeholder="기타 경조사 내용을 입력해주세요"
+              rows={3}
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* 내역 */}
+      <div className="space-y-1.5">
+        <SectionLabel>내역</SectionLabel>
+        <input
+          type="text"
+          value={description}
+          onChange={e => setDescription(e.target.value)}
+          placeholder="예: 결혼 축하금"
+          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
+        />
+      </div>
+
+      {/* 금액 */}
+      <div className="space-y-1.5">
+        <SectionLabel>금액</SectionLabel>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={amountRaw}
+          onChange={e => setAmountRaw(formatKRWInput(e.target.value))}
+          placeholder="0"
+          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 text-right"
+        />
+        {amount > 0 && (
+          <p className="text-xs text-gray-500 text-right">{amount.toLocaleString('ko-KR')}원</p>
+        )}
+      </div>
+
+      {/* 증빙 */}
+      <div className="space-y-2">
+        <SectionLabel>증빙</SectionLabel>
+        <AttachmentSection
+          attachments={attachments}
+          onAdd={files => setAttachments(prev => [...prev, ...files])}
+          onRemove={idx => setAttachments(prev => prev.filter((_, i) => i !== idx))}
+          accept="image/*,application/pdf"
+          label="파일 첨부 (이미지, PDF)"
+        />
+      </div>
+
+      {/* 신청인 */}
+      <div className="space-y-2">
+        <SectionLabel>신청인</SectionLabel>
+        <ApplicantBox departmentName={departmentName} employeePosition={employeePosition} employeeName={employeeName} />
+      </div>
+
+      <button
+        type="button"
+        onClick={handleSubmit}
+        disabled={!canSubmit || isPending || uploading}
+        className="w-full py-3 bg-primary text-white text-sm font-semibold rounded-lg disabled:opacity-40 hover:bg-primary/90 transition-colors"
+      >
+        {uploading ? '파일 업로드 중...' : isPending ? '제출 중...' : '경조사비 지급요청서 제출'}
+      </button>
+    </div>
+  )
+}
+
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 const TAB_TITLES: Record<ActiveTab, string> = {
@@ -1810,6 +2215,7 @@ const TAB_TITLES: Record<ActiveTab, string> = {
   TRANSPORTATION:  '교통비 사용내역서',
   PERSONAL_CARD:   '개인카드영수증 지출결의서',
   OTHER_RECEIPT:   '기타-개별영수증 지출결의서',
+  CONDOLENCE:      '경조사비 지급요청서',
   BUSINESS_INCOME: '사업소득(원천징수) 지급요청서',
   PRIZE:           '현금성 경품비(기타소득) 지급요청서',
 }
@@ -1872,6 +2278,7 @@ export default function ExpenseForm(props: Props) {
       {activeTab === 'TRANSPORTATION' && <TransportationTab {...tabProps} initialData={initialData} onSuccess={onSuccess} />}
       {activeTab === 'PERSONAL_CARD' && <ExpenseTab {...tabProps} initialData={initialData} onSuccess={onSuccess} lockedEvidenceType="PERSONAL_CARD" />}
       {activeTab === 'OTHER_RECEIPT' && <ExpenseTab {...tabProps} initialData={initialData} onSuccess={onSuccess} lockedEvidenceType="OTHER_RECEIPT" />}
+      {activeTab === 'CONDOLENCE' && <CondolenceTab {...tabProps} onSuccess={onSuccess} />}
       {activeTab === 'BUSINESS_INCOME' && <BusinessIncomeTab {...tabProps} initialData={initialData} onSuccess={onSuccess} />}
       {activeTab === 'PRIZE' && <PrizeTab {...tabProps} initialData={initialData} onSuccess={onSuccess} />}
     </div>

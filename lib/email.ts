@@ -67,7 +67,7 @@ async function getEmployeeEmailById(employeeId: string): Promise<string | null> 
   return getAuthEmail(data.auth_user_id)
 }
 
-export type RequestType = '지출결의서' | '연차신청' | '비품/소모품 신청' | '서류신청'
+export type RequestType = '지출결의서' | '연차신청' | '비품/소모품 신청' | '서류신청' | '경조사비 지급요청서'
 
 function formatKoreanDate(isoString: string) {
   const d = new Date(isoString)

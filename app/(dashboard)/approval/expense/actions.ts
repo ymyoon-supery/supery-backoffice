@@ -96,6 +96,65 @@ export async function submitExpense(input: SubmitExpenseInput) {
   return { error: null, id: reportId }
 }
 
+// ─── 경조사비 지급요청서 ──────────────────────────────────────────────────────
+
+export type CondolenceInput = {
+  title: string
+  targetType: string
+  targetName: string
+  paymentMethod: 'TRANSFER' | 'CASH'
+  bankName: string | null
+  accountNumber: string | null
+  accountHolder: string | null
+  paymentRequestDate: string
+  ceremonyType: string
+  ceremonyDetail: string
+  description: string
+  amount: number
+  attachmentUrls: string[]
+}
+
+export async function submitCondolenceExpense(input: CondolenceInput) {
+  const lineItems: LineItem[] = [{
+    item: input.description,
+    date: input.paymentRequestDate,
+    amount: input.amount,
+    note: [
+      `대상: ${input.targetType}(${input.targetName})`,
+      `경조사 유형: ${input.ceremonyType}`,
+      input.ceremonyDetail || null,
+    ].filter(Boolean).join(' / '),
+  }]
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: '인증이 필요합니다.' }
+  const { data: emp } = await supabase.from('employees').select('name, department_id').eq('auth_user_id', user.id).single()
+
+  const result = await submitExpense({
+    title: input.title,
+    payee: input.targetName,
+    paymentMethod: input.paymentMethod,
+    bankName: input.bankName,
+    accountNumber: input.accountNumber,
+    accountHolder: input.accountHolder ?? input.targetName,
+    paymentRequestDate: input.paymentRequestDate,
+    settlementDate: null,
+    lineItems,
+    attachmentUrls: input.attachmentUrls,
+    taxType: null,
+    evidenceType: null,
+    category: 'CONDOLENCE',
+    expenseType: 'CONDOLENCE',
+  })
+
+  if (!result.error && emp) {
+    await notifyNewRequest({ requestType: '경조사비 지급요청서', employeeName: emp.name, departmentId: emp.department_id, excludeAuthUserId: user.id, title: input.title })
+  }
+
+  return result
+}
+
 // ─── 사업소득(원천징수) 지급요청서 ────────────────────────────────────────────
 
 export type BusinessIncomeInput = {
