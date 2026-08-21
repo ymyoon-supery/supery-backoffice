@@ -61,6 +61,10 @@ export default async function AttendancePage() {
     return format(kst, 'yyyy-MM-dd') === todayStr
   })
 
+  const displayRecords = todayRecords.filter(r =>
+    !(r.note?.includes('자동 휴식') || r.note?.includes('자동 업무 복귀') || r.note?.includes('외근 복귀 (자동 감지)'))
+  )
+
   const lastRecord = todayRecords[todayRecords.length - 1]
   const initialState =
     lastRecord?.type === 'CHECK_OUT' ? 'DONE'
@@ -111,13 +115,13 @@ export default async function AttendancePage() {
             오늘 기록 ({format(kstNow, 'M월 d일 EEEE', { locale: ko })})
           </h2>
         </div>
-        {todayRecords.length === 0 ? (
+        {displayRecords.length === 0 ? (
           <div className="px-5 py-8 text-center text-sm text-gray-400">
             오늘 기록이 없습니다.
           </div>
         ) : (
           <ul className="divide-y divide-gray-50">
-            {todayRecords.map((r) => (
+            {displayRecords.map((r) => (
               <li key={r.id} className="flex items-center justify-between px-5 py-3 text-sm">
                 <span className="text-gray-600">
                   {r.type === 'CHECK_IN' ? '출근'
