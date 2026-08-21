@@ -19,15 +19,31 @@ export async function POST(req: NextRequest) {
   if (!employee) return NextResponse.json({ error: 'Invalid key' }, { status: 401 })
 
   const body = await req.json().catch(() => ({}))
+  const deviceName = (body.device as string) || 'Unknown'
+  const now = new Date().toISOString()
 
-  await admin.from('agent_installations').upsert({
-    employee_id: employee.id,
-    device_name: (body.device as string) || 'Unknown',
-    os_info: (body.os as string) || null,
-    app_version: (body.version as string) || null,
-    registered_at: new Date().toISOString(),
-    last_seen_at: new Date().toISOString(),
-  }, { onConflict: 'employee_id,device_name' })
+  const { data: existing } = await admin
+    .from('agent_installations')
+    .select('id')
+    .eq('employee_id', employee.id)
+    .eq('device_name', deviceName)
+    .maybeSingle()
+
+  if (existing) {
+    await admin
+      .from('agent_installations')
+      .update({ os_info: body.os || null, app_version: body.version || null, last_seen_at: now })
+      .eq('id', existing.id)
+  } else {
+    await admin.from('agent_installations').insert({
+      employee_id: employee.id,
+      device_name: deviceName,
+      os_info: (body.os as string) || null,
+      app_version: (body.version as string) || null,
+      registered_at: now,
+      last_seen_at: now,
+    })
+  }
 
   return NextResponse.json({ ok: true })
 }

@@ -7,7 +7,7 @@ const admin = createClient(
 )
 
 const WORKING_TYPES = new Set(['CHECK_IN', 'BREAK_END', 'FIELD_END'])
-const INACTIVITY_THRESHOLD = 15 * 60 // 15분(초)
+const INACTIVITY_THRESHOLD = 15 * 60
 
 export async function POST(req: NextRequest) {
   const apiKey = req.headers.get('x-agent-key')?.trim()
@@ -23,16 +23,31 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}))
   const idleSeconds: number = Number(body.idle_seconds) || 0
+  const deviceName = (body.device as string) || 'Unknown'
   const now = new Date()
 
-  // 설치 현황 업데이트
-  const device = (body.device as string) || 'Unknown'
-  await admin.from('agent_installations').upsert({
-    employee_id: employee.id,
-    device_name: device,
-    app_version: (body.version as string) || null,
-    last_seen_at: now.toISOString(),
-  }, { onConflict: 'employee_id,device_name', ignoreDuplicates: false })
+  // 설치 현황 last_seen_at 업데이트
+  const { data: existing } = await admin
+    .from('agent_installations')
+    .select('id')
+    .eq('employee_id', employee.id)
+    .eq('device_name', deviceName)
+    .maybeSingle()
+
+  if (existing) {
+    await admin
+      .from('agent_installations')
+      .update({ last_seen_at: now.toISOString(), app_version: body.version || null })
+      .eq('id', existing.id)
+  } else {
+    await admin.from('agent_installations').insert({
+      employee_id: employee.id,
+      device_name: deviceName,
+      app_version: (body.version as string) || null,
+      registered_at: now.toISOString(),
+      last_seen_at: now.toISOString(),
+    })
+  }
 
   // 오늘 마지막 근태 기록 조회
   const kstDate = new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
@@ -47,7 +62,6 @@ export async function POST(req: NextRequest) {
 
   const lastType = lastRecord?.type ?? null
 
-  // 업무 중 → 비활동 15분 이상이면 자동 휴식
   if (lastType && WORKING_TYPES.has(lastType) && idleSeconds >= INACTIVITY_THRESHOLD) {
     const lastActivityAt = new Date(now.getTime() - idleSeconds * 1000)
     const lastRecordAt = new Date(lastRecord!.recorded_at)
@@ -62,12 +76,7 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  // 자동 휴식 중 → 활동 재개 시 업무 복귀
-  if (
-    lastType === 'BREAK_START' &&
-    lastRecord?.note?.includes('자동 휴식') &&
-    idleSeconds < 60
-  ) {
+  if (lastType === 'BREAK_START' && lastRecord?.note?.includes('자동 휴식') && idleSeconds < 60) {
     await admin.from('attendance_records').insert({
       employee_id: employee.id,
       type: 'BREAK_END',
