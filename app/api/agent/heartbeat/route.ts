@@ -1,0 +1,81 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+
+const admin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+)
+
+const WORKING_TYPES = new Set(['CHECK_IN', 'BREAK_END', 'FIELD_END'])
+const INACTIVITY_THRESHOLD = 15 * 60 // 15분(초)
+
+export async function POST(req: NextRequest) {
+  const apiKey = req.headers.get('x-agent-key')?.trim()
+  if (!apiKey) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { data: employee } = await admin
+    .from('employees')
+    .select('id')
+    .eq('agent_api_key', apiKey)
+    .single()
+
+  if (!employee) return NextResponse.json({ error: 'Invalid key' }, { status: 401 })
+
+  const body = await req.json().catch(() => ({}))
+  const idleSeconds: number = Number(body.idle_seconds) || 0
+  const now = new Date()
+
+  // 설치 현황 업데이트
+  const device = (body.device as string) || 'Unknown'
+  await admin.from('agent_installations').upsert({
+    employee_id: employee.id,
+    device_name: device,
+    app_version: (body.version as string) || null,
+    last_seen_at: now.toISOString(),
+  }, { onConflict: 'employee_id,device_name', ignoreDuplicates: false })
+
+  // 오늘 마지막 근태 기록 조회
+  const kstDate = new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const { data: lastRecord } = await admin
+    .from('attendance_records')
+    .select('type, recorded_at, note')
+    .eq('employee_id', employee.id)
+    .gte('recorded_at', `${kstDate}T00:00:00+09:00`)
+    .order('recorded_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const lastType = lastRecord?.type ?? null
+
+  // 업무 중 → 비활동 15분 이상이면 자동 휴식
+  if (lastType && WORKING_TYPES.has(lastType) && idleSeconds >= INACTIVITY_THRESHOLD) {
+    const lastActivityAt = new Date(now.getTime() - idleSeconds * 1000)
+    const lastRecordAt = new Date(lastRecord!.recorded_at)
+    const breakStartAt = new Date(Math.max(lastActivityAt.getTime(), lastRecordAt.getTime()))
+
+    await admin.from('attendance_records').insert({
+      employee_id: employee.id,
+      type: 'BREAK_START',
+      recorded_at: breakStartAt.toISOString(),
+      note: 'PC 비활동 자동 휴식',
+      is_field: false,
+    })
+  }
+
+  // 자동 휴식 중 → 활동 재개 시 업무 복귀
+  if (
+    lastType === 'BREAK_START' &&
+    lastRecord?.note?.includes('자동 휴식') &&
+    idleSeconds < 60
+  ) {
+    await admin.from('attendance_records').insert({
+      employee_id: employee.id,
+      type: 'BREAK_END',
+      recorded_at: now.toISOString(),
+      note: 'PC 활동 감지 자동 업무 복귀',
+      is_field: false,
+    })
+  }
+
+  return NextResponse.json({ ok: true })
+}

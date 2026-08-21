@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import {
   Clock, FileText, BarChart2, Users, ClipboardList, Home,
   Bell, FilePlus, CalendarDays, Settings, Megaphone, Inbox,
-  Receipt, Package, Loader2, X, BookOpen, FileBarChart,
+  Receipt, Package, Loader2, X, BookOpen, FileBarChart, Monitor,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useMobileSidebar } from './MobileSidebarContext'
@@ -27,6 +27,7 @@ const adminNavGroups = [
       { href: '/admin/attendance', label: '근태 현황', icon: Clock },
       { href: '/admin/reports', label: '52시간 리포트', icon: BarChart2 },
       { href: '/admin/diary', label: '업무 다이어리', icon: BookOpen },
+      { href: '/admin/agents', label: 'PC 에이전트', icon: Monitor },
     ],
   },
   {
