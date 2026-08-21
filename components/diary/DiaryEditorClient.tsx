@@ -2,11 +2,13 @@
 
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
+import TaskList from '@tiptap/extension-task-list'
+import TaskItem from '@tiptap/extension-task-item'
 import { useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, parseISO } from 'date-fns'
 import { ko } from 'date-fns/locale'
-import { Save, Trash2, ArrowLeft, Bold, Italic, Strikethrough, List, ListOrdered, Minus } from 'lucide-react'
+import { Save, Trash2, ArrowLeft, Bold, Italic, Strikethrough, List, ListOrdered, Minus, CheckSquare } from 'lucide-react'
 import { upsertDiary, deleteDiary } from '@/app/(dashboard)/diary/actions'
 import { toast } from 'sonner'
 
@@ -39,11 +41,15 @@ export default function DiaryEditorClient({ date, initialDiary }: { date: string
   const isModified = initialDiary && initialDiary.updated_at > initialDiary.created_at
 
   const editor = useEditor({
-    extensions: [StarterKit],
+    extensions: [
+      StarterKit,
+      TaskList,
+      TaskItem.configure({ nested: true }),
+    ],
     content: initialDiary?.content ?? '',
     editorProps: {
       attributes: {
-        class: 'prose prose-sm max-w-none min-h-[420px] p-4 focus:outline-none',
+        class: 'tiptap prose prose-sm max-w-none min-h-[420px] p-4 focus:outline-none',
       },
     },
   })
@@ -159,6 +165,13 @@ export default function DiaryEditorClient({ date, initialDiary }: { date: string
             title="번호 목록"
           >
             <ListOrdered size={14} />
+          </ToolbarBtn>
+          <ToolbarBtn
+            onClick={() => editor?.chain().focus().toggleTaskList().run()}
+            active={editor?.isActive('taskList')}
+            title="체크리스트"
+          >
+            <CheckSquare size={14} />
           </ToolbarBtn>
           <div className="w-px h-4 bg-gray-200 mx-1" />
           <ToolbarBtn
