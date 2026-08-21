@@ -61,9 +61,22 @@ export default async function AttendancePage() {
     return format(kst, 'yyyy-MM-dd') === todayStr
   })
 
-  const displayRecords = todayRecords.filter(r =>
-    !(r.note?.includes('자동 휴식') || r.note?.includes('자동 업무 복귀') || r.note?.includes('외근 복귀 (자동 감지)'))
-  )
+  function isAutoRecord(r: { note?: string | null }) {
+    return r.note?.includes('자동 휴식') || r.note?.includes('자동 업무 복귀') || r.note?.includes('외근 복귀 (자동 감지)')
+  }
+
+  const displayRecords = todayRecords.filter(r => !isAutoRecord(r))
+
+  // 오늘 제외한 이번 주 기록, 날짜별 그룹핑 (자동 기록 제외)
+  const weekByDate = new Map<string, typeof records>()
+  for (const r of records) {
+    const kst = new Date(new Date(r.recorded_at).getTime() + 9 * 60 * 60 * 1000)
+    const dateStr = format(kst, 'yyyy-MM-dd')
+    if (dateStr === todayStr || isAutoRecord(r)) continue
+    if (!weekByDate.has(dateStr)) weekByDate.set(dateStr, [])
+    weekByDate.get(dateStr)!.push(r)
+  }
+  const weekPastDates = Array.from(weekByDate.keys()).sort().reverse()
 
   const lastRecord = todayRecords[todayRecords.length - 1]
   const initialState =
@@ -151,6 +164,53 @@ export default async function AttendancePage() {
           </ul>
         )}
       </div>
+      {weekPastDates.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100">
+          <div className="px-5 py-4 border-b border-gray-50">
+            <h2 className="text-sm font-medium text-gray-700">이번 주 기록</h2>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {weekPastDates.map(dateStr => {
+              const dayRecords = weekByDate.get(dateStr)!
+              const label = format(new Date(dateStr + 'T12:00:00'), 'M월 d일 EEEE', { locale: ko })
+              return (
+                <div key={dateStr}>
+                  <p className="px-5 py-2 text-xs text-gray-400 bg-gray-50/50">{label}</p>
+                  <ul className="divide-y divide-gray-50">
+                    {dayRecords.map(r => (
+                      <li key={r.id} className="flex items-center justify-between px-5 py-3 text-sm">
+                        <span className="text-gray-600">
+                          {r.type === 'CHECK_IN' ? '출근'
+                            : r.type === 'CHECK_OUT' ? '퇴근'
+                            : r.type === 'BREAK_START' ? '휴식 시작'
+                            : r.type === 'BREAK_END' ? '업무 복귀'
+                            : r.type === 'FIELD_START' ? '외근 시작'
+                            : r.type === 'FIELD_END' ? '외근 복귀'
+                            : r.type}
+                          {r.is_field && r.type === 'CHECK_IN' && (
+                            <span className="ml-2 text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">외근</span>
+                          )}
+                          {r.note && (
+                            <span className="ml-2 text-xs text-gray-400">{r.note}</span>
+                          )}
+                        </span>
+                        <div className="text-right">
+                          <span className="text-gray-900 font-medium">
+                            {format(new Date(new Date(r.recorded_at).getTime() + 9 * 60 * 60 * 1000), 'HH:mm')}
+                          </span>
+                          {r.location && (
+                            <p className="text-xs text-gray-400">{r.location}</p>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
