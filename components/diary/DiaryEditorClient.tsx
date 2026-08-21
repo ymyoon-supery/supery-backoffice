@@ -40,13 +40,16 @@ export default function DiaryEditorClient({ date, initialDiary }: { date: string
   const dateLabel = format(parseISO(date), 'yyyy년 M월 d일 (EEEE)', { locale: ko })
   const isModified = initialDiary && initialDiary.updated_at > initialDiary.created_at
 
+  const defaultContent = `<h2>오늘의 To Do List</h2><ul data-type="taskList"><li data-type="taskItem" data-checked="false"><p></p></li></ul>`
+
   const editor = useEditor({
     extensions: [
       StarterKit,
       TaskList,
       TaskItem.configure({ nested: true }),
     ],
-    content: initialDiary?.content ?? '',
+    content: initialDiary?.content ?? defaultContent,
+    autofocus: initialDiary ? false : 'end',
     editorProps: {
       attributes: {
         class: 'tiptap prose prose-sm max-w-none min-h-[420px] p-4 focus:outline-none',
