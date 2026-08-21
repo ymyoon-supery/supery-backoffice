@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useTransition, useEffect, useRef, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import { format } from 'date-fns'
 import { toast } from 'sonner'
-import { Clock, MapPin, LogOut, Building2, Home, Car } from 'lucide-react'
+import { Clock, MapPin, LogOut, Building2, Home, Car, BookOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { recordAttendance, checkOfficeIp, createHomeLocationRequest } from '@/app/(dashboard)/attendance/actions'
 
@@ -63,7 +65,9 @@ export default function TimeTracker({
     coords: { lat: number; lng: number }
   } | null>(null)
   const [newLocationName, setNewLocationName] = useState('')
+  const [showCheckInSuccessModal, setShowCheckInSuccessModal] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const router = useRouter()
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const stateRef = useRef(state)
   const isAutoBreakRef = useRef(false)
@@ -163,6 +167,7 @@ export default function TimeTracker({
   }, [state, isAutoBreak, handleActivity, triggerAutoBreak])
 
   function doOfficeCheckIn() {
+    const isFirstCheckIn = stateRef.current === 'BEFORE_WORK'
     setOfficeIpWarning(null)
     startTransition(async () => {
       const result = await recordAttendance({
@@ -172,7 +177,8 @@ export default function TimeTracker({
       })
       if (result?.error) { toast.error(result.error); return }
       setState('WORKING')
-      toast.success('출근 기록 완료')
+      if (isFirstCheckIn) { setShowCheckInSuccessModal(true) }
+      else { toast.success('출근 기록 완료') }
     })
   }
 
@@ -181,6 +187,7 @@ export default function TimeTracker({
     distanceM: number
     coords: { lat: number; lng: number }
   }) {
+    const isFirstCheckIn = stateRef.current === 'BEFORE_WORK'
     setRemoteGpsState(null)
     setNewLocationName('')
     startTransition(async () => {
@@ -199,7 +206,12 @@ export default function TimeTracker({
       })
       if (result?.error) { toast.error(result.error); return }
       setState('WORKING')
-      toast.success(opts ? '출근 기록 완료. 재택근무지 변경 신청이 접수되었습니다.' : '출근 기록 완료')
+      if (isFirstCheckIn) {
+        if (opts) toast.success('재택근무지 변경 신청이 접수되었습니다.')
+        setShowCheckInSuccessModal(true)
+      } else {
+        toast.success(opts ? '출근 기록 완료. 재택근무지 변경 신청이 접수되었습니다.' : '출근 기록 완료')
+      }
     })
   }
 
@@ -262,6 +274,7 @@ export default function TimeTracker({
   }
 
   function confirmField() {
+    const isFirstCheckIn = fieldIsCheckIn && stateRef.current === 'BEFORE_WORK'
     setShowFieldForm(false)
     const note = fieldNote.trim() || '외근'
     startTransition(async () => {
@@ -274,7 +287,8 @@ export default function TimeTracker({
       if (result?.error) { toast.error(result.error); return }
       setState('FIELD')
       setFieldNote('')
-      toast.success('외근 중 기록 완료')
+      if (isFirstCheckIn) { setShowCheckInSuccessModal(true) }
+      else { toast.success('외근 중 기록 완료') }
     })
   }
 
@@ -424,6 +438,37 @@ export default function TimeTracker({
                 취소
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showCheckInSuccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-8 shadow-2xl max-w-sm w-full mx-4 text-center space-y-4">
+            <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+              <BookOpen size={26} className="text-primary" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-lg font-bold text-gray-900">결과는 습관이 축적된 것입니다.</h3>
+              <p className="text-sm text-gray-500 leading-relaxed">
+                좋은 습관은 시간을 내 편으로 만들지만,<br />나쁜 습관은 시간을 적으로 만든다.
+              </p>
+              <div className="pt-1 border-t border-gray-100">
+                <p className="text-sm font-semibold text-primary mt-2">지금 바로 할 수 있는 좋은 습관 하나!</p>
+                <p className="text-sm text-gray-600 mt-1 leading-relaxed">
+                  매일 출근 후 바로 오늘의 할일을 기록하고<br />업무를 시작하는 습관을 들여보세요.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setShowCheckInSuccessModal(false)
+                router.push('/diary/' + format(new Date(), 'yyyy-MM-dd'))
+              }}
+              className="w-full bg-primary text-white rounded-xl py-3 text-sm font-semibold hover:bg-primary/90 transition-colors"
+            >
+              오늘의 할일 기록하기
+            </button>
           </div>
         </div>
       )}
