@@ -30,12 +30,13 @@ export async function POST(req: NextRequest) {
     .maybeSingle()
 
   if (existing) {
-    await admin
+    const { error } = await admin
       .from('agent_installations')
       .update({ os_info: body.os || null, app_version: body.version || null, last_seen_at: now })
       .eq('id', existing.id)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   } else {
-    await admin.from('agent_installations').insert({
+    const { error } = await admin.from('agent_installations').insert({
       employee_id: employee.id,
       device_name: deviceName,
       os_info: (body.os as string) || null,
@@ -43,6 +44,7 @@ export async function POST(req: NextRequest) {
       registered_at: now,
       last_seen_at: now,
     })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
   return NextResponse.json({ ok: true })
