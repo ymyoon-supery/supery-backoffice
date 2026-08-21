@@ -27,6 +27,7 @@ export type VatCategory =
   | 'TRANSPORTATION'
   | 'PERSONAL_CARD'
   | 'OTHER_RECEIPT'
+  | 'CONDOLENCE'
 
 export type VatRecord = {
   id: string

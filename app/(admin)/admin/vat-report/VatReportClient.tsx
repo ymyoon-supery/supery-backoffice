@@ -38,6 +38,7 @@ const TABS: TabDef[] = [
   { id: 'TRANSPORTATION', label: '교통비',          group: '경비정산' },
   { id: 'PERSONAL_CARD',  label: '개인카드영수증',  group: '경비정산' },
   { id: 'OTHER_RECEIPT',  label: '기타-개별영수증', group: '경비정산' },
+  { id: 'CONDOLENCE',    label: '경조사',          group: '경비정산' },
 ]
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
@@ -190,6 +191,25 @@ function buildExcelRows(category: VatCategory, records: VatRecord[]): { headers:
         r.payee ?? '',
         fmtDate(r.payment_request_date),
       ])
+      return { headers, rows }
+    }
+    case 'CONDOLENCE': {
+      const headers = ['신청일', '문서번호', '신청자', '부서', '제목', '지급대상', '금액', '지급방식', '지급요청일', '비고']
+      const rows = records.map(r => {
+        const note = r.line_items?.[0]?.note ?? ''
+        return [
+          fmtDate(r.created_at),
+          r.doc_number ?? '',
+          r.employees?.name ?? '',
+          r.employees?.dept_name ?? '',
+          r.title ?? '',
+          r.payee ?? '',
+          r.amount ?? 0,
+          r.payment_method ? (PAYMENT_METHOD_LABELS[r.payment_method] ?? r.payment_method) : '',
+          fmtDate(r.payment_request_date),
+          note,
+        ]
+      })
       return { headers, rows }
     }
   }
@@ -351,6 +371,36 @@ function renderTableRows(category: VatCategory, records: VatRecord[]) {
                 <td className="px-4 py-2.5 text-sm text-gray-700 max-w-[200px] truncate">{r.title ?? '—'}</td>
                 <td className="px-4 py-2.5 text-sm text-gray-800 text-right whitespace-nowrap">{fmtAmt(r.amount)}</td>
                 <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{r.payee ?? '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </>
+      )
+    case 'CONDOLENCE':
+      return (
+        <>
+          <thead className="bg-gray-50 border-b border-gray-100">
+            <tr>
+              {['신청일', '문서번호', '신청자', '부서', '제목', '지급대상', '금액', '지급방식', '지급요청일', '비고'].map(h => (
+                <th key={h} className="text-left px-4 py-3 text-xs text-gray-500 font-medium whitespace-nowrap">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {records.map(r => (
+              <tr key={r.id} className="hover:bg-gray-50/50">
+                <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{fmtDate(r.created_at)}</td>
+                <td className="px-4 py-2.5 text-xs text-gray-400 whitespace-nowrap">{r.doc_number ?? '—'}</td>
+                <td className="px-4 py-2.5 text-sm text-gray-800 whitespace-nowrap">{r.employees?.name ?? '—'}</td>
+                <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{r.employees?.dept_name ?? '—'}</td>
+                <td className="px-4 py-2.5 text-sm text-gray-700 max-w-[180px] truncate">{r.title ?? '—'}</td>
+                <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{r.payee ?? '—'}</td>
+                <td className="px-4 py-2.5 text-sm text-gray-800 text-right whitespace-nowrap">{fmtAmt(r.amount)}</td>
+                <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">
+                  {r.payment_method ? (PAYMENT_METHOD_LABELS[r.payment_method] ?? r.payment_method) : '—'}
+                </td>
+                <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{fmtDate(r.payment_request_date) || '—'}</td>
+                <td className="px-4 py-2.5 text-xs text-gray-400 max-w-[200px] truncate">{r.line_items?.[0]?.note ?? '—'}</td>
               </tr>
             ))}
           </tbody>
