@@ -1,0 +1,33 @@
+name: Build SuperyAgent
+
+on:
+  push:
+    paths:
+      - 'agent/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 설치
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 의존성 설치
+        run: pip install -r agent/requirements.txt
+
+      - name: exe 빌드
+        run: pyinstaller --onefile --windowed --name SuperyAgent agent/supery_agent.py
+
+      - name: 빌드 결과물 업로드
+        uses: actions/upload-artifact@v4
+        with:
+          name: SuperyAgent-Windows
+          path: dist/SuperyAgent.exe
+          retention-days: 30
