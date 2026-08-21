@@ -245,7 +245,13 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
                       <>
                         {targetPart && <Row label="대상" value={targetPart} />}
                         {typePart && <Row label="경조사 유형" value={typePart} />}
-                        {detailPart && <Row label="상세 정보" value={detailPart} />}
+                        {detailPart && (
+                          <Row label="상세 정보" value={
+                            <div className="space-y-0.5">
+                              {detailPart.split(', ').map((d, i) => <div key={i}>{d}</div>)}
+                            </div>
+                          } />
+                        )}
                       </>
                     )
                   })()
