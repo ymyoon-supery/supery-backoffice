@@ -39,6 +39,7 @@ type SubmitExpenseInput = {
   expenseType?: string
   cardCompany?: string | null
   cardNumber?: string | null
+  notifyRequestType?: import('@/lib/email').RequestType
 }
 
 export async function submitExpense(input: SubmitExpenseInput) {
@@ -88,7 +89,7 @@ export async function submitExpense(input: SubmitExpenseInput) {
   const { data: emp } = await supabase
     .from('employees').select('name, department_id').eq('auth_user_id', user.id).single()
   if (emp) {
-    await notifyNewRequest({ requestType: '지출결의서', employeeName: emp.name, departmentId: emp.department_id, excludeAuthUserId: user.id, title: input.title })
+    await notifyNewRequest({ requestType: input.notifyRequestType ?? '지출결의서', employeeName: emp.name, departmentId: emp.department_id, excludeAuthUserId: user.id, title: input.title })
   }
 
   revalidateTag(CACHE_TAGS.approvalInbox)
@@ -126,12 +127,7 @@ export async function submitCondolenceExpense(input: CondolenceInput) {
     ].filter(Boolean).join(' / '),
   }]
 
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: '인증이 필요합니다.' }
-  const { data: emp } = await supabase.from('employees').select('name, department_id').eq('auth_user_id', user.id).single()
-
-  const result = await submitExpense({
+  return submitExpense({
     title: input.title,
     payee: input.targetName,
     paymentMethod: input.paymentMethod,
@@ -146,13 +142,8 @@ export async function submitCondolenceExpense(input: CondolenceInput) {
     evidenceType: null,
     category: 'CONDOLENCE',
     expenseType: 'CONDOLENCE',
+    notifyRequestType: '경조사비 지급요청서',
   })
-
-  if (!result.error && emp) {
-    await notifyNewRequest({ requestType: '경조사비 지급요청서', employeeName: emp.name, departmentId: emp.department_id, excludeAuthUserId: user.id, title: input.title })
-  }
-
-  return result
 }
 
 // ─── 사업소득(원천징수) 지급요청서 ────────────────────────────────────────────

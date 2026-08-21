@@ -76,12 +76,13 @@ const STATUS_CFG: Record<string, { label: string; cls: string }> = {
   CANCELLED: { label: '취소',   cls: 'bg-gray-100 text-gray-500' },
   COMPLETED: { label: '완료',   cls: 'bg-blue-100 text-blue-700' },
 }
-const PERSONAL_EXPENSE_TYPES = ['CORPORATE_CARD', 'TRANSPORTATION']
+const PERSONAL_EXPENSE_TYPES = ['CORPORATE_CARD', 'TRANSPORTATION', 'CONDOLENCE']
 const WITHHOLDING_EXPENSE_TYPES = ['BUSINESS_INCOME', 'PRIZE']
 
 const EXPENSE_TYPE_DOC_TITLE: Record<string, string> = {
   BUSINESS_INCOME: '사업소득 지급의뢰서',
   PRIZE:           '기타소득 지급의뢰서',
+  CONDOLENCE:      '경조사비 지급요청서',
 }
 
 function formatKRW(n: number) {
@@ -149,10 +150,11 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
     : '/approval/expense/new'
 
   const isWithholding = WITHHOLDING_EXPENSE_TYPES.includes(data.expenseType ?? '')
+  const isCondolence = data.expenseType === 'CONDOLENCE'
   const docTitle = EXPENSE_TYPE_DOC_TITLE[data.expenseType ?? ''] ?? '지  출  결  의  서'
 
-  const rowVats = isWithholding
-    ? data.lineItems.map(li => ({ supply: li.amount ?? 0, vat: 0, total: li.amount ?? 0, vatLabel: null as string | null, userNote: li.note ?? '' }))
+  const rowVats = (isWithholding || isCondolence)
+    ? data.lineItems.map(li => ({ supply: li.amount ?? 0, vat: 0, total: li.amount ?? 0, vatLabel: null as string | null, userNote: '' }))
     : data.lineItems.map(li => parseVatFromNote(li.note, li.amount))
   const totalSupply = rowVats.reduce((s, r) => s + r.supply, 0)
   const totalVat    = rowVats.reduce((s, r) => s + r.vat, 0)
@@ -232,12 +234,31 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
             <table className="w-full border border-gray-200 rounded-lg overflow-hidden text-sm">
               <tbody>
                 <Row label="제목" value={data.title} />
-                <Row label="구분 (세목)" value={data.taxType ? TAX_TYPE_LABELS[data.taxType] ?? data.taxType : null} />
-                <Row label="증빙" value={data.evidenceType ? EVIDENCE_TYPE_LABELS[data.evidenceType] ?? data.evidenceType : null} />
-                {(data.cardCompany || data.cardNumber) && (
-                  <Row label="카드 정보" value={[data.cardCompany, data.cardNumber ? maskCardNumber(data.cardNumber) : null].filter(Boolean).join(' · ')} />
+                {isCondolence ? (
+                  (() => {
+                    const note = data.lineItems[0]?.note ?? ''
+                    const parts = note.split(' / ')
+                    const targetPart = parts.find(p => p.startsWith('대상:'))?.replace('대상:', '').trim() ?? ''
+                    const typePart = parts.find(p => p.startsWith('경조사 유형:'))?.replace('경조사 유형:', '').trim() ?? ''
+                    const detailPart = parts.filter(p => !p.startsWith('대상:') && !p.startsWith('경조사 유형:')).join(' / ')
+                    return (
+                      <>
+                        {targetPart && <Row label="대상" value={targetPart} />}
+                        {typePart && <Row label="경조사 유형" value={typePart} />}
+                        {detailPart && <Row label="상세 정보" value={detailPart} />}
+                      </>
+                    )
+                  })()
+                ) : (
+                  <>
+                    <Row label="구분 (세목)" value={data.taxType ? TAX_TYPE_LABELS[data.taxType] ?? data.taxType : null} />
+                    <Row label="증빙" value={data.evidenceType ? EVIDENCE_TYPE_LABELS[data.evidenceType] ?? data.evidenceType : null} />
+                    {(data.cardCompany || data.cardNumber) && (
+                      <Row label="카드 정보" value={[data.cardCompany, data.cardNumber ? maskCardNumber(data.cardNumber) : null].filter(Boolean).join(' · ')} />
+                    )}
+                  </>
                 )}
-                <Row label="지급처" value={data.payee} />
+                <Row label={isCondolence ? '지급대상' : '지급처'} value={data.payee} />
                 <Row
                   label="지급방식"
                   value={data.paymentMethod ? PAYMENT_METHOD_LABELS[data.paymentMethod] ?? data.paymentMethod : null}
@@ -249,7 +270,7 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
                   />
                 )}
                 <Row label="지급요청일" value={data.paymentRequestDate} />
-                <Row label="정산(예정)일" value={data.settlementDate} />
+                {!isCondolence && <Row label="정산(예정)일" value={data.settlementDate} />}
                 <Row label="신청일" value={requestDateStr} />
               </tbody>
             </table>
