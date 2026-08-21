@@ -22,7 +22,7 @@ from PIL import Image, ImageDraw
 
 # ──────────────────────────────────────────────
 #  빌드 전에 아래 URL을 실제 서비스 주소로 변경하세요
-API_BASE = "https://supery-backoffice.vercel.app/api"
+API_BASE = "https://office.supery.co.kr/api"
 # ──────────────────────────────────────────────
 
 VERSION = "1.0.0"
