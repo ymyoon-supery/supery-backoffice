@@ -29,21 +29,25 @@ export async function POST(req: NextRequest) {
     .eq('device_name', deviceName)
     .maybeSingle()
 
+  console.log('[agent/register] employee_id:', employee.id, 'device:', deviceName, 'existing:', existing?.id ?? null)
+
   if (existing) {
     const { error } = await admin
       .from('agent_installations')
       .update({ os_info: body.os || null, app_version: body.version || null, last_seen_at: now })
       .eq('id', existing.id)
+    console.log('[agent/register] update error:', error)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   } else {
-    const { error } = await admin.from('agent_installations').insert({
+    const { error, data } = await admin.from('agent_installations').insert({
       employee_id: employee.id,
       device_name: deviceName,
       os_info: (body.os as string) || null,
       app_version: (body.version as string) || null,
       registered_at: now,
       last_seen_at: now,
-    })
+    }).select()
+    console.log('[agent/register] insert error:', error, 'data:', data)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
