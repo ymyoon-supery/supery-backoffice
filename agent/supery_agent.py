@@ -36,7 +36,7 @@ API_BASE = "https://office.supery.co.kr/api"
 WORKSYNC_URL = "https://office.supery.co.kr"
 # ──────────────────────────────────────────────
 
-VERSION = "1.3.1"
+VERSION = "1.3.2"
 APP_NAME = "SuperyAgent"
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.json")
 LOG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.log")
@@ -171,15 +171,18 @@ def check_workday_checkin(is_first_run: bool = False) -> None:
 
         # 주말(5=토, 6=일) 제외
         if now_kst.weekday() >= 5:
+            logging.warning(f"[checkin-popup] 스킵: 주말 weekday={now_kst.weekday()}")
             return
         # 07:00~15:00 범위 외 제외
         if not (7 <= now_kst.hour < 15):
+            logging.warning(f"[checkin-popup] 스킵: 시간 범위 외 hour={now_kst.hour} ({now_kst.strftime('%H:%M')} KST)")
             return
 
         _checkin_prompted = True
 
         # 인터넷 연결 확인
         if not check_internet():
+            logging.warning("[checkin-popup] 스킵: 인터넷 없음")
             root = tk.Tk()
             root.withdraw()
             root.attributes("-topmost", True)
@@ -193,9 +196,12 @@ def check_workday_checkin(is_first_run: bool = False) -> None:
             return
 
         # 이미 웹에서 출근한 경우 팝업 스킵
-        if get_today_checkin_status():
+        already_in = get_today_checkin_status()
+        logging.warning(f"[checkin-popup] get_today_checkin_status={already_in}")
+        if already_in:
             return
 
+        logging.warning("[checkin-popup] 팝업 표시")
         root = tk.Tk()
         root.withdraw()
         root.attributes("-topmost", True)
@@ -211,7 +217,7 @@ def check_workday_checkin(is_first_run: bool = False) -> None:
             webbrowser.open(f"{WORKSYNC_URL}/attendance")
 
     except Exception as e:
-        logging.warning(f"[checkin-popup] {e}")
+        logging.warning(f"[checkin-popup] 예외: {e}")
 
 
 # ── 세션 파일 (강제 종료 감지용) ────────────────
@@ -254,19 +260,46 @@ def was_prev_session_force_killed() -> bool:
 # ── PC 종료 시 자동 퇴근 ────────────────────────
 
 def on_agent_exit() -> None:
-    """에이전트 종료(PC 꺼짐/재시작/트레이 종료) 시 퇴근 처리"""
-    mark_session_end()
+    """에이전트 종료(PC 꺼짐/재시작/트레이 종료) 시 퇴근 처리
+    checkout 성공 시에만 exited_cleanly=True — 실패 시 다음 부팅에서 재시도"""
     if not api_key:
+        mark_session_end()
         return
     try:
-        requests.post(
+        resp = requests.post(
             f"{API_BASE}/agent/checkout",
             json={"device": platform.node(), "version": VERSION},
             headers={"X-Agent-Key": api_key},
             timeout=3,  # Windows 종료 시 짧게 설정 (5초 내 정리 필요)
         )
+        if resp.ok:
+            mark_session_end()
+        # checkout 실패 시 mark_session_end() 미호출 → exited_cleanly=False 유지
+        # → 다음 부팅 시 was_prev_session_force_killed()=True → 재시도
     except Exception:
-        pass
+        pass  # 네트워크 종료 중 실패 → exited_cleanly=False 유지
+
+
+def checkout_prev_session() -> None:
+    """재부팅 후 이전 세션 퇴근 기록 — 네트워크 준비될 때까지 최대 30초 재시도"""
+    deadline = time.time() + 30
+    attempt = 0
+    while time.time() < deadline:
+        attempt += 1
+        try:
+            resp = requests.post(
+                f"{API_BASE}/agent/checkout",
+                json={"device": platform.node(), "version": VERSION, "reason": "prev_session_killed"},
+                headers={"X-Agent-Key": api_key},
+                timeout=5,
+            )
+            if resp.ok:
+                logging.warning(f"[checkout] prev session checkout ok (attempt {attempt}): {resp.json()}")
+                return
+        except Exception as e:
+            logging.warning(f"[checkout] attempt {attempt} failed: {e}")
+        time.sleep(3)
+    logging.warning("[checkout] prev session checkout failed after 30s")
 
 
 # ── API 호출 ────────────────────────────────────
@@ -387,8 +420,9 @@ def main() -> None:
     atexit.register(on_agent_exit)
 
     # 이전 세션이 강제 종료됐으면 서버에 checkout 기록 (atexit 미실행 보완)
+    # 네트워크 미준비 상태일 수 있으므로 최대 30초 재시도 후 check_workday_checkin 호출
     if not is_first_run and was_prev_session_force_killed():
-        api_post("agent/checkout", {"device": platform.node(), "version": VERSION, "reason": "prev_session_killed"})
+        checkout_prev_session()
 
     mark_session_start()
 
