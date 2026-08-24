@@ -8,21 +8,25 @@ const admin = createClient(
 
 const WORKING_TYPES = new Set(['CHECK_IN', 'BREAK_END', 'FIELD_END'])
 const INACTIVITY_THRESHOLD = 15 * 60
+const MIN_BREAK_DURATION_SEC = 5 * 60  // 자동 BREAK_END 삽입 전 최소 휴식 시간 (짧은 idle 스파이크 방지)
+const MAX_IDLE_SECONDS = 6 * 60 * 60   // idle_seconds 최대값 클램프
 
 export async function POST(req: NextRequest) {
   const apiKey = req.headers.get('x-agent-key')?.trim()
   if (!apiKey) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: employee } = await admin
+  const { data: employee, error: empError } = await admin
     .from('employees')
     .select('id')
     .eq('agent_api_key', apiKey)
-    .single()
+    .maybeSingle()
 
-  if (!employee) return NextResponse.json({ error: 'Invalid key' }, { status: 401 })
+  if (empError || !employee) return NextResponse.json({ error: 'Invalid key' }, { status: 401 })
 
   const body = await req.json().catch(() => ({}))
-  const idleSeconds: number = Number(body.idle_seconds) || 0
+  // idle_seconds를 [0, 6시간]으로 클램프 — 버그/악의적 클라이언트의 큰 값이 과거 시각 삽입을 유발하지 않도록
+  const rawIdle = Number(body.idle_seconds) || 0
+  const idleSeconds: number = Math.max(0, Math.min(rawIdle, MAX_IDLE_SECONDS))
   const deviceName = (body.device as string) || 'Unknown'
   const now = new Date()
 
@@ -62,6 +66,7 @@ export async function POST(req: NextRequest) {
 
   const lastType = lastRecord?.type ?? null
 
+  // 15분 이상 비활동 → 자동 휴식 시작
   if (lastType && WORKING_TYPES.has(lastType) && idleSeconds >= INACTIVITY_THRESHOLD) {
     const lastActivityAt = new Date(now.getTime() - idleSeconds * 1000)
     const lastRecordAt = new Date(lastRecord!.recorded_at)
@@ -76,14 +81,23 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  if (lastType === 'BREAK_START' && lastRecord?.note?.includes('자동 휴식') && idleSeconds < 60) {
-    await admin.from('attendance_records').insert({
-      employee_id: employee.id,
-      type: 'BREAK_END',
-      recorded_at: now.toISOString(),
-      note: 'PC 활동 감지 자동 업무 복귀',
-      is_field: false,
-    })
+  // 활동 재개 감지 → 자동 업무 복귀
+  // note 정확 일치로 수동 기록과 구분 + 최소 5분 휴식 후에만 삽입 (idle 스파이크로 인한 무한 BREAK 루프 방지)
+  if (
+    lastType === 'BREAK_START' &&
+    lastRecord?.note === 'PC 비활동 자동 휴식' &&
+    idleSeconds < 60
+  ) {
+    const breakDurationSec = (now.getTime() - new Date(lastRecord!.recorded_at).getTime()) / 1000
+    if (breakDurationSec >= MIN_BREAK_DURATION_SEC) {
+      await admin.from('attendance_records').insert({
+        employee_id: employee.id,
+        type: 'BREAK_END',
+        recorded_at: now.toISOString(),
+        note: 'PC 활동 감지 자동 업무 복귀',
+        is_field: false,
+      })
+    }
   }
 
   return NextResponse.json({ ok: true })

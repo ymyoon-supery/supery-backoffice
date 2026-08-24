@@ -44,13 +44,14 @@ export async function revokeAgentKey(employeeId: string): Promise<{ error?: stri
 
   const supabase = adminClient()
 
-  await supabase.from('agent_installations').delete().eq('employee_id', employeeId)
+  // 키 무효화를 먼저 처리 — 실패 시 재시도가 안전하도록 순서 보장
   const { error } = await supabase
     .from('employees')
     .update({ agent_api_key: null })
     .eq('id', employeeId)
-
   if (error) return { error: error.message }
+
+  await supabase.from('agent_installations').delete().eq('employee_id', employeeId)
 
   revalidatePath('/admin/agents')
   return {}

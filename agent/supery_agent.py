@@ -17,6 +17,8 @@ import ctypes
 import winreg
 import webbrowser
 import atexit
+import random
+import tempfile
 import tkinter as tk
 from tkinter import simpledialog, messagebox
 from datetime import datetime, timezone, timedelta
@@ -71,9 +73,13 @@ def load_config() -> dict:
 
 
 def save_config(cfg: dict) -> None:
+    """원자적 쓰기 — 저장 중 크래시 발생 시 config 파일 손상 방지"""
     try:
-        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-            json.dump(cfg, f, ensure_ascii=False)
+        dir_name = os.path.dirname(CONFIG_PATH)
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=dir_name, delete=False, suffix=".tmp") as tmp:
+            json.dump(cfg, tmp, ensure_ascii=False)
+            tmp_path = tmp.name
+        os.replace(tmp_path, CONFIG_PATH)
     except Exception:
         pass
 
@@ -207,13 +213,18 @@ def on_agent_exit() -> None:
 # ── 하트비트 루프 ────────────────────────────────
 
 def heartbeat_loop() -> None:
+    # 썬더링 허드 방지: 여러 PC가 동시에 시작할 때 요청이 몰리지 않도록 초기 지터
+    time.sleep(random.uniform(0, 30))
     while running:
-        idle = get_idle_seconds()
-        api_post("agent/heartbeat", {
-            "idle_seconds": int(idle),
-            "device": platform.node(),
-            "version": VERSION,
-        })
+        try:
+            idle = get_idle_seconds()
+            api_post("agent/heartbeat", {
+                "idle_seconds": int(idle),
+                "device": platform.node(),
+                "version": VERSION,
+            })
+        except Exception:
+            pass  # 예외가 루프를 종료하지 않도록 — 다음 주기에 재시도
         time.sleep(HEARTBEAT_INTERVAL)
 
 

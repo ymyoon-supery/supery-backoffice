@@ -12,19 +12,26 @@ export async function POST(req: NextRequest) {
   const apiKey = req.headers.get('x-agent-key')?.trim()
   if (!apiKey) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: employee } = await admin
+  const { data: employee, error: empError } = await admin
     .from('employees')
     .select('id')
     .eq('agent_api_key', apiKey)
-    .single()
+    .maybeSingle()
 
-  if (!employee) return NextResponse.json({ error: 'Invalid key' }, { status: 401 })
+  if (empError || !employee) return NextResponse.json({ error: 'Invalid key' }, { status: 401 })
 
   const now = new Date()
+
+  // KST 07:00~23:59 범위에서만 자동 퇴근 처리
+  // — 새벽 Windows 업데이트 재부팅, 점심 잠깐 재시작 등으로 인한 오퇴근 방지
+  const kstHour = new Date(now.getTime() + 9 * 60 * 60 * 1000).getUTCHours()
+  if (kstHour < 7) {
+    return NextResponse.json({ ok: true, skipped: true })
+  }
+
   const kstDate = new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
-  // 오늘 마지막 근태 기록 조회
-  const { data: lastRecord } = await admin
+  const { data: lastRecord, error: recError } = await admin
     .from('attendance_records')
     .select('type')
     .eq('employee_id', employee.id)
@@ -32,6 +39,8 @@ export async function POST(req: NextRequest) {
     .order('recorded_at', { ascending: false })
     .limit(1)
     .maybeSingle()
+
+  if (recError) return NextResponse.json({ error: recError.message }, { status: 500 })
 
   // 출근 기록이 없거나 이미 퇴근 상태면 스킵
   if (!lastRecord || !ACTIVE_TYPES.has(lastRecord.type)) {
