@@ -90,13 +90,13 @@ def load_config() -> dict:
 def save_config(cfg: dict) -> None:
     """원자적 쓰기 — 저장 중 크래시 발생 시 config 파일 손상 방지"""
     try:
-        dir_name = os.path.dirname(CONFIG_PATH)
+        dir_name = os.path.dirname(CONFIG_PATH) or "."
         with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=dir_name, delete=False, suffix=".tmp") as tmp:
             json.dump(cfg, tmp, ensure_ascii=False)
             tmp_path = tmp.name
         os.replace(tmp_path, CONFIG_PATH)
-    except Exception:
-        pass
+    except Exception as e:
+        logging.warning(f"[save_config] {e}")
 
 
 # ── Windows 시작 프로그램 등록 ──────────────────
@@ -136,6 +136,8 @@ def check_internet() -> bool:
 
 def get_today_checkin_status() -> bool:
     """오늘 이미 CHECK_IN 기록이 있는지 서버에서 확인 — 웹 출근 후 팝업 중복 방지"""
+    if not api_key:
+        return False
     try:
         resp = requests.get(
             f"{API_BASE}/agent/today-status",
