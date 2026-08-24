@@ -36,10 +36,11 @@ API_BASE = "https://office.supery.co.kr/api"
 WORKSYNC_URL = "https://office.supery.co.kr"
 # ──────────────────────────────────────────────
 
-VERSION = "1.3.0"
+VERSION = "1.3.1"
 APP_NAME = "SuperyAgent"
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.json")
 LOG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.log")
+SESSION_PATH = os.path.join(os.path.expanduser("~"), ".supery_session.json")
 HEARTBEAT_INTERVAL = 60  # 1분마다 체크
 
 KST = timezone(timedelta(hours=9))
@@ -213,10 +214,48 @@ def check_workday_checkin(is_first_run: bool = False) -> None:
         logging.warning(f"[checkin-popup] {e}")
 
 
+# ── 세션 파일 (강제 종료 감지용) ────────────────
+
+def mark_session_start() -> None:
+    """에이전트 시작 시 세션 파일 생성 — 정상 종료 전까지 exited_cleanly=False 유지"""
+    try:
+        data = {"started_at": datetime.now(KST).isoformat(), "exited_cleanly": False}
+        with open(SESSION_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+    except Exception as e:
+        logging.warning(f"[session] mark_start: {e}")
+
+
+def mark_session_end() -> None:
+    """정상 종료 시 세션 파일에 exited_cleanly=True 기록"""
+    try:
+        if os.path.exists(SESSION_PATH):
+            with open(SESSION_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            data["exited_cleanly"] = True
+            with open(SESSION_PATH, "w", encoding="utf-8") as f:
+                json.dump(data, f)
+    except Exception as e:
+        logging.warning(f"[session] mark_end: {e}")
+
+
+def was_prev_session_force_killed() -> bool:
+    """이전 세션이 강제 종료(PC 꺼짐 등)됐는지 확인 — True면 서버 checkout 미기록 상태"""
+    try:
+        if os.path.exists(SESSION_PATH):
+            with open(SESSION_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return not data.get("exited_cleanly", True)
+    except Exception:
+        pass
+    return False
+
+
 # ── PC 종료 시 자동 퇴근 ────────────────────────
 
 def on_agent_exit() -> None:
     """에이전트 종료(PC 꺼짐/재시작/트레이 종료) 시 퇴근 처리"""
+    mark_session_end()
     if not api_key:
         return
     try:
@@ -346,6 +385,12 @@ def main() -> None:
 
     setup_autostart(True)
     atexit.register(on_agent_exit)
+
+    # 이전 세션이 강제 종료됐으면 서버에 checkout 기록 (atexit 미실행 보완)
+    if not is_first_run and was_prev_session_force_killed():
+        api_post("agent/checkout", {"device": platform.node(), "version": VERSION, "reason": "prev_session_killed"})
+
+    mark_session_start()
 
     threading.Thread(target=heartbeat_loop, daemon=True).start()
 
