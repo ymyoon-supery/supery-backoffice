@@ -3,7 +3,7 @@
 import { useState, useTransition, useEffect } from 'react'
 import { toast } from 'sonner'
 import { Monitor, Copy, RefreshCw, Trash2, CheckCircle2, Clock, WifiOff } from 'lucide-react'
-import { generateAgentKey, revokeAgentKey } from './actions'
+import { generateAgentKey, revokeAgentKey, toggleAutoBreak } from './actions'
 import { formatDistanceToNow } from 'date-fns'
 import { ko } from 'date-fns/locale'
 
@@ -21,6 +21,7 @@ type Row = {
   name: string
   email: string
   hasKey: boolean
+  autoBreak: boolean
   installations: Installation[]
 }
 
@@ -40,10 +41,13 @@ const STATUS_BADGE = {
 
 export default function AgentsClient({ rows }: { rows: Row[] }) {
   const [generatedKeys, setGeneratedKeys] = useState<Record<string, string>>({})
+  const [autoBreakMap, setAutoBreakMap] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(rows.map(r => [r.id, r.autoBreak]))
+  )
   const [isPending, startTransition] = useTransition()
   const [now, setNow] = useState(() => Date.now())
 
-  // 30초마다 상태 뱃지 재계산 (페이지 오래 열어둬도 stale 방지)
+  // 30초마다 상태 뱃지 재계산 (페이지 오래 열어도 stale 방지)
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 30_000)
     return () => clearInterval(id)
@@ -65,6 +69,18 @@ export default function AgentsClient({ rows }: { rows: Row[] }) {
       if (error) { toast.error(error); return }
       setGeneratedKeys(prev => { const n = { ...prev }; delete n[employeeId]; return n })
       toast.success('에이전트 키가 삭제되었습니다.')
+    })
+  }
+
+  function handleToggleAutoBreak(employeeId: string, current: boolean) {
+    const next = !current
+    setAutoBreakMap(prev => ({ ...prev, [employeeId]: next }))
+    startTransition(async () => {
+      const { error } = await toggleAutoBreak(employeeId, next)
+      if (error) {
+        setAutoBreakMap(prev => ({ ...prev, [employeeId]: current }))
+        toast.error(error)
+      }
     })
   }
 
@@ -94,6 +110,7 @@ export default function AgentsClient({ rows }: { rows: Row[] }) {
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">설치 기기</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">마지막 접속</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">상태</th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">자동 휴식</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
@@ -102,6 +119,7 @@ export default function AgentsClient({ rows }: { rows: Row[] }) {
               const latest = row.installations[0]
               const status = agentStatus(latest, now)
               const newKey = generatedKeys[row.id]
+              const autoBreak = autoBreakMap[row.id] ?? row.autoBreak
 
               return (
                 <tr key={row.id} className="hover:bg-gray-50/50">
@@ -143,6 +161,16 @@ export default function AgentsClient({ rows }: { rows: Row[] }) {
                     {latest ? formatDistanceToNow(new Date(latest.last_seen_at), { addSuffix: true, locale: ko }) : '-'}
                   </td>
                   <td className="px-4 py-3">{STATUS_BADGE[status]}</td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => handleToggleAutoBreak(row.id, autoBreak)}
+                      disabled={isPending}
+                      title={autoBreak ? '자동 휴식 감지 켜짐 — 클릭하여 끄기' : '자동 휴식 감지 꺼짐 — 클릭하여 켜기'}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 ${autoBreak ? 'bg-primary' : 'bg-gray-200'}`}
+                    >
+                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${autoBreak ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                    </button>
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2 justify-end">
                       <button

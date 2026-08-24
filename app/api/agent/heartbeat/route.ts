@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
 
   const { data: employee, error: empError } = await admin
     .from('employees')
-    .select('id')
+    .select('id, agent_auto_break')
     .eq('agent_api_key', apiKey)
     .maybeSingle()
 
@@ -53,50 +53,55 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  // 오늘 마지막 근태 기록 조회
-  const kstDate = new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
-  const { data: lastRecord } = await admin
-    .from('attendance_records')
-    .select('type, recorded_at, note')
-    .eq('employee_id', employee.id)
-    .gte('recorded_at', `${kstDate}T00:00:00+09:00`)
-    .order('recorded_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  // 자동 휴식 감지가 꺼진 직원(외근직 등)은 이하 로직 스킵
+  const autoBreakEnabled = employee.agent_auto_break !== false
 
-  const lastType = lastRecord?.type ?? null
+  if (autoBreakEnabled) {
+    // 오늘 마지막 근태 기록 조회
+    const kstDate = new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    const { data: lastRecord } = await admin
+      .from('attendance_records')
+      .select('type, recorded_at, note')
+      .eq('employee_id', employee.id)
+      .gte('recorded_at', `${kstDate}T00:00:00+09:00`)
+      .order('recorded_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
-  // 15분 이상 비활동 → 자동 휴식 시작
-  if (lastType && WORKING_TYPES.has(lastType) && idleSeconds >= INACTIVITY_THRESHOLD) {
-    const lastActivityAt = new Date(now.getTime() - idleSeconds * 1000)
-    const lastRecordAt = new Date(lastRecord!.recorded_at)
-    const breakStartAt = new Date(Math.max(lastActivityAt.getTime(), lastRecordAt.getTime()))
+    const lastType = lastRecord?.type ?? null
 
-    await admin.from('attendance_records').insert({
-      employee_id: employee.id,
-      type: 'BREAK_START',
-      recorded_at: breakStartAt.toISOString(),
-      note: 'PC 비활동 자동 휴식',
-      is_field: false,
-    })
-  }
+    // 15분 이상 비활동 → 자동 휴식 시작
+    if (lastType && WORKING_TYPES.has(lastType) && idleSeconds >= INACTIVITY_THRESHOLD) {
+      const lastActivityAt = new Date(now.getTime() - idleSeconds * 1000)
+      const lastRecordAt = new Date(lastRecord!.recorded_at)
+      const breakStartAt = new Date(Math.max(lastActivityAt.getTime(), lastRecordAt.getTime()))
 
-  // 활동 재개 감지 → 자동 업무 복귀
-  // note 정확 일치로 수동 기록과 구분 + 최소 5분 휴식 후에만 삽입 (idle 스파이크로 인한 무한 BREAK 루프 방지)
-  if (
-    lastType === 'BREAK_START' &&
-    lastRecord?.note === 'PC 비활동 자동 휴식' &&
-    idleSeconds < 60
-  ) {
-    const breakDurationSec = (now.getTime() - new Date(lastRecord!.recorded_at).getTime()) / 1000
-    if (breakDurationSec >= MIN_BREAK_DURATION_SEC) {
       await admin.from('attendance_records').insert({
         employee_id: employee.id,
-        type: 'BREAK_END',
-        recorded_at: now.toISOString(),
-        note: 'PC 활동 감지 자동 업무 복귀',
+        type: 'BREAK_START',
+        recorded_at: breakStartAt.toISOString(),
+        note: 'PC 비활동 자동 휴식',
         is_field: false,
       })
+    }
+
+    // 활동 재개 감지 → 자동 업무 복귀
+    // note 정확 일치로 수동 기록과 구분 + 최소 5분 휴식 후에만 삽입 (idle 스파이크로 인한 무한 BREAK 루프 방지)
+    if (
+      lastType === 'BREAK_START' &&
+      lastRecord?.note === 'PC 비활동 자동 휴식' &&
+      idleSeconds < 60
+    ) {
+      const breakDurationSec = (now.getTime() - new Date(lastRecord!.recorded_at).getTime()) / 1000
+      if (breakDurationSec >= MIN_BREAK_DURATION_SEC) {
+        await admin.from('attendance_records').insert({
+          employee_id: employee.id,
+          type: 'BREAK_END',
+          recorded_at: now.toISOString(),
+          note: 'PC 활동 감지 자동 업무 복귀',
+          is_field: false,
+        })
+      }
     }
   }
 

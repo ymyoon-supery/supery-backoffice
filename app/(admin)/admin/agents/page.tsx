@@ -10,7 +10,7 @@ export default async function AgentsPage() {
   const [{ data: employees }, { data: employeesWithKey }, { data: installations }] = await Promise.all([
     admin
       .from('employees')
-      .select('id, name, email')
+      .select('id, name, email, agent_auto_break')
       .eq('is_active', true)
       .order('name'),
     // agent_api_key 원본 노출 없이 "키 존재 여부"만 별도 조회
@@ -38,6 +38,7 @@ export default async function AgentsPage() {
     name: emp.name,
     email: emp.email,
     hasKey: keySet.has(emp.id),
+    autoBreak: emp.agent_auto_break !== false,
     installations: installMap.get(emp.id) ?? [],
   }))
 

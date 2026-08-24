@@ -56,3 +56,19 @@ export async function revokeAgentKey(employeeId: string): Promise<{ error?: stri
   revalidatePath('/admin/agents')
   return {}
 }
+
+export async function toggleAutoBreak(employeeId: string, enabled: boolean): Promise<{ error?: string }> {
+  const { error: authError } = await requireAdmin()
+  if (authError) return { error: authError }
+
+  const supabase = adminClient()
+  const { error } = await supabase
+    .from('employees')
+    .update({ agent_auto_break: enabled })
+    .eq('id', employeeId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/admin/agents')
+  return {}
+}

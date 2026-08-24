@@ -1,16 +1,18 @@
 """
-Supery 근태 에이전트 v1.2.0
+Supery 근태 에이전트 v1.3.0
 - Windows ctypes GetLastInputInfo 방식 (백신 친화적, 후킹 없음)
 - 15분 PC 비활동 시 자동 휴식 기록
 - 활동 재개 시 자동 업무 복귀 기록
 - 시스템 트레이 상주 / Windows 시작 프로그램 자동 등록
-- 워킹데이(월~금) 07:00~15:00 첫 시작 시 출근 확인 팝업
+- 워킹데이(월~금) 07:00~15:00 첫 시작 시 출근 확인 팝업 (웹 출근 여부 서버 확인)
 - PC 종료/재시작 시 자동 퇴근 기록
+- 로그 파일: ~/.supery_agent.log (1MB 롤링)
 """
 import sys
 import os
 import json
 import time
+import logging
 import platform
 import threading
 import ctypes
@@ -22,6 +24,7 @@ import tempfile
 import tkinter as tk
 from tkinter import simpledialog, messagebox
 from datetime import datetime, timezone, timedelta
+from logging.handlers import RotatingFileHandler
 
 import requests
 import pystray
@@ -33,15 +36,27 @@ API_BASE = "https://office.supery.co.kr/api"
 WORKSYNC_URL = "https://office.supery.co.kr"
 # ──────────────────────────────────────────────
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 APP_NAME = "SuperyAgent"
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.json")
+LOG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.log")
 HEARTBEAT_INTERVAL = 60  # 1분마다 체크
 
 KST = timezone(timedelta(hours=9))
 
 api_key: str = ""
 running: bool = True
+
+
+# ── 로거 설정 ───────────────────────────────────
+
+def setup_logging() -> None:
+    handler = RotatingFileHandler(LOG_PATH, maxBytes=1024 * 1024, backupCount=2, encoding="utf-8")
+    logging.basicConfig(
+        handlers=[handler],
+        level=logging.WARNING,
+        format="%(asctime)s %(levelname)s %(message)s",
+    )
 
 
 # ── Windows API 유휴 시간 조회 ──────────────────
@@ -102,8 +117,8 @@ def setup_autostart(enable: bool = True) -> None:
             except FileNotFoundError:
                 pass
         winreg.CloseKey(reg)
-    except Exception:
-        pass
+    except Exception as e:
+        logging.warning(f"[autostart] 시작 프로그램 등록 실패: {e}")
 
 
 # ── 인터넷 연결 확인 ────────────────────────────
@@ -115,6 +130,23 @@ def check_internet() -> bool:
         return True
     except Exception:
         return False
+
+
+# ── 서버에서 오늘 출근 여부 확인 ────────────────
+
+def get_today_checkin_status() -> bool:
+    """오늘 이미 CHECK_IN 기록이 있는지 서버에서 확인 — 웹 출근 후 팝업 중복 방지"""
+    try:
+        resp = requests.get(
+            f"{API_BASE}/agent/today-status",
+            headers={"X-Agent-Key": api_key},
+            timeout=5,
+        )
+        if resp.ok:
+            return bool(resp.json().get("checked_in", False))
+    except Exception:
+        pass
+    return False
 
 
 # ── 워킹데이 출근 확인 팝업 ──────────────────────
@@ -160,6 +192,10 @@ def check_workday_checkin(is_first_run: bool = False) -> None:
             root.destroy()
             return
 
+        # 이미 웹에서 출근한 경우 팝업 스킵
+        if get_today_checkin_status():
+            return
+
         root = tk.Tk()
         root.withdraw()
         root.attributes("-topmost", True)
@@ -174,23 +210,8 @@ def check_workday_checkin(is_first_run: bool = False) -> None:
         if answer:
             webbrowser.open(f"{WORKSYNC_URL}/attendance")
 
-    except Exception:
-        pass  # 팝업 오류가 에이전트 전체를 종료하지 않도록
-
-
-# ── API 호출 ────────────────────────────────────
-
-def api_post(endpoint: str, data: dict) -> bool:
-    try:
-        resp = requests.post(
-            f"{API_BASE}/{endpoint}",
-            json=data,
-            headers={"X-Agent-Key": api_key},
-            timeout=10,
-        )
-        return resp.ok
-    except Exception:
-        return False
+    except Exception as e:
+        logging.warning(f"[checkin-popup] {e}")
 
 
 # ── PC 종료 시 자동 퇴근 ────────────────────────
@@ -210,6 +231,21 @@ def on_agent_exit() -> None:
         pass
 
 
+# ── API 호출 ────────────────────────────────────
+
+def api_post(endpoint: str, data: dict) -> bool:
+    try:
+        resp = requests.post(
+            f"{API_BASE}/{endpoint}",
+            json=data,
+            headers={"X-Agent-Key": api_key},
+            timeout=10,
+        )
+        return resp.ok
+    except Exception:
+        return False
+
+
 # ── 하트비트 루프 ────────────────────────────────
 
 def heartbeat_loop() -> None:
@@ -223,8 +259,8 @@ def heartbeat_loop() -> None:
                 "device": platform.node(),
                 "version": VERSION,
             })
-        except Exception:
-            pass  # 예외가 루프를 종료하지 않도록 — 다음 주기에 재시도
+        except Exception as e:
+            logging.warning(f"[heartbeat] {e}")
         time.sleep(HEARTBEAT_INTERVAL)
 
 
@@ -299,6 +335,8 @@ def create_icon() -> Image.Image:
 
 def main() -> None:
     global api_key, running
+
+    setup_logging()
 
     cfg = load_config()
     api_key = cfg.get("api_key", "")
