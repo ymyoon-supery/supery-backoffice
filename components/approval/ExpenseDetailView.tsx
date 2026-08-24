@@ -89,6 +89,18 @@ function formatKRW(n: number) {
   return n.toLocaleString('ko-KR') + '원'
 }
 
+function parseWithholdingFromNote(note: string | undefined): { withholdingAmount: number; netAmount: number; userNote: string } {
+  if (!note) return { withholdingAmount: 0, netAmount: 0, userNote: '' }
+  const parts = note.split(' / ')
+  const whMatch = parts[0]?.match(/원천징수:\s*([\d,]+)원/)
+  const netMatch = parts[1]?.match(/실지급:\s*([\d,]+)원/)
+  return {
+    withholdingAmount: whMatch ? Number(whMatch[1].replace(/,/g, '')) : 0,
+    netAmount: netMatch ? Number(netMatch[1].replace(/,/g, '')) : 0,
+    userNote: parts.slice(2).join(' / '),
+  }
+}
+
 function parseVatFromNote(note: string | undefined, total: number | undefined) {
   const t = total ?? 0
   let supply = t, vat = 0, vatLabel: string | null = null, userNote = note ?? ''
@@ -153,7 +165,16 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
   const isCondolence = data.expenseType === 'CONDOLENCE'
   const docTitle = EXPENSE_TYPE_DOC_TITLE[data.expenseType ?? ''] ?? '지  출  결  의  서'
 
-  const rowVats = (isWithholding || isCondolence)
+  const withholdingInfo = isWithholding
+    ? parseWithholdingFromNote(data.lineItems[0]?.note)
+    : null
+
+  const rowVats = isWithholding
+    ? data.lineItems.map(li => {
+        const { userNote } = parseWithholdingFromNote(li.note)
+        return { supply: li.amount ?? 0, vat: 0, total: li.amount ?? 0, vatLabel: null as string | null, userNote }
+      })
+    : isCondolence
     ? data.lineItems.map(li => ({ supply: li.amount ?? 0, vat: 0, total: li.amount ?? 0, vatLabel: null as string | null, userNote: '' }))
     : data.lineItems.map(li => parseVatFromNote(li.note, li.amount))
   const totalSupply = rowVats.reduce((s, r) => s + r.supply, 0)
@@ -352,13 +373,27 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
                   </>}
                   <tr>
                     <td colSpan={hasVat ? 4 : 2} className="px-4 py-2.5 text-sm font-semibold text-gray-700 whitespace-nowrap">
-                      {hasVat ? '최종합계 (부가세 포함)' : '지출합계'}
+                      {isWithholding ? '세전금액' : hasVat ? '최종합계 (부가세 포함)' : '지출합계'}
                     </td>
                     <td className="px-4 py-2.5 text-right text-sm font-bold text-gray-900 tabular-nums whitespace-nowrap">
                       {formatKRW(data.storedAmount ?? totalAmount)}
                     </td>
                     <td />
                   </tr>
+                  {isWithholding && withholdingInfo && withholdingInfo.withholdingAmount > 0 && (
+                    <>
+                      <tr>
+                        <td colSpan={2} className="px-4 py-2 text-xs text-gray-500">원천징수 (3.3%)</td>
+                        <td className="px-4 py-2 text-right text-xs text-red-500 tabular-nums whitespace-nowrap">- {formatKRW(withholdingInfo.withholdingAmount)}</td>
+                        <td />
+                      </tr>
+                      <tr className="border-t border-gray-200">
+                        <td colSpan={2} className="px-4 py-2.5 text-sm font-semibold text-gray-700 whitespace-nowrap">실지급액</td>
+                        <td className="px-4 py-2.5 text-right text-sm font-bold text-blue-700 tabular-nums whitespace-nowrap">{formatKRW(withholdingInfo.netAmount)}</td>
+                        <td />
+                      </tr>
+                    </>
+                  )}
                 </tfoot>
               </table>
               </div>
