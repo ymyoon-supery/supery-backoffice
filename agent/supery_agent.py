@@ -1,10 +1,10 @@
 """
-Supery 근태 에이전트 v1.3.0
+Supery 근태 에이전트 v1.3.3
 - Windows ctypes GetLastInputInfo 방식 (백신 친화적, 후킹 없음)
 - 15분 PC 비활동 시 자동 휴식 기록
 - 활동 재개 시 자동 업무 복귀 기록
 - 시스템 트레이 상주 / Windows 시작 프로그램 자동 등록
-- 워킹데이(월~금) 07:00~15:00 첫 시작 시 출근 확인 팝업 (웹 출근 여부 서버 확인)
+- 워킹데이(월~금) PC 시작 시 출근 확인 팝업 (시간 제한 없음, 웹 출근 여부 서버 확인)
 - PC 종료/재시작 시 자동 퇴근 기록
 - 로그 파일: ~/.supery_agent.log (1MB 롤링)
 """
@@ -36,7 +36,7 @@ API_BASE = "https://office.supery.co.kr/api"
 WORKSYNC_URL = "https://office.supery.co.kr"
 # ──────────────────────────────────────────────
 
-VERSION = "1.3.2"
+VERSION = "1.3.3"
 APP_NAME = "SuperyAgent"
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.json")
 LOG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.log")
@@ -173,11 +173,6 @@ def check_workday_checkin(is_first_run: bool = False) -> None:
         if now_kst.weekday() >= 5:
             logging.warning(f"[checkin-popup] 스킵: 주말 weekday={now_kst.weekday()}")
             return
-        # 07:00~15:00 범위 외 제외
-        if not (7 <= now_kst.hour < 15):
-            logging.warning(f"[checkin-popup] 스킵: 시간 범위 외 hour={now_kst.hour} ({now_kst.strftime('%H:%M')} KST)")
-            return
-
         _checkin_prompted = True
 
         # 인터넷 연결 확인
