@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { toast } from 'sonner'
 import { Monitor, Copy, RefreshCw, Trash2, CheckCircle2, Clock, WifiOff } from 'lucide-react'
 import { generateAgentKey, revokeAgentKey } from './actions'
@@ -24,9 +24,9 @@ type Row = {
   installations: Installation[]
 }
 
-function agentStatus(inst: Installation | undefined): 'online' | 'away' | 'offline' {
+function agentStatus(inst: Installation | undefined, now: number): 'online' | 'away' | 'offline' {
   if (!inst) return 'offline'
-  const diffMin = (Date.now() - new Date(inst.last_seen_at).getTime()) / 60000
+  const diffMin = (now - new Date(inst.last_seen_at).getTime()) / 60000
   if (diffMin < 10) return 'online'
   if (diffMin < 30) return 'away'
   return 'offline'
@@ -41,6 +41,13 @@ const STATUS_BADGE = {
 export default function AgentsClient({ rows }: { rows: Row[] }) {
   const [generatedKeys, setGeneratedKeys] = useState<Record<string, string>>({})
   const [isPending, startTransition] = useTransition()
+  const [now, setNow] = useState(() => Date.now())
+
+  // 30초마다 상태 뱃지 재계산 (페이지 오래 열어둬도 stale 방지)
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(id)
+  }, [])
 
   function handleGenerate(employeeId: string) {
     startTransition(async () => {
@@ -93,7 +100,7 @@ export default function AgentsClient({ rows }: { rows: Row[] }) {
           <tbody className="divide-y divide-gray-50">
             {rows.map(row => {
               const latest = row.installations[0]
-              const status = agentStatus(latest)
+              const status = agentStatus(latest, now)
               const newKey = generatedKeys[row.id]
 
               return (

@@ -72,6 +72,7 @@ export default function StatusBoard({ initial, onLeaveMap }: {
       return { label: '미출근', className: 'bg-gray-100 text-gray-500' }
     }
     if (s.lastRecord.type === 'CHECK_OUT') return { label: '퇴근', className: 'bg-gray-100 text-gray-500' }
+    if (s.lastRecord.type === 'BREAK_START') return { label: '휴식중', className: 'bg-amber-50 text-amber-700' }
     if (s.lastRecord.is_field) return { label: '외근', className: 'bg-blue-50 text-blue-700' }
     return { label: '근무중', className: 'bg-green-50 text-green-700' }
   }
