@@ -46,6 +46,7 @@ KST = timezone(timedelta(hours=9))
 
 api_key: str = ""
 running: bool = True
+_checkin_prompted: bool = False  # 이 세션에서 팝업을 이미 표시했는지 (재부팅 시 리셋됨)
 
 
 # ── 로거 설정 ───────────────────────────────────
@@ -155,9 +156,14 @@ def get_today_checkin_status() -> bool:
 
 def check_workday_checkin(is_first_run: bool = False) -> None:
     """월~금 07:00~15:00 첫 시작 시 출근 확인 — 메인 스레드에서만 호출"""
+    global _checkin_prompted
     try:
         # 최초 등록 직후에는 건너뜀 (등록 팝업과 연속으로 뜨는 것 방지)
         if is_first_run:
+            return
+
+        # 이 세션에서 이미 팝업을 표시했으면 스킵 (재부팅 시 자동 리셋)
+        if _checkin_prompted:
             return
 
         now_kst = datetime.now(KST)
@@ -169,16 +175,7 @@ def check_workday_checkin(is_first_run: bool = False) -> None:
         if not (7 <= now_kst.hour < 15):
             return
 
-        today_str = now_kst.strftime("%Y-%m-%d")
-        cfg = load_config()
-
-        # 오늘 이미 확인했으면 스킵
-        if cfg.get("last_checkin_prompt") == today_str:
-            return
-
-        # 오늘은 다시 묻지 않도록 먼저 저장 (크래시 방지)
-        cfg["last_checkin_prompt"] = today_str
-        save_config(cfg)
+        _checkin_prompted = True
 
         # 인터넷 연결 확인
         if not check_internet():
@@ -229,13 +226,6 @@ def on_agent_exit() -> None:
             headers={"X-Agent-Key": api_key},
             timeout=3,  # Windows 종료 시 짧게 설정 (5초 내 정리 필요)
         )
-    except Exception:
-        pass
-    # 다음 부팅 시 재출근 팝업이 다시 표시되도록 오늘 팝업 플래그 초기화
-    try:
-        cfg = load_config()
-        cfg.pop("last_checkin_prompt", None)
-        save_config(cfg)
     except Exception:
         pass
 
