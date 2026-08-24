@@ -21,14 +21,16 @@ export async function GET(req: NextRequest) {
   const now = new Date()
   const kstDate = new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
-  const { data: checkIn } = await admin
+  // 오늘 마지막 근태 레코드가 CHECK_OUT이면 퇴근 상태 → 재출근 팝업 허용
+  const { data: lastRecord } = await admin
     .from('attendance_records')
-    .select('id')
+    .select('type')
     .eq('employee_id', employee.id)
-    .eq('type', 'CHECK_IN')
     .gte('recorded_at', `${kstDate}T00:00:00+09:00`)
+    .order('recorded_at', { ascending: false })
     .limit(1)
     .maybeSingle()
 
-  return NextResponse.json({ checked_in: !!checkIn })
+  const checkedIn = !!lastRecord && lastRecord.type !== 'CHECK_OUT'
+  return NextResponse.json({ checked_in: checkedIn })
 }

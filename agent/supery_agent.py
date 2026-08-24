@@ -231,6 +231,13 @@ def on_agent_exit() -> None:
         )
     except Exception:
         pass
+    # 다음 부팅 시 재출근 팝업이 다시 표시되도록 오늘 팝업 플래그 초기화
+    try:
+        cfg = load_config()
+        cfg.pop("last_checkin_prompt", None)
+        save_config(cfg)
+    except Exception:
+        pass
 
 
 # ── API 호출 ────────────────────────────────────
