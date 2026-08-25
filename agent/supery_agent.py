@@ -338,7 +338,7 @@ def _setup_task_scheduler() -> None:
     <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
     <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
     <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
-    <Priority>4</Priority>
+    <Priority>3</Priority>
   </Settings>
   <Actions Context="Author">
     <Exec>
