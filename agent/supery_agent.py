@@ -1,10 +1,10 @@
 """
-Supery 근태 에이전트 v1.3.3
+Supery 근태 에이전트 v1.3.4
 - Windows ctypes GetLastInputInfo 방식 (백신 친화적, 후킹 없음)
 - 15분 PC 비활동 시 자동 휴식 기록
 - 활동 재개 시 자동 업무 복귀 기록
-- 시스템 트레이 상주 / Windows 시작 프로그램 자동 등록
-- 워킹데이(월~금) PC 시작 시 출근 확인 팝업 (시간 제한 없음, 웹 출근 여부 서버 확인)
+- 시스템 트레이 상주 / Task Scheduler 로그온 작업 등록 (높은 우선순위)
+- 워킹데이(월~금) PC 시작 시 출근 확인 팝업 (3배 크기, 시간 제한 없음, 웹 출근 여부 서버 확인)
 - PC 종료/재시작 시 자동 퇴근 기록
 - 로그 파일: ~/.supery_agent.log (1MB 롤링)
 """
@@ -15,6 +15,7 @@ import time
 import logging
 import platform
 import threading
+import subprocess
 import ctypes
 import winreg
 import webbrowser
@@ -22,7 +23,6 @@ import atexit
 import random
 import tempfile
 import tkinter as tk
-from tkinter import simpledialog, messagebox
 from datetime import datetime, timezone, timedelta
 from logging.handlers import RotatingFileHandler
 
@@ -36,7 +36,7 @@ API_BASE = "https://office.supery.co.kr/api"
 WORKSYNC_URL = "https://office.supery.co.kr"
 # ──────────────────────────────────────────────
 
-VERSION = "1.3.3"
+VERSION = "1.3.4"
 APP_NAME = "SuperyAgent"
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.json")
 LOG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.log")
@@ -101,26 +101,300 @@ def save_config(cfg: dict) -> None:
         logging.warning(f"[save_config] {e}")
 
 
-# ── Windows 시작 프로그램 등록 ──────────────────
+# ── 대형 팝업 다이얼로그 (표준 messagebox의 약 3배 크기) ──
+
+_DIALOG_W = 800
+_DIALOG_H = 420
+_FONT_MSG = ("맑은 고딕", 22)
+_FONT_BTN = ("맑은 고딕", 18)
+_BTN_PRIMARY = {
+    "bg": "#2563eb", "fg": "white",
+    "activebackground": "#1d4ed8", "activeforeground": "white",
+}
+_BTN_SECONDARY = {
+    "bg": "#e5e7eb", "fg": "#374151",
+    "activebackground": "#d1d5db", "activeforeground": "#374151",
+}
+
+
+def _make_dialog_root() -> tk.Tk:
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes("-topmost", True)
+    return root
+
+
+def _center_geometry(root: tk.Tk, w: int, h: int) -> str:
+    root.update_idletasks()
+    sw = root.winfo_screenwidth()
+    sh = root.winfo_screenheight()
+    x = (sw - w) // 2
+    y = (sh - h) // 2
+    return f"{w}x{h}+{x}+{y}"
+
+
+def show_large_info(title: str, message: str) -> None:
+    root = _make_dialog_root()
+    dlg = tk.Toplevel(root)
+    dlg.title(title)
+    dlg.attributes("-topmost", True)
+    dlg.resizable(False, False)
+    dlg.geometry(_center_geometry(root, _DIALOG_W, _DIALOG_H))
+    dlg.configure(bg="#ffffff")
+
+    frame = tk.Frame(dlg, padx=50, pady=30, bg="#ffffff")
+    frame.pack(fill=tk.BOTH, expand=True)
+    tk.Label(frame, text=message, font=_FONT_MSG, justify=tk.CENTER,
+             wraplength=680, bg="#ffffff").pack(expand=True, pady=(10, 5))
+    tk.Button(frame, text="확인", font=_FONT_BTN, width=14, height=2,
+              relief=tk.FLAT, cursor="hand2",
+              command=dlg.destroy, **_BTN_PRIMARY).pack(pady=18)
+
+    dlg.protocol("WM_DELETE_WINDOW", dlg.destroy)
+    dlg.focus_force()
+    dlg.grab_set()
+    root.wait_window(dlg)
+    root.destroy()
+
+
+def show_large_warning(title: str, message: str) -> None:
+    root = _make_dialog_root()
+    dlg = tk.Toplevel(root)
+    dlg.title(title)
+    dlg.attributes("-topmost", True)
+    dlg.resizable(False, False)
+    dlg.geometry(_center_geometry(root, _DIALOG_W, _DIALOG_H))
+    dlg.configure(bg="#ffffff")
+
+    frame = tk.Frame(dlg, padx=50, pady=30, bg="#ffffff")
+    frame.pack(fill=tk.BOTH, expand=True)
+    tk.Label(frame, text=message, font=_FONT_MSG, justify=tk.CENTER,
+             wraplength=680, bg="#ffffff").pack(expand=True, pady=(10, 5))
+    tk.Button(frame, text="확인", font=_FONT_BTN, width=14, height=2,
+              relief=tk.FLAT, cursor="hand2",
+              command=dlg.destroy, **_BTN_SECONDARY).pack(pady=18)
+
+    dlg.protocol("WM_DELETE_WINDOW", dlg.destroy)
+    dlg.focus_force()
+    dlg.grab_set()
+    root.wait_window(dlg)
+    root.destroy()
+
+
+def show_large_error(title: str, message: str) -> None:
+    root = _make_dialog_root()
+    dlg = tk.Toplevel(root)
+    dlg.title(title)
+    dlg.attributes("-topmost", True)
+    dlg.resizable(False, False)
+    dlg.geometry(_center_geometry(root, _DIALOG_W, _DIALOG_H))
+    dlg.configure(bg="#ffffff")
+
+    frame = tk.Frame(dlg, padx=50, pady=30, bg="#ffffff")
+    frame.pack(fill=tk.BOTH, expand=True)
+    tk.Label(frame, text=message, font=_FONT_MSG, justify=tk.CENTER,
+             wraplength=680, bg="#ffffff", fg="#dc2626").pack(expand=True, pady=(10, 5))
+    tk.Button(frame, text="확인", font=_FONT_BTN, width=14, height=2,
+              relief=tk.FLAT, cursor="hand2",
+              command=dlg.destroy, **_BTN_SECONDARY).pack(pady=18)
+
+    dlg.protocol("WM_DELETE_WINDOW", dlg.destroy)
+    dlg.focus_force()
+    dlg.grab_set()
+    root.wait_window(dlg)
+    root.destroy()
+
+
+def show_large_yesno(title: str, message: str) -> bool:
+    result = [False]
+    root = _make_dialog_root()
+    dlg = tk.Toplevel(root)
+    dlg.title(title)
+    dlg.attributes("-topmost", True)
+    dlg.resizable(False, False)
+    dlg.geometry(_center_geometry(root, _DIALOG_W, _DIALOG_H))
+    dlg.configure(bg="#ffffff")
+
+    frame = tk.Frame(dlg, padx=50, pady=30, bg="#ffffff")
+    frame.pack(fill=tk.BOTH, expand=True)
+    tk.Label(frame, text=message, font=_FONT_MSG, justify=tk.CENTER,
+             wraplength=680, bg="#ffffff").pack(expand=True, pady=(10, 5))
+
+    btn_frame = tk.Frame(frame, bg="#ffffff")
+    btn_frame.pack(pady=18)
+
+    def on_yes():
+        result[0] = True
+        dlg.destroy()
+
+    tk.Button(btn_frame, text="예", font=_FONT_BTN, width=14, height=2,
+              relief=tk.FLAT, cursor="hand2",
+              command=on_yes, **_BTN_PRIMARY).pack(side=tk.LEFT, padx=20)
+    tk.Button(btn_frame, text="아니오", font=_FONT_BTN, width=14, height=2,
+              relief=tk.FLAT, cursor="hand2",
+              command=dlg.destroy, **_BTN_SECONDARY).pack(side=tk.LEFT, padx=20)
+
+    dlg.protocol("WM_DELETE_WINDOW", dlg.destroy)
+    dlg.focus_force()
+    dlg.grab_set()
+    root.wait_window(dlg)
+    root.destroy()
+    return result[0]
+
+
+def show_large_input(title: str, prompt: str):
+    result = [None]
+    root = _make_dialog_root()
+    dlg = tk.Toplevel(root)
+    dlg.title(title)
+    dlg.attributes("-topmost", True)
+    dlg.resizable(False, False)
+    dlg.geometry(_center_geometry(root, _DIALOG_W, 420))
+    dlg.configure(bg="#ffffff")
+
+    frame = tk.Frame(dlg, padx=50, pady=30, bg="#ffffff")
+    frame.pack(fill=tk.BOTH, expand=True)
+    tk.Label(frame, text=prompt, font=_FONT_MSG, bg="#ffffff").pack(pady=(10, 15))
+
+    entry = tk.Entry(frame, font=("맑은 고딕", 14), width=38, relief=tk.SOLID, bd=1)
+    entry.pack(pady=5, ipady=10)
+    entry.focus_set()
+
+    btn_frame = tk.Frame(frame, bg="#ffffff")
+    btn_frame.pack(pady=22)
+
+    def on_ok():
+        val = entry.get().strip()
+        result[0] = val if val else None
+        dlg.destroy()
+
+    entry.bind("<Return>", lambda e: on_ok())
+
+    tk.Button(btn_frame, text="확인", font=_FONT_BTN, width=14, height=2,
+              relief=tk.FLAT, cursor="hand2",
+              command=on_ok, **_BTN_PRIMARY).pack(side=tk.LEFT, padx=20)
+    tk.Button(btn_frame, text="취소", font=_FONT_BTN, width=14, height=2,
+              relief=tk.FLAT, cursor="hand2",
+              command=dlg.destroy, **_BTN_SECONDARY).pack(side=tk.LEFT, padx=20)
+
+    dlg.protocol("WM_DELETE_WINDOW", dlg.destroy)
+    dlg.grab_set()
+    root.wait_window(dlg)
+    root.destroy()
+    return result[0]
+
+
+# ── Windows 시작 프로그램 등록 (Task Scheduler 우선) ──
 
 def setup_autostart(enable: bool = True) -> None:
+    # 기존 레지스트리 항목 정리 (Task Scheduler로 이관)
+    _remove_registry_autostart()
+    if enable:
+        _setup_task_scheduler()
+    else:
+        _remove_task_scheduler()
+
+
+def _remove_registry_autostart() -> None:
     key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
     try:
         reg = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE)
-        if enable:
-            if getattr(sys, "frozen", False):
-                exe = f'"{sys.executable}"'
-            else:
-                exe = f'"{sys.executable}" "{os.path.abspath(__file__)}"'
-            winreg.SetValueEx(reg, APP_NAME, 0, winreg.REG_SZ, exe)
-        else:
+        try:
+            winreg.DeleteValue(reg, APP_NAME)
+        except FileNotFoundError:
+            pass
+        winreg.CloseKey(reg)
+    except Exception:
+        pass
+
+
+def _setup_task_scheduler() -> None:
+    """Task Scheduler 로그온 작업 등록 — Priority 1(HIGH)로 다른 시작 프로그램보다 빠르게 실행"""
+    if getattr(sys, "frozen", False):
+        cmd = sys.executable
+        args = ""
+    else:
+        cmd = sys.executable
+        args = f'"{os.path.abspath(__file__)}"'
+
+    xml = f"""<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Description>Supery 근태 에이전트 - 자동 시작</Description>
+  </RegistrationInfo>
+  <Triggers>
+    <LogonTrigger>
+      <Enabled>true</Enabled>
+    </LogonTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <LogonType>InteractiveToken</LogonType>
+      <RunLevel>LeastPrivilege</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+    <Priority>1</Priority>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>{cmd}</Command>
+      <Arguments>{args}</Arguments>
+    </Exec>
+  </Actions>
+</Task>"""
+
+    xml_path = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".xml", encoding="utf-16", delete=False) as f:
+            f.write(xml)
+            xml_path = f.name
+
+        result = subprocess.run(
+            ["schtasks", "/Create", "/F", "/TN", APP_NAME, "/XML", xml_path],
+            capture_output=True, text=True, timeout=10,
+        )
+        if result.returncode != 0:
+            logging.warning(f"[autostart] Task Scheduler 등록 실패: {result.stderr} — 레지스트리 폴백")
+            _setup_registry_autostart()
+    except Exception as e:
+        logging.warning(f"[autostart] Task Scheduler 예외: {e} — 레지스트리 폴백")
+        _setup_registry_autostart()
+    finally:
+        if xml_path and os.path.exists(xml_path):
             try:
-                winreg.DeleteValue(reg, APP_NAME)
-            except FileNotFoundError:
+                os.unlink(xml_path)
+            except Exception:
                 pass
+
+
+def _remove_task_scheduler() -> None:
+    try:
+        subprocess.run(
+            ["schtasks", "/Delete", "/TN", APP_NAME, "/F"],
+            capture_output=True, timeout=10,
+        )
+    except Exception as e:
+        logging.warning(f"[autostart] Task Scheduler 삭제 실패: {e}")
+
+
+def _setup_registry_autostart() -> None:
+    """레지스트리 시작 프로그램 등록 (Task Scheduler 폴백)"""
+    key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
+    try:
+        reg = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE)
+        if getattr(sys, "frozen", False):
+            exe = f'"{sys.executable}"'
+        else:
+            exe = f'"{sys.executable}" "{os.path.abspath(__file__)}"'
+        winreg.SetValueEx(reg, APP_NAME, 0, winreg.REG_SZ, exe)
         winreg.CloseKey(reg)
     except Exception as e:
-        logging.warning(f"[autostart] 시작 프로그램 등록 실패: {e}")
+        logging.warning(f"[autostart] 레지스트리 등록 실패: {e}")
 
 
 # ── 인터넷 연결 확인 ────────────────────────────
@@ -156,58 +430,42 @@ def get_today_checkin_status() -> bool:
 # ── 워킹데이 출근 확인 팝업 ──────────────────────
 
 def check_workday_checkin(is_first_run: bool = False) -> None:
-    """월~금 07:00~15:00 첫 시작 시 출근 확인 — 메인 스레드에서만 호출"""
+    """월~금 첫 시작 시 출근 확인 — 메인 스레드에서만 호출"""
     global _checkin_prompted
     try:
-        # 최초 등록 직후에는 건너뜀 (등록 팝업과 연속으로 뜨는 것 방지)
         if is_first_run:
             return
 
-        # 이 세션에서 이미 팝업을 표시했으면 스킵 (재부팅 시 자동 리셋)
         if _checkin_prompted:
             return
 
         now_kst = datetime.now(KST)
 
-        # 주말(5=토, 6=일) 제외
         if now_kst.weekday() >= 5:
             logging.warning(f"[checkin-popup] 스킵: 주말 weekday={now_kst.weekday()}")
             return
         _checkin_prompted = True
 
-        # 인터넷 연결 확인
         if not check_internet():
             logging.warning("[checkin-popup] 스킵: 인터넷 없음")
-            root = tk.Tk()
-            root.withdraw()
-            root.attributes("-topmost", True)
-            messagebox.showwarning(
+            show_large_warning(
                 "WorkSync",
                 "인터넷이 연결되지 않아 출근 등록을 할 수 없습니다.\n"
                 "인터넷 연결 후 WorkSync에서 직접 출근 등록해주세요.",
-                parent=root,
             )
-            root.destroy()
             return
 
-        # 이미 웹에서 출근한 경우 팝업 스킵
         already_in = get_today_checkin_status()
         logging.warning(f"[checkin-popup] get_today_checkin_status={already_in}")
         if already_in:
             return
 
         logging.warning("[checkin-popup] 팝업 표시")
-        root = tk.Tk()
-        root.withdraw()
-        root.attributes("-topmost", True)
-        answer = messagebox.askyesno(
+        answer = show_large_yesno(
             "WorkSync 출근 확인",
             "업무를 시작하시겠습니까?\n\n"
             "[예]를 클릭하면 WorkSync 출근 등록 페이지가 열립니다.",
-            parent=root,
         )
-        root.destroy()
-
         if answer:
             webbrowser.open(f"{WORKSYNC_URL}/attendance")
 
@@ -333,26 +591,17 @@ def heartbeat_loop() -> None:
 # ── 최초 실행 설정 ───────────────────────────────
 
 def first_run_setup() -> str:
-    root = tk.Tk()
-    root.withdraw()
-
-    messagebox.showinfo(
+    show_large_info(
         "Supery 근태 에이전트",
         f"Supery 근태 에이전트 v{VERSION}\n\n"
         "관리자에게 받은 에이전트 키를 입력하면\n"
         "자동 등록 후 백그라운드에서 실행됩니다.",
-        parent=root,
     )
 
-    key = simpledialog.askstring("에이전트 키 입력", "에이전트 키:", parent=root)
-    root.destroy()
-
-    if not key or not key.strip():
+    key = show_large_input("에이전트 키 입력", "에이전트 키:")
+    if not key:
         sys.exit(0)
-    key = key.strip()
 
-    root2 = tk.Tk()
-    root2.withdraw()
     try:
         resp = requests.post(
             f"{API_BASE}/agent/register",
@@ -366,24 +615,19 @@ def first_run_setup() -> str:
         )
         if resp.ok:
             save_config({"api_key": key})
-            messagebox.showinfo(
+            show_large_info(
                 "등록 완료",
                 "에이전트가 등록되었습니다.\n시스템 트레이에서 실행 중인지 확인하세요.",
-                parent=root2,
             )
-            root2.destroy()
             return key
         else:
-            messagebox.showerror(
+            show_large_error(
                 "등록 실패",
                 f"키가 올바르지 않습니다. (서버: {resp.status_code})",
-                parent=root2,
             )
-            root2.destroy()
             sys.exit(1)
     except Exception as e:
-        messagebox.showerror("연결 오류", f"서버에 연결할 수 없습니다.\n{e}", parent=root2)
-        root2.destroy()
+        show_large_error("연결 오류", f"서버에 연결할 수 없습니다.\n{e}")
         sys.exit(1)
 
 
