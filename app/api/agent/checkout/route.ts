@@ -21,15 +21,26 @@ export async function POST(req: NextRequest) {
   if (empError || !employee) return NextResponse.json({ error: 'Invalid key' }, { status: 401 })
 
   const now = new Date()
+  const body = await req.json().catch(() => ({}))
+  const reason = body.reason as string | undefined
+  const lastActiveAt = body.last_active_at as string | undefined
 
-  // KST 07:00~23:59 범위에서만 자동 퇴근 처리
+  // 강제 종료 재부팅 시 이전 세션의 실제 마지막 활동 시각을 퇴근 시각으로 사용
+  let recordedAt = now.toISOString()
+  if (reason === 'prev_session_killed' && lastActiveAt) {
+    const parsed = new Date(lastActiveAt)
+    if (!isNaN(parsed.getTime())) recordedAt = parsed.toISOString()
+  }
+
+  // KST 07:00~23:59 범위에서만 자동 퇴근 처리 (퇴근 시각 기준)
   // — 새벽 Windows 업데이트 재부팅, 점심 잠깐 재시작 등으로 인한 오퇴근 방지
-  const kstHour = new Date(now.getTime() + 9 * 60 * 60 * 1000).getUTCHours()
+  const checkoutTime = new Date(recordedAt)
+  const kstHour = new Date(checkoutTime.getTime() + 9 * 60 * 60 * 1000).getUTCHours()
   if (kstHour < 7) {
     return NextResponse.json({ ok: true, skipped: true })
   }
 
-  const kstDate = new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const kstDate = new Date(checkoutTime.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
   const { data: lastRecord, error: recError } = await admin
     .from('attendance_records')
@@ -50,7 +61,7 @@ export async function POST(req: NextRequest) {
   const { error } = await admin.from('attendance_records').insert({
     employee_id: employee.id,
     type: 'CHECK_OUT',
-    recorded_at: now.toISOString(),
+    recorded_at: recordedAt,
     note: 'PC 종료 자동 퇴근',
     is_field: false,
   })

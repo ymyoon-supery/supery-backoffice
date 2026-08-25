@@ -36,7 +36,7 @@ API_BASE = "https://office.supery.co.kr/api"
 WORKSYNC_URL = "https://office.supery.co.kr"
 # ──────────────────────────────────────────────
 
-VERSION = "1.3.4"
+VERSION = "1.3.5"
 APP_NAME = "SuperyAgent"
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.json")
 LOG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.log")
@@ -498,6 +498,32 @@ def mark_session_end() -> None:
         logging.warning(f"[session] mark_end: {e}")
 
 
+def update_session_last_heartbeat() -> None:
+    """heartbeat 성공 시 세션 파일에 실제 활동 시각 기록 — 강제 종료 시 실제 퇴근 시각 추적용"""
+    try:
+        data: dict = {}
+        if os.path.exists(SESSION_PATH):
+            with open(SESSION_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        data["last_heartbeat_at"] = datetime.now(KST).isoformat()
+        with open(SESSION_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+    except Exception as e:
+        logging.warning(f"[session] update_heartbeat: {e}")
+
+
+def get_prev_session_last_heartbeat() -> str | None:
+    """이전 세션의 마지막 heartbeat 시각 반환 — 재부팅 시 실제 종료 시각 복원용"""
+    try:
+        if os.path.exists(SESSION_PATH):
+            with open(SESSION_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data.get("last_heartbeat_at")
+    except Exception:
+        pass
+    return None
+
+
 def was_prev_session_force_killed() -> bool:
     """이전 세션이 강제 종료(PC 꺼짐 등)됐는지 확인 — True면 서버 checkout 미기록 상태"""
     try:
@@ -534,15 +560,20 @@ def on_agent_exit() -> None:
 
 
 def checkout_prev_session() -> None:
-    """재부팅 후 이전 세션 퇴근 기록 — 네트워크 준비될 때까지 최대 30초 재시도"""
+    """재부팅 후 이전 세션 퇴근 기록 — 네트워크 준비될 때까지 최대 30초 재시도
+    last_active_at: 이전 세션의 마지막 heartbeat 시각 → 실제 종료 시각으로 기록"""
+    last_active_at = get_prev_session_last_heartbeat()
     deadline = time.time() + 30
     attempt = 0
     while time.time() < deadline:
         attempt += 1
         try:
+            payload: dict = {"device": platform.node(), "version": VERSION, "reason": "prev_session_killed"}
+            if last_active_at:
+                payload["last_active_at"] = last_active_at
             resp = requests.post(
                 f"{API_BASE}/agent/checkout",
-                json={"device": platform.node(), "version": VERSION, "reason": "prev_session_killed"},
+                json=payload,
                 headers={"X-Agent-Key": api_key},
                 timeout=5,
             )
@@ -578,11 +609,13 @@ def heartbeat_loop() -> None:
     while running:
         try:
             idle = get_idle_seconds()
-            api_post("agent/heartbeat", {
+            ok = api_post("agent/heartbeat", {
                 "idle_seconds": int(idle),
                 "device": platform.node(),
                 "version": VERSION,
             })
+            if ok:
+                update_session_last_heartbeat()
         except Exception as e:
             logging.warning(f"[heartbeat] {e}")
         time.sleep(HEARTBEAT_INTERVAL)
