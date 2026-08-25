@@ -69,6 +69,27 @@ export async function GET(request: NextRequest) {
   }
 
   const employeeIds = unprocessed.map(r => r.employee_id)
+
+  // PC 비활동 자동 휴식 BREAK_START가 있으면 그 시각이 실질적 퇴근 시각
+  // (PC를 끄지 않고 퇴근 시 heartbeat는 계속 오지만 비활동 감지 시각이 정확한 이탈 시각)
+  const { data: lastBreakStarts } = await supabase
+    .from('attendance_records')
+    .select('employee_id, recorded_at')
+    .in('employee_id', employeeIds)
+    .eq('type', 'BREAK_START')
+    .eq('note', 'PC 비활동 자동 휴식')
+    .gte('recorded_at', dayStart)
+    .lte('recorded_at', dayEnd)
+    .order('recorded_at', { ascending: false })
+
+  // 직원별 마지막 BREAK_START 시각 맵
+  const lastBreakStartMap = new Map<string, string>()
+  for (const bs of lastBreakStarts ?? []) {
+    if (!lastBreakStartMap.has(bs.employee_id)) {
+      lastBreakStartMap.set(bs.employee_id, bs.recorded_at)
+    }
+  }
+
   const { data: employees } = await supabase
     .from('employees')
     .select('id, last_heartbeat')
@@ -82,6 +103,7 @@ export async function GET(request: NextRequest) {
 
   for (const record of unprocessed) {
     const lastHeartbeat = heartbeatMap.get(record.employee_id)
+    const lastBreakStart = lastBreakStartMap.get(record.employee_id)
 
     const dayStartMs = new Date(dayStart).getTime()
     const dayEndMs = new Date(dayEnd).getTime()
@@ -91,24 +113,32 @@ export async function GET(request: NextRequest) {
       heartbeatMs >= dayStartMs &&
       heartbeatMs <= dayEndMs
 
-    if (heartbeatInRange) {
+    // 퇴근 시각 결정: PC 비활동 감지 시각 우선, 없으면 마지막 heartbeat
+    const checkoutAt = lastBreakStart ?? (heartbeatInRange ? lastHeartbeat : null)
+
+    if (checkoutAt) {
+      const note = lastBreakStart
+        ? '자동 퇴근 (PC 비활동 감지 시각 기준)'
+        : '자동 퇴근 (마지막 활동 기준)'
       const { error } = await supabase.from('attendance_records').insert({
         employee_id: record.employee_id,
         type: 'CHECK_OUT',
-        recorded_at: lastHeartbeat,
-        note: '자동 퇴근 (마지막 활동 기준)',
+        recorded_at: checkoutAt,
+        note,
         is_field: false,
         is_anomaly: false,
       })
       if (!error) {
         autoCheckouts++
-        const { error: clearError } = await supabase
-          .from('employees')
-          .update({ last_heartbeat: null })
-          .eq('id', record.employee_id)
-        if (clearError) {
-          console.error('[auto-checkout] heartbeat clear failed for', record.employee_id, clearError.message)
-          failures.push({ employeeId: record.employee_id, reason: `heartbeat clear: ${clearError.message}` })
+        if (heartbeatInRange) {
+          const { error: clearError } = await supabase
+            .from('employees')
+            .update({ last_heartbeat: null })
+            .eq('id', record.employee_id)
+          if (clearError) {
+            console.error('[auto-checkout] heartbeat clear failed for', record.employee_id, clearError.message)
+            failures.push({ employeeId: record.employee_id, reason: `heartbeat clear: ${clearError.message}` })
+          }
         }
       } else {
         failures.push({ employeeId: record.employee_id, reason: error.message })
