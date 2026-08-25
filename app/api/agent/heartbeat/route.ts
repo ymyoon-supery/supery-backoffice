@@ -76,13 +76,27 @@ export async function POST(req: NextRequest) {
       const lastRecordAt = new Date(lastRecord!.recorded_at)
       const breakStartAt = new Date(Math.max(lastActivityAt.getTime(), lastRecordAt.getTime()))
 
-      await admin.from('attendance_records').insert({
-        employee_id: employee.id,
-        type: 'BREAK_START',
-        recorded_at: breakStartAt.toISOString(),
-        note: 'PC 비활동 자동 휴식',
-        is_field: false,
-      })
+      // Race Condition 방지: 최근 20분 내 자동 BREAK_START가 이미 있으면 스킵
+      // (DB 레벨 uniq_auto_break_per_minute 인덱스가 2차 방어선)
+      const recentWindow = new Date(now.getTime() - 20 * 60 * 1000).toISOString()
+      const { data: recentAutoBreak } = await admin
+        .from('attendance_records')
+        .select('id')
+        .eq('employee_id', employee.id)
+        .eq('type', 'BREAK_START')
+        .eq('note', 'PC 비활동 자동 휴식')
+        .gte('recorded_at', recentWindow)
+        .maybeSingle()
+
+      if (!recentAutoBreak) {
+        await admin.from('attendance_records').insert({
+          employee_id: employee.id,
+          type: 'BREAK_START',
+          recorded_at: breakStartAt.toISOString(),
+          note: 'PC 비활동 자동 휴식',
+          is_field: false,
+        })
+      }
     }
 
     // 활동 재개 감지 → 자동 업무 복귀
