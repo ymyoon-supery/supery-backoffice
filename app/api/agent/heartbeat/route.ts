@@ -65,6 +65,7 @@ export async function POST(req: NextRequest) {
       .eq('employee_id', employee.id)
       .gte('recorded_at', `${kstDate}T00:00:00+09:00`)
       .order('recorded_at', { ascending: false })
+      .order('id', { ascending: false })  // 동일 recorded_at 시 id 높은 것(나중 삽입) 우선
       .limit(1)
       .maybeSingle()
 
@@ -74,28 +75,32 @@ export async function POST(req: NextRequest) {
     if (lastType && WORKING_TYPES.has(lastType) && idleSeconds >= INACTIVITY_THRESHOLD) {
       const lastActivityAt = new Date(now.getTime() - idleSeconds * 1000)
       const lastRecordAt = new Date(lastRecord!.recorded_at)
-      const breakStartAt = new Date(Math.max(lastActivityAt.getTime(), lastRecordAt.getTime()))
 
-      // Race Condition 방지: 최근 20분 내 자동 BREAK_START가 이미 있으면 스킵
-      // (DB 레벨 uniq_auto_break_per_minute 인덱스가 2차 방어선)
-      const recentWindow = new Date(now.getTime() - 20 * 60 * 1000).toISOString()
-      const { data: recentAutoBreak } = await admin
-        .from('attendance_records')
-        .select('id')
-        .eq('employee_id', employee.id)
-        .eq('type', 'BREAK_START')
-        .eq('note', 'PC 비활동 자동 휴식')
-        .gte('recorded_at', recentWindow)
-        .maybeSingle()
+      // Stale heartbeat 방지: 비활동 시작 시점이 마지막 기록보다 이전이면 지연 도착한 heartbeat → 스킵
+      // (예: BREAK_END 직후 도착한 오래된 high-idle heartbeat가 새 BREAK_START를 만드는 것 차단)
+      if (lastActivityAt >= lastRecordAt) {
+        const breakStartAt = new Date(Math.max(lastActivityAt.getTime(), lastRecordAt.getTime()))
 
-      if (!recentAutoBreak) {
-        await admin.from('attendance_records').insert({
-          employee_id: employee.id,
-          type: 'BREAK_START',
-          recorded_at: breakStartAt.toISOString(),
-          note: 'PC 비활동 자동 휴식',
-          is_field: false,
-        })
+        // Race Condition 방지: 최근 30분 내 자동 BREAK_START가 이미 있으면 스킵
+        const recentWindow = new Date(now.getTime() - 30 * 60 * 1000).toISOString()
+        const { data: recentAutoBreak } = await admin
+          .from('attendance_records')
+          .select('id')
+          .eq('employee_id', employee.id)
+          .eq('type', 'BREAK_START')
+          .eq('note', 'PC 비활동 자동 휴식')
+          .gte('recorded_at', recentWindow)
+          .maybeSingle()
+
+        if (!recentAutoBreak) {
+          await admin.from('attendance_records').insert({
+            employee_id: employee.id,
+            type: 'BREAK_START',
+            recorded_at: breakStartAt.toISOString(),
+            note: 'PC 비활동 자동 휴식',
+            is_field: false,
+          })
+        }
       }
     }
 
