@@ -1,11 +1,13 @@
 """
-Supery 근태 에이전트 v1.3.4
+Supery 근태 에이전트 v1.3.6
 - Windows ctypes GetLastInputInfo 방식 (백신 친화적, 후킹 없음)
 - 15분 PC 비활동 시 자동 휴식 기록
 - 활동 재개 시 자동 업무 복귀 기록
 - 시스템 트레이 상주 / Task Scheduler 로그온 작업 등록 (높은 우선순위)
 - 워킹데이(월~금) PC 시작 시 출근 확인 팝업 (3배 크기, 시간 제한 없음, 웹 출근 여부 서버 확인)
 - PC 종료/재시작 시 자동 퇴근 기록
+- 단일 인스턴스 뮤텍스 (중복 실행 방지)
+- 트레이 완전 기동 후에만 자동 퇴근 허용 (설치 직후 충돌/재실행으로 인한 오퇴근 방지)
 - 로그 파일: ~/.supery_agent.log (1MB 롤링)
 """
 import sys
@@ -36,7 +38,7 @@ API_BASE = "https://office.supery.co.kr/api"
 WORKSYNC_URL = "https://office.supery.co.kr"
 # ──────────────────────────────────────────────
 
-VERSION = "1.3.5"
+VERSION = "1.3.6"
 APP_NAME = "SuperyAgent"
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.json")
 LOG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.log")
@@ -48,6 +50,21 @@ KST = timezone(timedelta(hours=9))
 api_key: str = ""
 running: bool = True
 _checkin_prompted: bool = False  # 이 세션에서 팝업을 이미 표시했는지 (재부팅 시 리셋됨)
+_fully_started: bool = False     # pystray 트레이가 완전히 기동된 후에만 True — 조기 종료 시 오퇴근 방지
+_mutex_handle = None             # 단일 인스턴스 뮤텍스 핸들
+
+
+# ── 단일 인스턴스 잠금 ──────────────────────────
+
+def acquire_single_instance_lock() -> bool:
+    """Windows 뮤텍스로 중복 실행 감지 — 이미 실행 중이면 False 반환"""
+    global _mutex_handle
+    _mutex_handle = ctypes.windll.kernel32.CreateMutexW(None, True, f"Global\\{APP_NAME}SingleInstance")
+    if ctypes.windll.kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
+        ctypes.windll.kernel32.CloseHandle(_mutex_handle)
+        _mutex_handle = None
+        return False
+    return True
 
 
 # ── 로거 설정 ───────────────────────────────────
@@ -540,8 +557,9 @@ def was_prev_session_force_killed() -> bool:
 
 def on_agent_exit() -> None:
     """에이전트 종료(PC 꺼짐/재시작/트레이 종료) 시 퇴근 처리
-    checkout 성공 시에만 exited_cleanly=True — 실패 시 다음 부팅에서 재시도"""
-    if not api_key:
+    checkout 성공 시에만 exited_cleanly=True — 실패 시 다음 부팅에서 재시도
+    _fully_started가 False이면 설치/초기화 중 조기 종료이므로 퇴근 처리 스킵"""
+    if not api_key or not _fully_started:
         mark_session_end()
         return
     try:
@@ -677,9 +695,13 @@ def create_icon() -> Image.Image:
 # ── 진입점 ──────────────────────────────────────
 
 def main() -> None:
-    global api_key, running
+    global api_key, running, _fully_started
 
     setup_logging()
+
+    if not acquire_single_instance_lock():
+        logging.warning("[main] 이미 실행 중인 인스턴스가 있어 종료합니다.")
+        sys.exit(0)
 
     cfg = load_config()
     api_key = cfg.get("api_key", "")
@@ -711,6 +733,8 @@ def main() -> None:
 
     # 워킹데이 출근 확인 (pystray 시작 전, 메인 스레드)
     check_workday_checkin(is_first_run=is_first_run)
+
+    _fully_started = True  # 여기서부터 종료 시 정상 퇴근 처리
 
     def on_quit(icon, _):
         global running
