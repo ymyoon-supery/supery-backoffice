@@ -11,7 +11,7 @@ import { calcDaySummary, groupByEmpDate, WorkSchedule } from '@/lib/attendance/c
 export default async function AdminAttendancePage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; date?: string; empId?: string; employment?: string }>
+  searchParams: Promise<{ view?: string; date?: string; empId?: string; employment?: string; tab?: string }>
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -22,6 +22,7 @@ export default async function AdminAttendancePage({
   const baseDate = params.date ? parseISO(params.date) : new Date()
   const selectedEmpId = params.empId ?? ''
   const employment = params.employment === 'resigned' ? 'resigned' : 'active'
+  const initialTab = params.tab === 'detail' ? 'detail' : 'summary'
 
   let rangeStart: Date, rangeEnd: Date
   if (view === 'day') {
@@ -113,6 +114,8 @@ export default async function AdminAttendancePage({
         leaveRecords={leaveRecords ?? []}
         rawRecords={records ?? []}
         allEmployeesForEditor={employees ?? []}
+        initialTab={initialTab}
+        employment={employment}
       />
     </div>
   )
