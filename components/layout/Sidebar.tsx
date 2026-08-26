@@ -7,6 +7,7 @@ import {
   Clock, FileText, BarChart2, Users, ClipboardList, Home,
   Bell, FilePlus, CalendarDays, Settings, Megaphone, Inbox,
   Receipt, Package, Loader2, X, BookOpen, FileBarChart, Monitor,
+  CreditCard,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useMobileSidebar } from './MobileSidebarContext'
@@ -53,6 +54,7 @@ const adminNavGroups = [
     label: '시스템',
     items: [
       { href: '/admin/settings', label: '설정', icon: Settings },
+      { href: '/admin/subscriptions', label: '구독서비스 관리', icon: CreditCard },
     ],
   },
 ]
