@@ -325,9 +325,9 @@ export default function AttendanceSummaryView({
 
       {tab === 'detail' && (
         <AttendanceEditor
-          records={rawRecords}
+          records={selectedEmpId ? rawRecords.filter((r: any) => r.employee_id === selectedEmpId) : rawRecords}
           employees={allEmployeesForEditor}
-          leaveRecords={leaveRecords}
+          leaveRecords={selectedEmpId ? leaveRecords.filter((r: any) => r.employee_id === selectedEmpId) : leaveRecords}
         />
       )}
     </div>
