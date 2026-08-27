@@ -72,3 +72,43 @@ export async function toggleAutoBreak(employeeId: string, enabled: boolean): Pro
   revalidatePath('/admin/agents')
   return {}
 }
+
+export async function getAgentUploadUrl(version: string): Promise<{
+  uploadUrl: string
+  storagePath: string
+  error?: string
+}> {
+  const { error: authError } = await requireAdmin()
+  if (authError) return { uploadUrl: '', storagePath: '', error: authError }
+
+  const storagePath = `SuperyAgent-${version}.exe`
+  const supabase = adminClient()
+
+  const { data, error } = await supabase.storage
+    .from('agent-releases')
+    .createSignedUploadUrl(storagePath, { upsert: true })
+
+  if (error || !data) return { uploadUrl: '', storagePath: '', error: error?.message ?? '업로드 URL 생성 실패' }
+
+  return { uploadUrl: data.signedUrl, storagePath }
+}
+
+export async function confirmAgentUpload(storagePath: string, version: string): Promise<{ error?: string }> {
+  const { error: authError } = await requireAdmin()
+  if (authError) return { error: authError }
+
+  const supabase = adminClient()
+  const { error } = await supabase
+    .from('company_settings')
+    .update({
+      agent_version: version,
+      agent_exe_storage_path: storagePath,
+      agent_version_updated_at: new Date().toISOString(),
+    })
+    .not('id', 'is', null)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/admin/agents')
+  return {}
+}

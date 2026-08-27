@@ -1,11 +1,11 @@
 """
-Supery 근태 에이전트 v1.3.6
+Supery 근태 에이전트 v1.3.7
 - Windows ctypes GetLastInputInfo 방식 (백신 친화적, 후킹 없음)
 - 15분 PC 비활동 시 자동 휴식 기록
 - 활동 재개 시 자동 업무 복귀 기록
 - 시스템 트레이 상주 / Task Scheduler 로그온 작업 등록 (높은 우선순위)
 - 워킹데이(월~금) PC 시작 시 출근 확인 팝업 (3배 크기, 시간 제한 없음, 웹 출근 여부 서버 확인)
-- PC 종료/재시작 시 자동 퇴근 기록
+- PC 종료/재시작 시 자동 퇴근 기록 (WM_ENDSESSION 숨김 창 + atexit 이중 보장)
 - 단일 인스턴스 뮤텍스 (중복 실행 방지)
 - 트레이 완전 기동 후에만 자동 퇴근 허용 (설치 직후 충돌/재실행으로 인한 오퇴근 방지)
 - 로그 파일: ~/.supery_agent.log (1MB 롤링)
@@ -38,7 +38,7 @@ API_BASE = "https://office.supery.co.kr/api"
 WORKSYNC_URL = "https://office.supery.co.kr"
 # ──────────────────────────────────────────────
 
-VERSION = "1.3.6"
+VERSION = "1.3.7"
 APP_NAME = "SuperyAgent"
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.json")
 LOG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.log")
@@ -52,6 +52,8 @@ running: bool = True
 _checkin_prompted: bool = False  # 이 세션에서 팝업을 이미 표시했는지 (재부팅 시 리셋됨)
 _fully_started: bool = False     # pystray 트레이가 완전히 기동된 후에만 True — 조기 종료 시 오퇴근 방지
 _mutex_handle = None             # 단일 인스턴스 뮤텍스 핸들
+_checkout_done: bool = False     # WM_ENDSESSION + atexit 이중 호출 방지
+_shutdown_wnd_proc_cb = None     # WndProc 콜백 GC 방지용 모듈 레벨 참조
 
 
 # ── 단일 인스턴스 잠금 ──────────────────────────
@@ -557,8 +559,13 @@ def was_prev_session_force_killed() -> bool:
 
 def on_agent_exit() -> None:
     """에이전트 종료(PC 꺼짐/재시작/트레이 종료) 시 퇴근 처리
-    checkout 성공 시에만 exited_cleanly=True — 실패 시 다음 부팅에서 재시도
-    _fully_started가 False이면 설치/초기화 중 조기 종료이므로 퇴근 처리 스킵"""
+    WM_ENDSESSION 핸들러와 atexit 양쪽에서 호출될 수 있으므로 _checkout_done으로 중복 실행 방지
+    checkout 성공 시에만 exited_cleanly=True — 실패 시 다음 부팅에서 재시도"""
+    global _checkout_done
+    if _checkout_done:
+        return
+    _checkout_done = True
+
     if not api_key or not _fully_started:
         mark_session_end()
         return
@@ -567,7 +574,7 @@ def on_agent_exit() -> None:
             f"{API_BASE}/agent/checkout",
             json={"device": platform.node(), "version": VERSION},
             headers={"X-Agent-Key": api_key},
-            timeout=3,  # Windows 종료 시 짧게 설정 (5초 내 정리 필요)
+            timeout=5,  # WM_ENDSESSION 핸들러 내에서는 네트워크가 살아있으므로 여유 있게
         )
         if resp.ok:
             mark_session_end()
@@ -575,6 +582,76 @@ def on_agent_exit() -> None:
         # → 다음 부팅 시 was_prev_session_force_killed()=True → 재시도
     except Exception:
         pass  # 네트워크 종료 중 실패 → exited_cleanly=False 유지
+
+
+def _register_windows_shutdown_handler() -> None:
+    """WM_ENDSESSION 수신 전용 숨김 창 등록 — atexit보다 신뢰성 높은 Windows 종료 감지
+    TerminateProcess로 강제 종료되기 전, Windows가 종료 승인을 기다리는 단계에서 호출됨"""
+    global _shutdown_wnd_proc_cb
+
+    WM_QUERYENDSESSION = 0x0011
+    WM_ENDSESSION = 0x0016
+
+    WndProcType = ctypes.WINFUNCTYPE(
+        ctypes.c_long,
+        ctypes.c_void_p,  # HWND
+        ctypes.c_uint,    # message
+        ctypes.c_size_t,  # WPARAM
+        ctypes.c_size_t,  # LPARAM
+    )
+
+    def _wnd_proc(hwnd, msg, wparam, lparam):
+        if msg == WM_QUERYENDSESSION:
+            return 1  # 종료 승인
+        if msg == WM_ENDSESSION and wparam:
+            # Windows가 종료를 확정한 순간 — 네트워크 살아있는 상태에서 퇴근 기록
+            on_agent_exit()
+            return 0
+        return ctypes.windll.user32.DefWindowProcW(hwnd, msg, wparam, lparam)
+
+    _shutdown_wnd_proc_cb = WndProcType(_wnd_proc)  # GC 방지: 모듈 레벨에 저장
+
+    class WNDCLASSW(ctypes.Structure):
+        _fields_ = [
+            ('style', ctypes.c_uint),
+            ('lpfnWndProc', WndProcType),
+            ('cbClsExtra', ctypes.c_int),
+            ('cbWndExtra', ctypes.c_int),
+            ('hInstance', ctypes.c_void_p),
+            ('hIcon', ctypes.c_void_p),
+            ('hCursor', ctypes.c_void_p),
+            ('hbrBackground', ctypes.c_void_p),
+            ('lpszMenuName', ctypes.c_wchar_p),
+            ('lpszClassName', ctypes.c_wchar_p),
+        ]
+
+    CLASS_NAME = "SuperyShutdownWnd"
+    hinst = ctypes.windll.kernel32.GetModuleHandleW(None)
+
+    wc = WNDCLASSW()
+    wc.lpfnWndProc = _shutdown_wnd_proc_cb
+    wc.hInstance = hinst
+    wc.lpszClassName = CLASS_NAME
+
+    ctypes.windll.user32.RegisterClassW(ctypes.byref(wc))
+
+    hwnd = ctypes.windll.user32.CreateWindowExW(
+        0, CLASS_NAME, None, 0,
+        0, 0, 0, 0, None, None, hinst, None,
+    )
+
+    if not hwnd:
+        logging.warning("[shutdown] 숨김 창 생성 실패 — atexit 단독 동작")
+        return
+
+    def _pump():
+        msg = ctypes.wintypes.MSG()
+        while ctypes.windll.user32.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
+            ctypes.windll.user32.TranslateMessage(ctypes.byref(msg))
+            ctypes.windll.user32.DispatchMessageW(ctypes.byref(msg))
+
+    threading.Thread(target=_pump, name="ShutdownListener", daemon=True).start()
+    logging.warning("[shutdown] WM_ENDSESSION 핸들러 등록 완료")
 
 
 def checkout_prev_session() -> None:
@@ -602,6 +679,89 @@ def checkout_prev_session() -> None:
             logging.warning(f"[checkout] attempt {attempt} failed: {e}")
         time.sleep(3)
     logging.warning("[checkout] prev session checkout failed after 30s")
+
+
+# ── 자동 업데이트 ────────────────────────────────
+
+def _version_tuple(v: str) -> tuple:
+    try:
+        return tuple(int(x) for x in v.split('.'))
+    except Exception:
+        return (0,)
+
+
+def _to_short_path(path: str) -> str:
+    """한글 경로 포함 배치 파일 호환을 위해 Windows 8.3 단축 경로로 변환"""
+    try:
+        buf = ctypes.create_unicode_buffer(260)
+        ctypes.windll.kernel32.GetShortPathNameW(path, buf, 260)
+        return buf.value or path
+    except Exception:
+        return path
+
+
+def check_for_update() -> None:
+    """시작 시 최신 버전 확인 — 신버전이면 자동 다운로드 후 재시작
+    PyInstaller EXE로 실행 중일 때만 동작 (개발 환경 제외)"""
+    global _checkout_done
+    if not api_key:
+        return
+    if not getattr(sys, 'frozen', False):
+        return  # 개발 환경 — 자동 업데이트 비활성화
+    try:
+        resp = requests.get(
+            f"{API_BASE}/agent/version",
+            headers={"X-Agent-Key": api_key},
+            timeout=10,
+        )
+        if not resp.ok:
+            return
+        data = resp.json()
+        latest = data.get("version") or ""
+        if not latest or _version_tuple(latest) <= _version_tuple(VERSION):
+            return  # 최신 버전이거나 서버에 배포 버전 없음
+
+        download_url = data.get("download_url") or ""
+        if not download_url:
+            return
+
+        logging.warning(f"[update] 신버전 감지: {VERSION} → {latest}, 다운로드 시작")
+
+        exe_path = sys.executable
+        new_exe = exe_path + ".new"
+
+        with requests.get(download_url, stream=True, timeout=120) as r:
+            r.raise_for_status()
+            with open(new_exe, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=65536):
+                    f.write(chunk)
+
+        # 배치 파일: 현재 프로세스 종료 후 2초 대기 → EXE 교체 → 재시작
+        short_exe = _to_short_path(exe_path)
+        short_new = _to_short_path(new_exe)
+        bat_path = exe_path + "_update.bat"
+        bat_content = (
+            "@echo off\r\n"
+            "timeout /t 2 /nobreak > nul\r\n"
+            f'move /y "{short_new}" "{short_exe}"\r\n'
+            f'start "" "{short_exe}"\r\n'
+            "del \"%~0\"\r\n"
+        )
+        with open(bat_path, 'w', encoding='ascii', errors='replace') as f:
+            f.write(bat_content)
+
+        subprocess.Popen(
+            ['cmd', '/c', bat_path],
+            creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW,
+        )
+
+        logging.warning(f"[update] v{latest} 업데이트 준비 완료 — 재시작")
+        mark_session_end()   # 다음 부팅 시 checkout_prev_session 호출 방지
+        _checkout_done = True  # on_agent_exit에서 불필요한 checkout 방지
+        sys.exit(0)
+
+    except Exception as e:
+        logging.warning(f"[update] 업데이트 실패: {e}")
 
 
 # ── API 호출 ────────────────────────────────────
@@ -712,6 +872,7 @@ def main() -> None:
 
     setup_autostart(True)
     atexit.register(on_agent_exit)
+    _register_windows_shutdown_handler()  # WM_ENDSESSION 숨김 창 — atexit보다 신뢰성 높음
 
     # 이전 세션이 강제 종료됐으면 서버에 checkout 기록 (atexit 미실행 보완)
     # 네트워크 미준비 상태일 수 있으므로 최대 30초 재시도 후 check_workday_checkin 호출
@@ -719,6 +880,7 @@ def main() -> None:
         checkout_prev_session()
 
     mark_session_start()
+    check_for_update()  # 신버전 있으면 다운로드 후 배치로 재시작 (EXE 실행 시에만)
 
     threading.Thread(target=heartbeat_loop, daemon=True).start()
 

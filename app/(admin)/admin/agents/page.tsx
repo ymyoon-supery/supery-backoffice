@@ -7,7 +7,7 @@ export default async function AgentsPage() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   )
 
-  const [{ data: employees }, { data: employeesWithKey }, { data: installations }] = await Promise.all([
+  const [{ data: employees }, { data: employeesWithKey }, { data: installations }, { data: settings }] = await Promise.all([
     admin
       .from('employees')
       .select('id, name, email, agent_auto_break')
@@ -23,6 +23,10 @@ export default async function AgentsPage() {
       .from('agent_installations')
       .select('employee_id, device_name, os_info, app_version, registered_at, last_seen_at')
       .order('last_seen_at', { ascending: false }),
+    admin
+      .from('company_settings')
+      .select('agent_version, agent_version_updated_at')
+      .single(),
   ])
 
   const keySet = new Set((employeesWithKey ?? []).map(e => e.id))
@@ -45,7 +49,11 @@ export default async function AgentsPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold text-gray-900">PC 에이전트 현황</h1>
-      <AgentsClient rows={rows} />
+      <AgentsClient
+        rows={rows}
+        agentVersion={settings?.agent_version ?? null}
+        agentVersionUpdatedAt={settings?.agent_version_updated_at ?? null}
+      />
     </div>
   )
 }
