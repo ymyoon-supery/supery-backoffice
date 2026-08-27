@@ -38,7 +38,7 @@ API_BASE = "https://office.supery.co.kr/api"
 WORKSYNC_URL = "https://office.supery.co.kr"
 # ──────────────────────────────────────────────
 
-VERSION = "1.3.7"
+VERSION = "1.3.8"
 APP_NAME = "SuperyAgent"
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.json")
 LOG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.log")
@@ -54,6 +54,8 @@ _fully_started: bool = False     # pystray 트레이가 완전히 기동된 후�
 _mutex_handle = None             # 단일 인스턴스 뮤텍스 핸들
 _checkout_done: bool = False     # WM_ENDSESSION + atexit 이중 호출 방지
 _shutdown_wnd_proc_cb = None     # WndProc 콜백 GC 방지용 모듈 레벨 참조
+_sleep_started_wall: float | None = None  # time.time() at PBT_APMSUSPEND
+_sleep_idle_at_suspend: float = 0.0       # idle_seconds at suspend time
 
 
 # ── 단일 인스턴스 잠금 ──────────────────────────
@@ -591,6 +593,10 @@ def _register_windows_shutdown_handler() -> None:
 
     WM_QUERYENDSESSION = 0x0011
     WM_ENDSESSION = 0x0016
+    WM_POWERBROADCAST = 0x0218
+    PBT_APMSUSPEND = 0x0004
+    PBT_APMRESUMEAUTOMATIC = 0x0012
+    PBT_APMRESUMESUSPEND = 0x0007
 
     WndProcType = ctypes.WINFUNCTYPE(
         ctypes.c_long,
@@ -601,12 +607,38 @@ def _register_windows_shutdown_handler() -> None:
     )
 
     def _wnd_proc(hwnd, msg, wparam, lparam):
+        global _sleep_started_wall, _sleep_idle_at_suspend
         if msg == WM_QUERYENDSESSION:
             return 1  # 종료 승인
         if msg == WM_ENDSESSION and wparam:
             # Windows가 종료를 확정한 순간 — 네트워크 살아있는 상태에서 퇴근 기록
             on_agent_exit()
             return 0
+        if msg == WM_POWERBROADCAST:
+            if wparam == PBT_APMSUSPEND:
+                # 절전 진입 — 실제 시각과 현재 유휴 시간 기록
+                _sleep_started_wall = time.time()
+                _sleep_idle_at_suspend = get_idle_seconds()
+                logging.warning(f"[sleep] 절전 진입: idle={_sleep_idle_at_suspend:.0f}s")
+            elif wparam in (PBT_APMRESUMEAUTOMATIC, PBT_APMRESUMESUSPEND):
+                # 절전 해제 — S3에서 GetTickCount64가 멈추므로 실제 경과 시간으로 보정
+                start = _sleep_started_wall
+                idle_at = _sleep_idle_at_suspend
+                _sleep_started_wall = None
+                _sleep_idle_at_suspend = 0.0
+                if start is not None:
+                    sleep_dur = time.time() - start
+                    idle_eff = min(idle_at + sleep_dur, 6 * 3600)
+                    logging.warning(f"[sleep] 절전 해제: dur={sleep_dur:.0f}s idle_eff={idle_eff:.0f}s")
+                    def _wake_hb(idle=idle_eff):
+                        time.sleep(3)  # 네트워크 안정화 대기
+                        api_post("agent/heartbeat", {
+                            "idle_seconds": int(idle),
+                            "device": platform.node(),
+                            "version": VERSION,
+                            "event": "wake",
+                        })
+                    threading.Thread(target=_wake_hb, daemon=True).start()
         return ctypes.windll.user32.DefWindowProcW(hwnd, msg, wparam, lparam)
 
     _shutdown_wnd_proc_cb = WndProcType(_wnd_proc)  # GC 방지: 모듈 레벨에 저장
