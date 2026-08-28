@@ -38,7 +38,7 @@ API_BASE = "https://office.supery.co.kr/api"
 WORKSYNC_URL = "https://office.supery.co.kr"
 # ──────────────────────────────────────────────
 
-VERSION = "1.3.8"
+VERSION = "1.3.9"
 APP_NAME = "SuperyAgent"
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.json")
 LOG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.log")
@@ -747,14 +747,17 @@ def check_for_update() -> None:
             timeout=10,
         )
         if not resp.ok:
+            logging.warning(f"[update] 버전 확인 실패: HTTP {resp.status_code}")
             return
         data = resp.json()
         latest = data.get("version") or ""
         if not latest or _version_tuple(latest) <= _version_tuple(VERSION):
-            return  # 최신 버전이거나 서버에 배포 버전 없음
+            logging.warning(f"[update] 최신 버전 유지: current={VERSION} server={latest or 'none'}")
+            return
 
         download_url = data.get("download_url") or ""
         if not download_url:
+            logging.warning(f"[update] download_url 없음: server_version={latest}")
             return
 
         logging.warning(f"[update] 신버전 감지: {VERSION} → {latest}, 다운로드 시작")
@@ -779,8 +782,12 @@ def check_for_update() -> None:
             f'start "" "{short_exe}"\r\n'
             "del \"%~0\"\r\n"
         )
-        with open(bat_path, 'w', encoding='ascii', errors='replace') as f:
+        # 시스템 ANSI 인코딩(한국어 Windows=cp949) 사용 — ascii 사용 시 한글 경로가 ?로 깨져 move 실패
+        import locale
+        bat_enc = locale.getpreferredencoding(False) or 'cp949'
+        with open(bat_path, 'w', encoding=bat_enc) as f:
             f.write(bat_content)
+        logging.warning(f"[update] bat 생성: enc={bat_enc} short_exe={short_exe}")
 
         subprocess.Popen(
             ['cmd', '/c', bat_path],
