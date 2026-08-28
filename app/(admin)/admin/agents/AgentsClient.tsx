@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useTransition, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Monitor, Copy, RefreshCw, Trash2, CheckCircle2, Clock, WifiOff, Upload, AlertTriangle } from 'lucide-react'
 import { generateAgentKey, revokeAgentKey, toggleAutoBreak, getAgentUploadUrl, confirmAgentUpload } from './actions'
@@ -49,7 +48,6 @@ export default function AgentsClient({
   agentVersion: string | null
   agentVersionUpdatedAt: string | null
 }) {
-  const router = useRouter()
   const [generatedKeys, setGeneratedKeys] = useState<Record<string, string>>({})
   const [autoBreakMap, setAutoBreakMap] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(rows.map(r => [r.id, r.autoBreak]))
@@ -99,7 +97,6 @@ export default function AgentsClient({
       setUploadFile(null)
       if (fileInputRef.current) fileInputRef.current.value = ''
       toast.success(`v${ver} 배포 완료 — 직원 PC 재시작 시 자동 업데이트됩니다.`)
-      router.refresh()
     } catch (e) {
       setUploadError(String(e))
     } finally {
