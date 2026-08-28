@@ -142,5 +142,6 @@ export async function recordAttendance(input: RecordAttendanceInput) {
   }
 
   revalidateTag(CACHE_TAGS.attendance)
+  revalidatePath('/admin/attendance')
   return { error: null }
 }
