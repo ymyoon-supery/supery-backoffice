@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
-import { Monitor, Copy, RefreshCw, Trash2, CheckCircle2, Clock, WifiOff, Upload, AlertTriangle } from 'lucide-react'
+import { Monitor, Copy, RefreshCw, Trash2, CheckCircle2, Clock, WifiOff, Upload, AlertTriangle, Download } from 'lucide-react'
 import { generateAgentKey, revokeAgentKey, toggleAutoBreak, getAgentUploadUrl, confirmAgentUpload } from './actions'
 import { formatDistanceToNow, format } from 'date-fns'
 import { ko } from 'date-fns/locale'
@@ -146,16 +146,26 @@ export default function AgentsClient({
       <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium text-gray-700">에이전트 버전 관리</p>
-          <div className="text-sm text-gray-500">
+          <div className="flex items-center gap-3 text-sm text-gray-500">
             {deployedVersion ? (
-              <span>
-                배포 중: <span className="font-mono font-semibold text-gray-900">v{deployedVersion}</span>
-                {deployedAt && (
-                  <span className="text-gray-400 ml-2">
-                    ({format(new Date(deployedAt), 'MM.dd HH:mm')})
-                  </span>
-                )}
-              </span>
+              <>
+                <span>
+                  배포 중: <span className="font-mono font-semibold text-gray-900">v{deployedVersion}</span>
+                  {deployedAt && (
+                    <span className="text-gray-400 ml-2">
+                      ({format(new Date(deployedAt), 'MM.dd HH:mm')})
+                    </span>
+                  )}
+                </span>
+                <a
+                  href="/api/admin/agent-download"
+                  download="SuperyAgent.exe"
+                  className="flex items-center gap-1 text-xs text-gray-600 border border-gray-300 px-2.5 py-1 rounded-md hover:bg-gray-50 whitespace-nowrap"
+                >
+                  <Download size={12} />
+                  EXE 다운로드
+                </a>
+              </>
             ) : (
               <span className="text-gray-400">배포된 버전 없음</span>
             )}
