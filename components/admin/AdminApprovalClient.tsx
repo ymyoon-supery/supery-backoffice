@@ -31,6 +31,8 @@ const PAYMENT_STATUS_NEXT: Record<string, Array<{ value: 'PENDING_PAYMENT' | 'PA
   SETTLED:         [],
 }
 
+const DONE_PAGE_SIZE = 20
+
 function getPageNums(cur: number, total: number): number[] {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
   const half = 3
@@ -73,8 +75,10 @@ export default function AdminApprovalClient({
   const [kindFilter, setKindFilter] = useState<'all' | 'leave' | 'expense' | 'home_location'>('all')
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'PENDING_PAYMENT' | 'PAID' | 'SETTLED'>('all')
   const [dateSort, setDateSort] = useState<'desc' | 'asc'>(sort === 'asc' ? 'asc' : 'desc')
+  const [donePage, setDonePage] = useState(1)
 
-  useEffect(() => { setStatusFilter('all'); setKindFilter('all'); setPaymentFilter('all') }, [tab])
+  useEffect(() => { setStatusFilter('all'); setKindFilter('all'); setPaymentFilter('all'); setDonePage(1) }, [tab])
+  useEffect(() => { setDonePage(1) }, [statusFilter, kindFilter, paymentFilter, dateSort])
 
   useEffect(() => {
     if (!paymentDropdownId) return
@@ -201,6 +205,12 @@ export default function AdminApprovalClient({
     const tb = b.requestDate ? new Date(b.requestDate).getTime() : 0
     return dateSort === 'desc' ? tb - ta : ta - tb
   })
+
+  const doneTotalPages = tab === 'done' ? Math.max(1, Math.ceil(sortedFilteredItems.length / DONE_PAGE_SIZE)) : 1
+  const donePageNums = getPageNums(donePage, doneTotalPages)
+  const displayItems = tab === 'done'
+    ? sortedFilteredItems.slice((donePage - 1) * DONE_PAGE_SIZE, donePage * DONE_PAGE_SIZE)
+    : sortedFilteredItems
 
   const doneCounts = {
     all:      allItems.length,
@@ -393,7 +403,7 @@ export default function AdminApprovalClient({
 
         {/* ── Mobile card list ── */}
         <div className="md:hidden divide-y divide-gray-50">
-          {sortedFilteredItems.map(item => {
+          {displayItems.map(item => {
             const isFullApprove = item.managerName != null
             const isPendingRow = item.status === 'PENDING' && !isFullApprove
             const cfg = STATUS_CFG[item.status]
@@ -660,7 +670,7 @@ export default function AdminApprovalClient({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {sortedFilteredItems.map(item => {
+            {displayItems.map(item => {
               const isFullApprove = item.managerName != null
               const isPendingRow = item.status === 'PENDING' && !isFullApprove
               const cfg = STATUS_CFG[item.status]
@@ -928,8 +938,8 @@ export default function AdminApprovalClient({
         </table>
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
+      {/* Pagination — pending: URL 기반, done: 클라이언트 state 기반 */}
+      {tab !== 'done' && totalPages > 1 && (
         <div className="flex items-center justify-between">
           <p className="text-xs text-gray-400">{page} / {totalPages} 페이지</p>
           <div className="flex items-center gap-1">
@@ -944,6 +954,26 @@ export default function AdminApprovalClient({
             ))}
             {page < totalPages
               ? <Link href={buildUrl({ page: String(page + 1) })} className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50"><ChevronRight size={14} /></Link>
+              : <span className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg text-gray-500 opacity-30 cursor-not-allowed"><ChevronRight size={14} /></span>
+            }
+          </div>
+        </div>
+      )}
+      {tab === 'done' && doneTotalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-gray-400">{donePage} / {doneTotalPages} 페이지 · 총 {sortedFilteredItems.length}건</p>
+          <div className="flex items-center gap-1">
+            {donePage > 1
+              ? <button onClick={() => setDonePage(p => p - 1)} className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50"><ChevronLeft size={14} /></button>
+              : <span className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg text-gray-500 opacity-30 cursor-not-allowed"><ChevronLeft size={14} /></span>
+            }
+            {donePageNums.map(n => (
+              n === donePage
+                ? <span key={n} className="w-8 h-8 text-xs rounded-lg border bg-primary text-white border-primary flex items-center justify-center">{n}</span>
+                : <button key={n} onClick={() => setDonePage(n)} className="w-8 h-8 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center justify-center">{n}</button>
+            ))}
+            {donePage < doneTotalPages
+              ? <button onClick={() => setDonePage(p => p + 1)} className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50"><ChevronRight size={14} /></button>
               : <span className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg text-gray-500 opacity-30 cursor-not-allowed"><ChevronRight size={14} /></span>
             }
           </div>
