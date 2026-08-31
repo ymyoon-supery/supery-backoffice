@@ -7,21 +7,35 @@ import { Pin, PenLine } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
-export default async function NoticesPage() {
+const PAGE_SIZE = 20
+
+export default async function NoticesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>
+}) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [{ data: emp }, { data: notices }] = await Promise.all([
+  const params = await searchParams
+  const page = Math.max(1, parseInt(params.page ?? '1', 10))
+  const from = (page - 1) * PAGE_SIZE
+  const to = from + PAGE_SIZE - 1
+
+  const [{ data: emp }, { data: notices, count }] = await Promise.all([
     supabase.from('employees')
       .select('id, role, can_write_notice')
       .eq('auth_user_id', user.id)
       .single(),
     supabase.from('notices')
-      .select('id, title, is_pinned, created_at, employees(name)')
+      .select('id, title, is_pinned, created_at, employees(name)', { count: 'exact' })
       .order('is_pinned', { ascending: false })
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: false })
+      .range(from, to),
   ])
+
+  const totalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE))
 
   const canWrite = emp?.role === 'ADMIN' || emp?.can_write_notice === true
 
@@ -66,6 +80,20 @@ export default async function NoticesPage() {
               </div>
             </Link>
           ))}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center gap-3 py-1 text-xs text-gray-500">
+          {page > 1
+            ? <Link href={`/notices?page=${page - 1}`} className="px-3 py-1 rounded border border-gray-200 hover:bg-gray-50">이전</Link>
+            : <span className="px-3 py-1 rounded border border-gray-100 text-gray-300">이전</span>
+          }
+          <span>{page} / {totalPages}</span>
+          {page < totalPages
+            ? <Link href={`/notices?page=${page + 1}`} className="px-3 py-1 rounded border border-gray-200 hover:bg-gray-50">다음</Link>
+            : <span className="px-3 py-1 rounded border border-gray-100 text-gray-300">다음</span>
+          }
         </div>
       )}
     </div>

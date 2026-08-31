@@ -35,10 +35,13 @@ function getPendingClassName(label: string) {
   return 'bg-amber-50 text-amber-700'
 }
 
+const PAGE_SIZE = 20
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function SupplyManageClient({ supplyRequests }: { supplyRequests: any[] }) {
   const [isPending, startTransition] = useTransition()
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [page, setPage] = useState(1)
   const router = useRouter()
 
   useEffect(() => {
@@ -47,6 +50,8 @@ export default function SupplyManageClient({ supplyRequests }: { supplyRequests:
       if (count === 0) setStatusFilter('all')
     }
   }, [supplyRequests, statusFilter])
+
+  useEffect(() => { setPage(1) }, [statusFilter])
 
   const counts: Record<StatusFilter, number> = {
     all: supplyRequests.length,
@@ -60,6 +65,9 @@ export default function SupplyManageClient({ supplyRequests }: { supplyRequests:
   const filtered = statusFilter === 'all'
     ? supplyRequests
     : supplyRequests.filter(r => r.status === statusFilter)
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   function handleComplete(requestId: string) {
     if (!confirm('처리 완료로 변경하시겠습니까?')) return
@@ -113,7 +121,7 @@ export default function SupplyManageClient({ supplyRequests }: { supplyRequests:
           </div>
         ) : (
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          filtered.map((req: any) => {
+          paged.map((req: any) => {
             const emp = req.employees
             const empLabel = [emp?.position, emp?.name].filter(Boolean).join(' ')
             const pendingLabel: string | null = req.pendingApproverLabel ?? null
@@ -202,8 +210,20 @@ export default function SupplyManageClient({ supplyRequests }: { supplyRequests:
           })
         )}
       </div>
-      {supplyRequests.length >= 100 && (
-        <p className="text-xs text-center text-gray-400">최근 100건만 표시됩니다.</p>
+
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center gap-1">
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+            className="px-2 py-1 text-xs rounded border border-gray-200 disabled:opacity-30 hover:bg-gray-50">이전</button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+            <button key={p} onClick={() => setPage(p)}
+              className={`px-2.5 py-1 text-xs rounded border ${page === p ? 'bg-primary text-white border-primary' : 'border-gray-200 hover:bg-gray-50'}`}>
+              {p}
+            </button>
+          ))}
+          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+            className="px-2 py-1 text-xs rounded border border-gray-200 disabled:opacity-30 hover:bg-gray-50">다음</button>
+        </div>
       )}
     </div>
   )

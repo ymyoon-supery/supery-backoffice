@@ -33,8 +33,7 @@ export default async function LeaveManualPage({
     admin.from('leave_requests')
       .select('id, employee_id, leave_type, start_date, end_date, days_used, reason, is_manual')
       .eq('status', 'APPROVED')
-      .order('start_date', { ascending: false })
-      .limit(500),
+      .order('start_date', { ascending: false }),
     admin.from('leave_requests')
       .select('employee_id, days_used, start_date')
       .eq('status', 'APPROVED')

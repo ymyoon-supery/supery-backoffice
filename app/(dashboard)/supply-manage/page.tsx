@@ -32,7 +32,6 @@ export default async function SupplyManagePage() {
       supply_approval_steps ( step_order, status, comment, approver_id, employees ( position, name, role ) )
     `)
     .order('created_at', { ascending: false })
-    .limit(100)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supplyRequests = (rawRequests ?? []).map((r: any) => {

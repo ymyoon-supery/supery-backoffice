@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -112,6 +112,11 @@ export default function AdminNoticesClient({ initialNotices, employees: initialE
   }
 
   const notices = initialNotices
+  const PAGE_SIZE = 20
+  const [noticePage, setNoticePage] = useState(1)
+  useEffect(() => { setNoticePage(1) }, [initialNotices])
+  const totalNoticePages = Math.max(1, Math.ceil(notices.length / PAGE_SIZE))
+  const pagedNotices = notices.slice((noticePage - 1) * PAGE_SIZE, noticePage * PAGE_SIZE)
 
   return (
     <div className="space-y-6">
@@ -180,6 +185,9 @@ export default function AdminNoticesClient({ initialNotices, employees: initialE
           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
             공지사항 목록 ({notices.length}건)
           </span>
+          {totalNoticePages > 1 && (
+            <span className="text-xs text-gray-400">{noticePage} / {totalNoticePages} 페이지</span>
+          )}
         </div>
         {notices.length === 0 ? (
           <div className="text-center py-10 text-sm text-gray-400">등록된 공지사항이 없습니다.</div>
@@ -195,7 +203,7 @@ export default function AdminNoticesClient({ initialNotices, employees: initialE
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {notices.map((n) => (
+              {pagedNotices.map((n) => (
                 <tr key={n.id} className="hover:bg-gray-50/50">
                   <td className="px-4 py-3 text-center">
                     {n.is_pinned && <Pin size={13} className="text-primary inline-block" />}
@@ -224,6 +232,20 @@ export default function AdminNoticesClient({ initialNotices, employees: initialE
               ))}
             </tbody>
           </table>
+        )}
+        {totalNoticePages > 1 && (
+          <div className="flex justify-center items-center gap-1 px-4 py-3 border-t border-gray-50">
+            <button onClick={() => setNoticePage(p => Math.max(1, p - 1))} disabled={noticePage === 1}
+              className="px-2 py-1 text-xs rounded border border-gray-200 disabled:opacity-30 hover:bg-gray-50">이전</button>
+            {Array.from({ length: totalNoticePages }, (_, i) => i + 1).map(p => (
+              <button key={p} onClick={() => setNoticePage(p)}
+                className={`px-2.5 py-1 text-xs rounded border ${noticePage === p ? 'bg-primary text-white border-primary' : 'border-gray-200 hover:bg-gray-50'}`}>
+                {p}
+              </button>
+            ))}
+            <button onClick={() => setNoticePage(p => Math.min(totalNoticePages, p + 1))} disabled={noticePage === totalNoticePages}
+              className="px-2 py-1 text-xs rounded border border-gray-200 disabled:opacity-30 hover:bg-gray-50">다음</button>
+          </div>
         )}
       </div>
 
