@@ -165,7 +165,7 @@ export async function notifyApprovalResult({
 
 // ─── HTML Templates ───────────────────────────────────────────────────────────
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://office.supery.co.kr'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://office.supery.co.kr'
 
 function ctaButton(label: string, url: string) {
   return `<div style="margin-top:24px">
