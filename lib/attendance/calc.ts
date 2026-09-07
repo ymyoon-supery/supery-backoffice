@@ -49,9 +49,13 @@ export function calcDaySummary(
   const firstCheckIn = checkIns[0]
   const lastCheckOut = checkOuts.length > 0 ? checkOuts[checkOuts.length - 1] : null
   const checkInKST = toKSTTime(firstCheckIn.recorded_at)
+  const kstDate = toKSTDate(firstCheckIn.recorded_at)
+  const checkInAbs = new Date(firstCheckIn.recorded_at).getTime()
+  const workStartAbs = new Date(`${kstDate}T${schedule.workStartTime}:00+09:00`).getTime()
+  const lateMin = Math.max(0, Math.floor((checkInAbs - workStartAbs) / 60000))
 
   if (!lastCheckOut) {
-    return { checkIn: checkInKST, checkOut: null, breakMin: 0, workMin: 0, lateMin: 0, earlyLeaveMin: 0 }
+    return { checkIn: checkInKST, checkOut: null, breakMin: 0, workMin: 0, lateMin, earlyLeaveMin: 0 }
   }
 
   // Pair each CHECK_IN with the first CHECK_OUT that follows it.
@@ -68,7 +72,7 @@ export function calcDaySummary(
   }
 
   if (sessions.length === 0) {
-    return { checkIn: checkInKST, checkOut: null, breakMin: 0, workMin: 0, lateMin: 0, earlyLeaveMin: 0 }
+    return { checkIn: checkInKST, checkOut: null, breakMin: 0, workMin: 0, lateMin, earlyLeaveMin: 0 }
   }
 
   // If the last CHECK_IN is after the last CHECK_OUT, there is an open (ongoing) session.
@@ -99,11 +103,6 @@ export function calcDaySummary(
   }
 
   // Use absolute timestamps so midnight-crossing shifts are calculated correctly
-  const kstDate = toKSTDate(firstCheckIn.recorded_at)
-  const checkInAbs = new Date(firstCheckIn.recorded_at).getTime()
-  const workStartAbs = new Date(`${kstDate}T${schedule.workStartTime}:00+09:00`).getTime()
-  const lateMin = Math.max(0, Math.floor((checkInAbs - workStartAbs) / 60000))
-
   if (hasOpenSession) {
     // Still working: show accumulated work so far, no checkout time, no early-leave
     const workMin = Math.max(0, totalGross - totalBreakMin)

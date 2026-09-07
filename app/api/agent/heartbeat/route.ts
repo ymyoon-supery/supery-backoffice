@@ -80,26 +80,48 @@ export async function POST(req: NextRequest) {
       // (예: BREAK_END 직후 도착한 오래된 high-idle heartbeat가 새 BREAK_START를 만드는 것 차단)
       if (lastActivityAt >= lastRecordAt) {
         const breakStartAt = new Date(Math.max(lastActivityAt.getTime(), lastRecordAt.getTime()))
+        const breakStartKSTDate = new Date(breakStartAt.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
-        // Race Condition 방지: 최근 30분 내 자동 BREAK_START가 이미 있으면 스킵
-        const recentWindow = new Date(now.getTime() - 30 * 60 * 1000).toISOString()
-        const { data: recentAutoBreak } = await admin
-          .from('attendance_records')
-          .select('id')
-          .eq('employee_id', employee.id)
-          .eq('type', 'BREAK_START')
-          .eq('note', 'PC 비활동 자동 휴식')
-          .gte('recorded_at', recentWindow)
-          .maybeSingle()
-
-        if (!recentAutoBreak) {
-          await admin.from('attendance_records').insert({
-            employee_id: employee.id,
-            type: 'BREAK_START',
-            recorded_at: breakStartAt.toISOString(),
-            note: 'PC 비활동 자동 휴식',
-            is_field: false,
-          })
+        if (breakStartKSTDate < kstDate) {
+          // 자정을 넘긴 절전/화면잠금: 전날 마지막 활동 시각을 퇴근으로 기록
+          const { data: existingCheckout } = await admin
+            .from('attendance_records')
+            .select('id')
+            .eq('employee_id', employee.id)
+            .eq('type', 'CHECK_OUT')
+            .gte('recorded_at', `${breakStartKSTDate}T00:00:00+09:00`)
+            .lte('recorded_at', `${breakStartKSTDate}T23:59:59+09:00`)
+            .maybeSingle()
+          if (!existingCheckout) {
+            await admin.from('attendance_records').insert({
+              employee_id: employee.id,
+              type: 'CHECK_OUT',
+              recorded_at: breakStartAt.toISOString(),
+              note: 'PC 절전/잠금 자동 퇴근',
+              is_field: false,
+            })
+          }
+        } else {
+          // 당일 비활동: 기존 BREAK_START 로직
+          // Race Condition 방지: 최근 30분 내 자동 BREAK_START가 이미 있으면 스킵
+          const recentWindow = new Date(now.getTime() - 30 * 60 * 1000).toISOString()
+          const { data: recentAutoBreak } = await admin
+            .from('attendance_records')
+            .select('id')
+            .eq('employee_id', employee.id)
+            .eq('type', 'BREAK_START')
+            .eq('note', 'PC 비활동 자동 휴식')
+            .gte('recorded_at', recentWindow)
+            .maybeSingle()
+          if (!recentAutoBreak) {
+            await admin.from('attendance_records').insert({
+              employee_id: employee.id,
+              type: 'BREAK_START',
+              recorded_at: breakStartAt.toISOString(),
+              note: 'PC 비활동 자동 휴식',
+              is_field: false,
+            })
+          }
         }
       }
     }
