@@ -126,6 +126,51 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // 오늘 기록이 없고 어제 미종료 세션이 있으면 퇴근 자동 기록
+    // — 쿼리가 gte(오늘 00:00)이므로 어제 마지막 기록(BREAK_START/BREAK_END/CHECK_IN 등)은
+    //   lastRecord=null로 보임. 날짜가 바뀐 첫 heartbeat에서 전날을 별도 조회해 처리.
+    if (!lastRecord) {
+      const yesterdayKSTDate = new Date(now.getTime() + 9 * 60 * 60 * 1000 - 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+      const { data: yestRecord } = await admin
+        .from('attendance_records')
+        .select('type, recorded_at, note')
+        .eq('employee_id', employee.id)
+        .gte('recorded_at', `${yesterdayKSTDate}T00:00:00+09:00`)
+        .lt('recorded_at', `${kstDate}T00:00:00+09:00`)
+        .order('recorded_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (yestRecord) {
+        const yestType = yestRecord.type
+        // WORKING_TYPES(CHECK_IN/BREAK_END/FIELD_END)이거나 자동 휴식 BREAK_START면 미종료로 판단
+        const needsCheckout =
+          WORKING_TYPES.has(yestType) ||
+          (yestType === 'BREAK_START' && yestRecord.note === 'PC 비활동 자동 휴식')
+
+        if (needsCheckout) {
+          const { data: existingCheckout } = await admin
+            .from('attendance_records')
+            .select('id')
+            .eq('employee_id', employee.id)
+            .eq('type', 'CHECK_OUT')
+            .gte('recorded_at', `${yesterdayKSTDate}T00:00:00+09:00`)
+            .lt('recorded_at', `${kstDate}T00:00:00+09:00`)
+            .maybeSingle()
+          if (!existingCheckout) {
+            await admin.from('attendance_records').insert({
+              employee_id: employee.id,
+              type: 'CHECK_OUT',
+              recorded_at: yestRecord.recorded_at,
+              note: 'PC 절전/잠금 자동 퇴근',
+              is_field: false,
+            })
+          }
+        }
+      }
+    }
+
     // 활동 재개 감지 → 자동 업무 복귀
     // note 정확 일치로 수동 기록과 구분 + 최소 5분 휴식 후에만 삽입 (idle 스파이크로 인한 무한 BREAK 루프 방지)
     if (
