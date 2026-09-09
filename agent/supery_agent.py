@@ -1,5 +1,5 @@
 """
-Supery 근태 에이전트 v1.3.9
+Supery 근태 에이전트 v1.3.10
 - Windows ctypes GetLastInputInfo 방식 (백신 친화적, 후킹 없음)
 - 15분 PC 비활동 시 자동 휴식 기록
 - 활동 재개 시 자동 업무 복귀 기록
@@ -38,7 +38,7 @@ API_BASE = "https://office.supery.co.kr/api"
 WORKSYNC_URL = "https://office.supery.co.kr"
 # ──────────────────────────────────────────────
 
-VERSION = "1.3.9"
+VERSION = "1.3.10"
 APP_NAME = "SuperyAgent"
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.json")
 LOG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.log")
