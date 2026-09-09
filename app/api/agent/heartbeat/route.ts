@@ -42,19 +42,16 @@ export async function POST(req: NextRequest) {
     !isNaN(suspendAtMs) ? new Date(suspendAtMs - idleAtSuspend * 1000) : null
 
   // 설치 현황 last_seen_at 업데이트
-  const { data: existing } = await admin
+  // SELECT+INSERT 레이스 방지: UPDATE-first 패턴 — 기존 행이 있으면 UPDATE(원자적),
+  // 없으면(첫 등록) INSERT. 동시 INSERT 충돌은 에러 무시(unique constraint가 막아줌).
+  const { data: updated } = await admin
     .from('agent_installations')
-    .select('id')
+    .update({ last_seen_at: now.toISOString(), app_version: body.version || null })
     .eq('employee_id', employee.id)
     .eq('device_name', deviceName)
-    .maybeSingle()
+    .select('id')
 
-  if (existing) {
-    await admin
-      .from('agent_installations')
-      .update({ last_seen_at: now.toISOString(), app_version: body.version || null })
-      .eq('id', existing.id)
-  } else {
+  if (!updated || updated.length === 0) {
     await admin.from('agent_installations').insert({
       employee_id: employee.id,
       device_name: deviceName,
@@ -62,6 +59,7 @@ export async function POST(req: NextRequest) {
       registered_at: now.toISOString(),
       last_seen_at: now.toISOString(),
     })
+    // 동시 첫 heartbeat로 unique 충돌 시 에러 무시 — 다음 heartbeat에서 UPDATE 경로로 처리됨
   }
 
   // 자동 휴식 감지가 꺼진 직원(외근직 등)은 이하 로직 스킵
@@ -101,7 +99,7 @@ export async function POST(req: NextRequest) {
             .eq('employee_id', employee.id)
             .eq('type', 'CHECK_OUT')
             .gte('recorded_at', `${breakStartKSTDate}T00:00:00+09:00`)
-            .lte('recorded_at', `${breakStartKSTDate}T23:59:59+09:00`)
+            .lt('recorded_at', `${kstDate}T00:00:00+09:00`)
             .maybeSingle()
           if (!existingCheckout) {
             await admin.from('attendance_records').insert({
