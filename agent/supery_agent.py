@@ -1,5 +1,5 @@
 """
-Supery 근태 에이전트 v1.3.7
+Supery 근태 에이전트 v1.3.9
 - Windows ctypes GetLastInputInfo 방식 (백신 친화적, 후킹 없음)
 - 15분 PC 비활동 시 자동 휴식 기록
 - 활동 재개 시 자동 업무 복귀 기록
