@@ -29,7 +29,13 @@ export async function POST(req: NextRequest) {
   let recordedAt = now.toISOString()
   if (reason === 'prev_session_killed' && lastActiveAt) {
     const parsed = new Date(lastActiveAt)
-    if (!isNaN(parsed.getTime())) recordedAt = parsed.toISOString()
+    if (!isNaN(parsed.getTime())) {
+      const ageMs = now.getTime() - parsed.getTime()
+      // 36시간 이내 과거 && 5분 이내 미래만 허용 — 시계 오류·버그로 인한 비정상 시각 차단
+      if (ageMs >= -5 * 60 * 1000 && ageMs <= 36 * 60 * 60 * 1000) {
+        recordedAt = parsed.toISOString()
+      }
+    }
   }
 
   // KST 07:00~23:59 범위에서만 자동 퇴근 처리 (퇴근 시각 기준)
@@ -48,6 +54,7 @@ export async function POST(req: NextRequest) {
     .eq('employee_id', employee.id)
     .gte('recorded_at', `${kstDate}T00:00:00+09:00`)
     .order('recorded_at', { ascending: false })
+    .order('id', { ascending: false })
     .limit(1)
     .maybeSingle()
 

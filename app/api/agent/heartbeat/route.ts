@@ -33,11 +33,13 @@ export async function POST(req: NextRequest) {
   // 절전 wake heartbeat 전용: suspend_at(절전 진입 시각) - idle_at_suspend(절전 당시 유휴초) = 실제 마지막 활동 시각
   // idle_seconds 6시간 클램프로 인한 부정확성을 보정
   const suspendAtStr = body.suspend_at as string | undefined
-  const idleAtSuspend = Number(body.idle_at_suspend) || 0
+  // idle_at_suspend도 MAX_IDLE_SECONDS 클램프 — idle_seconds와 동일한 보호
+  const idleAtSuspend = Math.max(0, Math.min(Number(body.idle_at_suspend) || 0, MAX_IDLE_SECONDS))
+  // suspend_at이 유효하지 않은 날짜 문자열인 경우 NaN → null로 처리
+  // Invalid Date를 그대로 쓰면 .toISOString()에서 RangeError 크래시 발생
+  const suspendAtMs = suspendAtStr ? new Date(suspendAtStr).getTime() : NaN
   const lastActivityBeforeSleep: Date | null =
-    suspendAtStr && idleAtSuspend >= 0
-      ? new Date(new Date(suspendAtStr).getTime() - idleAtSuspend * 1000)
-      : null
+    !isNaN(suspendAtMs) ? new Date(suspendAtMs - idleAtSuspend * 1000) : null
 
   // 설치 현황 last_seen_at 업데이트
   const { data: existing } = await admin
@@ -208,13 +210,26 @@ export async function POST(req: NextRequest) {
     ) {
       const breakDurationSec = (now.getTime() - new Date(lastRecord!.recorded_at).getTime()) / 1000
       if (breakDurationSec >= MIN_BREAK_DURATION_SEC) {
-        await admin.from('attendance_records').insert({
-          employee_id: employee.id,
-          type: 'BREAK_END',
-          recorded_at: now.toISOString(),
-          note: 'PC 활동 감지 자동 업무 복귀',
-          is_field: false,
-        })
+        // Race 방지: 최근 2분 내 자동 BREAK_END가 이미 있으면 스킵
+        // (동시 heartbeat가 두 건 도달하거나 네트워크 재시도 시 중복 삽입 방지)
+        const recentBreakEndWindow = new Date(now.getTime() - 2 * 60 * 1000).toISOString()
+        const { data: existingBreakEnd } = await admin
+          .from('attendance_records')
+          .select('id')
+          .eq('employee_id', employee.id)
+          .eq('type', 'BREAK_END')
+          .eq('note', 'PC 활동 감지 자동 업무 복귀')
+          .gte('recorded_at', recentBreakEndWindow)
+          .maybeSingle()
+        if (!existingBreakEnd) {
+          await admin.from('attendance_records').insert({
+            employee_id: employee.id,
+            type: 'BREAK_END',
+            recorded_at: now.toISOString(),
+            note: 'PC 활동 감지 자동 업무 복귀',
+            is_field: false,
+          })
+        }
       }
     }
   }

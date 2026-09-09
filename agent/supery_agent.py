@@ -708,6 +708,7 @@ def checkout_prev_session() -> None:
                 timeout=5,
             )
             if resp.ok:
+                mark_session_end()  # 성공/skip 모두 다음 부팅에서 재시도하지 않도록 정리
                 logging.warning(f"[checkout] prev session checkout ok (attempt {attempt}): {resp.json()}")
                 return
         except Exception as e:
