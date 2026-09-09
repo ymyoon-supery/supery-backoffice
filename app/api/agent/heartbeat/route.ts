@@ -152,7 +152,7 @@ export async function POST(req: NextRequest) {
         if (needsCheckout) {
           const { data: existingCheckout } = await admin
             .from('attendance_records')
-            .select('id')
+            .select('id, recorded_at, note')
             .eq('employee_id', employee.id)
             .eq('type', 'CHECK_OUT')
             .gte('recorded_at', `${yesterdayKSTDate}T00:00:00+09:00`)
@@ -166,6 +166,16 @@ export async function POST(req: NextRequest) {
               note: 'PC 절전/잠금 자동 퇴근',
               is_field: false,
             })
+          } else if (
+            existingCheckout.note === 'PC 종료 자동 퇴근' &&
+            new Date(yestRecord.recorded_at) > new Date(existingCheckout.recorded_at)
+          ) {
+            // prev_session_killed로 기록된 stale 퇴근 시각보다 이후 활동이 있으면 갱신
+            // (네트워크 오류로 last_heartbeat_at이 멈춰 이른 시각이 기록된 경우 보정)
+            await admin
+              .from('attendance_records')
+              .update({ recorded_at: yestRecord.recorded_at, note: 'PC 절전/잠금 자동 퇴근' })
+              .eq('id', existingCheckout.id)
           }
         }
       }

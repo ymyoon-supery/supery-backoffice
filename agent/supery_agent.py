@@ -826,13 +826,14 @@ def heartbeat_loop() -> None:
     while running:
         try:
             idle = get_idle_seconds()
-            ok = api_post("agent/heartbeat", {
+            api_post("agent/heartbeat", {
                 "idle_seconds": int(idle),
                 "device": platform.node(),
                 "version": VERSION,
             })
-            if ok:
-                update_session_last_heartbeat()
+            # API 성공 여부 관계없이 시각 기록 — 네트워크 오류로 heartbeat 실패해도
+            # PC는 이 시점에 켜져 있었으므로 last_heartbeat_at을 항상 최신으로 유지
+            update_session_last_heartbeat()
         except Exception as e:
             logging.warning(f"[heartbeat] {e}")
         time.sleep(HEARTBEAT_INTERVAL)
