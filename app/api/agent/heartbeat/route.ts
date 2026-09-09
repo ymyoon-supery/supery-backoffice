@@ -30,6 +30,15 @@ export async function POST(req: NextRequest) {
   const deviceName = (body.device as string) || 'Unknown'
   const now = new Date()
 
+  // 절전 wake heartbeat 전용: suspend_at(절전 진입 시각) - idle_at_suspend(절전 당시 유휴초) = 실제 마지막 활동 시각
+  // idle_seconds 6시간 클램프로 인한 부정확성을 보정
+  const suspendAtStr = body.suspend_at as string | undefined
+  const idleAtSuspend = Number(body.idle_at_suspend) || 0
+  const lastActivityBeforeSleep: Date | null =
+    suspendAtStr && idleAtSuspend >= 0
+      ? new Date(new Date(suspendAtStr).getTime() - idleAtSuspend * 1000)
+      : null
+
   // 설치 현황 last_seen_at 업데이트
   const { data: existing } = await admin
     .from('agent_installations')
@@ -150,6 +159,16 @@ export async function POST(req: NextRequest) {
           (yestType === 'BREAK_START' && yestRecord.note === 'PC 비활동 자동 휴식')
 
         if (needsCheckout) {
+          // 퇴근 시각 결정: suspend_at - idle_at_suspend가 어제 날짜에 해당하고
+          // 마지막 서버 기록보다 이후면 절전 기반 시각이 더 정확
+          let checkoutAt = yestRecord.recorded_at
+          if (lastActivityBeforeSleep) {
+            const laKSTDate = new Date(lastActivityBeforeSleep.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
+            if (laKSTDate === yesterdayKSTDate && lastActivityBeforeSleep > new Date(yestRecord.recorded_at)) {
+              checkoutAt = lastActivityBeforeSleep.toISOString()
+            }
+          }
+
           const { data: existingCheckout } = await admin
             .from('attendance_records')
             .select('id, recorded_at, note')
@@ -162,19 +181,18 @@ export async function POST(req: NextRequest) {
             await admin.from('attendance_records').insert({
               employee_id: employee.id,
               type: 'CHECK_OUT',
-              recorded_at: yestRecord.recorded_at,
+              recorded_at: checkoutAt,
               note: 'PC 절전/잠금 자동 퇴근',
               is_field: false,
             })
           } else if (
             existingCheckout.note === 'PC 종료 자동 퇴근' &&
-            new Date(yestRecord.recorded_at) > new Date(existingCheckout.recorded_at)
+            new Date(checkoutAt) > new Date(existingCheckout.recorded_at)
           ) {
             // prev_session_killed로 기록된 stale 퇴근 시각보다 이후 활동이 있으면 갱신
-            // (네트워크 오류로 last_heartbeat_at이 멈춰 이른 시각이 기록된 경우 보정)
             await admin
               .from('attendance_records')
-              .update({ recorded_at: yestRecord.recorded_at, note: 'PC 절전/잠금 자동 퇴근' })
+              .update({ recorded_at: checkoutAt, note: 'PC 절전/잠금 자동 퇴근' })
               .eq('id', existingCheckout.id)
           }
         }

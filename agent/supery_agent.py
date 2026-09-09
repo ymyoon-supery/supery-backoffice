@@ -629,14 +629,17 @@ def _register_windows_shutdown_handler() -> None:
                 if start is not None:
                     sleep_dur = time.time() - start
                     idle_eff = min(idle_at + sleep_dur, 6 * 3600)
-                    logging.warning(f"[sleep] 절전 해제: dur={sleep_dur:.0f}s idle_eff={idle_eff:.0f}s")
-                    def _wake_hb(idle=idle_eff):
+                    suspend_at_iso = datetime.fromtimestamp(start, tz=KST).isoformat()
+                    logging.warning(f"[sleep] 절전 해제: dur={sleep_dur:.0f}s idle_eff={idle_eff:.0f}s suspend_at={suspend_at_iso}")
+                    def _wake_hb(idle=idle_eff, sus=suspend_at_iso, idle_sus=int(idle_at)):
                         time.sleep(3)  # 네트워크 안정화 대기
                         api_post("agent/heartbeat", {
                             "idle_seconds": int(idle),
                             "device": platform.node(),
                             "version": VERSION,
                             "event": "wake",
+                            "suspend_at": sus,       # 절전 진입 실제 시각 (KST ISO)
+                            "idle_at_suspend": idle_sus,  # 절전 당시 유휴 초 → 실제 마지막 활동 = suspend_at - idle_at_suspend
                         })
                     threading.Thread(target=_wake_hb, daemon=True).start()
         return ctypes.windll.user32.DefWindowProcW(hwnd, msg, wparam, lparam)
