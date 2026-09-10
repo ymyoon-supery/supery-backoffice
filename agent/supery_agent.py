@@ -1,5 +1,5 @@
 """
-Supery 근태 에이전트 v1.3.10
+Supery 근태 에이전트 v1.3.11
 - Windows ctypes GetLastInputInfo 방식 (백신 친화적, 후킹 없음)
 - 15분 PC 비활동 시 자동 휴식 기록
 - 활동 재개 시 자동 업무 복귀 기록
@@ -38,7 +38,7 @@ API_BASE = "https://office.supery.co.kr/api"
 WORKSYNC_URL = "https://office.supery.co.kr"
 # ──────────────────────────────────────────────
 
-VERSION = "1.3.10"
+VERSION = "1.3.11"
 APP_NAME = "SuperyAgent"
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.json")
 LOG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.log")
@@ -346,6 +346,7 @@ def _setup_task_scheduler() -> None:
   <Triggers>
     <LogonTrigger>
       <Enabled>true</Enabled>
+      <Delay>PT15S</Delay>
     </LogonTrigger>
   </Triggers>
   <Principals>
@@ -745,11 +746,25 @@ def check_for_update() -> None:
     if not getattr(sys, 'frozen', False):
         return  # 개발 환경 — 자동 업데이트 비활성화
     try:
-        resp = requests.get(
-            f"{API_BASE}/agent/version",
-            headers={"X-Agent-Key": api_key},
-            timeout=10,
-        )
+        # 부팅 직후 네트워크 미준비 대비 최대 30초 재시도
+        deadline = time.time() + 30
+        resp = None
+        attempt = 0
+        while time.time() < deadline:
+            attempt += 1
+            try:
+                resp = requests.get(
+                    f"{API_BASE}/agent/version",
+                    headers={"X-Agent-Key": api_key},
+                    timeout=10,
+                )
+                break
+            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+                logging.warning(f"[update] 버전 확인 attempt {attempt} 실패 — 재시도")
+                time.sleep(3)
+        if resp is None:
+            logging.warning("[update] 버전 확인 실패: 네트워크 미준비 (30s 초과)")
+            return
         if not resp.ok:
             logging.warning(f"[update] 버전 확인 실패: HTTP {resp.status_code}")
             return
