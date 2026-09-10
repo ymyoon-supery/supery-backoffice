@@ -223,21 +223,11 @@ export default async function AdminApprovalPage({
     )
   }
 
-  // ── Expense JS 필터 ──────────────────────────────────────────────
+  // ── Expense 전용 JS 필터 (expenseType, keyword) ────────────────
   if (expenseType) expenseItems = expenseItems.filter(e => e.expenseType === expenseType)
-  if (month) {
-    expenseItems = expenseItems.filter(e => e.requestDate.startsWith(month))
-  } else if (dateFrom || dateTo) {
-    if (dateFrom) expenseItems = expenseItems.filter(e => e.requestDate.slice(0, 10) >= dateFrom)
-    if (dateTo)   expenseItems = expenseItems.filter(e => e.requestDate.slice(0, 10) <= dateTo)
-  }
   if (keyword) {
     const kw = keyword.toLowerCase()
     expenseItems = expenseItems.filter(e => JSON.stringify(e.lineItems ?? []).toLowerCase().includes(kw))
-  }
-  if (employeeName) {
-    const en = employeeName.toLowerCase()
-    expenseItems = expenseItems.filter(e => e.employeeName.toLowerCase().includes(en))
   }
 
   // ── Home location requests ────────────────────────────────────
@@ -392,21 +382,33 @@ export default async function AdminApprovalPage({
     )
   }
 
-  // ── fullApprove Expense JS 필터 ──────────────────────────────────
+  // ── fullApprove Expense 전용 JS 필터 ──────────────────────────────
   if (expenseType) fullApproveExpenseItems = fullApproveExpenseItems.filter(e => e.expenseType === expenseType)
-  if (month) {
-    fullApproveExpenseItems = fullApproveExpenseItems.filter(e => e.requestDate.startsWith(month))
-  } else if (dateFrom || dateTo) {
-    if (dateFrom) fullApproveExpenseItems = fullApproveExpenseItems.filter(e => e.requestDate.slice(0, 10) >= dateFrom)
-    if (dateTo)   fullApproveExpenseItems = fullApproveExpenseItems.filter(e => e.requestDate.slice(0, 10) <= dateTo)
-  }
   if (keyword) {
     const kw = keyword.toLowerCase()
     fullApproveExpenseItems = fullApproveExpenseItems.filter(e => JSON.stringify(e.lineItems ?? []).toLowerCase().includes(kw))
   }
+
+  // ── 공통 날짜·신청인 JS 필터 helper ──────────────────────────────
+  function applyDateFilter<T extends { requestDate: string }>(arr: T[]): T[] {
+    if (month) return arr.filter(i => i.requestDate.startsWith(month))
+    if (dateFrom || dateTo) {
+      return arr.filter(i => {
+        const d = i.requestDate.slice(0, 10)
+        return (!dateFrom || d >= dateFrom) && (!dateTo || d <= dateTo)
+      })
+    }
+    return arr
+  }
+  // 지결서·재택변경은 patchLeave 인덱스 의존 없으므로 여기서 적용
+  expenseItems            = applyDateFilter(expenseItems)
+  homeLocationItems       = applyDateFilter(homeLocationItems)
+  fullApproveExpenseItems = applyDateFilter(fullApproveExpenseItems)
   if (employeeName) {
     const en = employeeName.toLowerCase()
-    fullApproveExpenseItems = fullApproveExpenseItems.filter(e => e.employeeName.toLowerCase().includes(en))
+    expenseItems            = expenseItems.filter(i => i.employeeName.toLowerCase().includes(en))
+    homeLocationItems       = homeLocationItems.filter(i => i.employeeName.toLowerCase().includes(en))
+    fullApproveExpenseItems = fullApproveExpenseItems.filter(i => i.employeeName.toLowerCase().includes(en))
   }
 
   // ── 연차 잔여 동적 계산 (입사일 기준, 올해 승인 사용량 기준) ──────
@@ -440,6 +442,15 @@ export default async function AdminApprovalPage({
     }
     patchLeave(leaveItems, leaveItemEmpIds)
     patchLeave(fullApproveLeaveItems, fullApproveItemEmpIds)
+  }
+
+  // ── 연차 날짜·신청인 JS 필터 (patchLeave 인덱스 매칭 이후 적용) ──
+  leaveItems            = applyDateFilter(leaveItems)
+  fullApproveLeaveItems = applyDateFilter(fullApproveLeaveItems)
+  if (employeeName) {
+    const en = employeeName.toLowerCase()
+    leaveItems            = leaveItems.filter(i => i.employeeName.toLowerCase().includes(en))
+    fullApproveLeaveItems = fullApproveLeaveItems.filter(i => i.employeeName.toLowerCase().includes(en))
   }
 
   // ── Merge, sort, paginate ─────────────────────────────────────
