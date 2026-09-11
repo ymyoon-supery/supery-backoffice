@@ -19,6 +19,8 @@ const LEAVE_ABBR: Record<string, string> = {
   ANNUAL: '연차', HALF_DAY: '반차', AM_HALF: '오전', PM_HALF: '오후',
   SICK: '병가', GROUP: '공동', COMP: '보상', OTHER: '기타',
 }
+// 반나절 휴가: 오전/오후 중 한쪽만 쉬고 나머지 시간은 근무
+const HALF_DAY_TYPES = new Set(['AM_HALF', 'PM_HALF', 'HALF_DAY'])
 const DAY_KO = ['일', '월', '화', '수', '목', '금', '토']
 
 function fmtWork(min: number): string {
@@ -163,7 +165,7 @@ export default function AttendanceSummaryView({
                   return (
                     <tr key={emp.id} className="hover:bg-gray-50/50">
                       <td className="px-4 py-3 font-medium text-gray-900">{emp.name}</td>
-                      {leave && !ds ? (
+                      {leave && !ds && !HALF_DAY_TYPES.has(leave.leave_type) ? (
                         <>
                           <td colSpan={3} className="px-4 py-3">
                             <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">{LEAVE_ABBR[leave.leave_type] ?? leave.leave_type}</span>
@@ -178,6 +180,11 @@ export default function AttendanceSummaryView({
                               {ds && ds.lateMin > 0 && (
                                 <span className="text-xs px-1.5 py-0.5 rounded bg-red-50 text-red-500 whitespace-nowrap">
                                   지각 +{ds.lateMin}분
+                                </span>
+                              )}
+                              {leave && HALF_DAY_TYPES.has(leave.leave_type) && (
+                                <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 whitespace-nowrap">
+                                  {LEAVE_ABBR[leave.leave_type]}
                                 </span>
                               )}
                             </div>

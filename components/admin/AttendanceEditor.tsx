@@ -50,7 +50,7 @@ export default function AttendanceEditor({ records, employees, leaveRecords }: {
   ].sort((a, b) => {
     if (a.is_anomaly && !b.is_anomaly) return -1
     if (!a.is_anomaly && b.is_anomaly) return 1
-    return b._sortKey.localeCompare(a._sortKey)
+    return new Date(b._sortKey).getTime() - new Date(a._sortKey).getTime()
   })
   const [editing, setEditing] = useState<string | null>(null)
   const [note, setNote] = useState('')
