@@ -5,6 +5,10 @@
       "schedule": "0 17 * * *"
     },
     {
+      "path": "/api/cron/accrue-annual-leave",
+      "schedule": "0 0 * * *"
+    },
+    {
       "path": "/api/google/directory-sync",
       "schedule": "0 17 * * *"
     },
