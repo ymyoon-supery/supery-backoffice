@@ -192,7 +192,7 @@ export default function AttendanceSummaryView({
                           <td className="px-4 py-3 tabular-nums text-gray-700">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span>{ds?.checkOut ?? <span className="text-gray-300">—</span>}</span>
-                              {ds && ds.earlyLeaveMin > 0 && (
+                              {ds && ds.earlyLeaveMin > 0 && !(leave && HALF_DAY_TYPES.has(leave.leave_type)) && (
                                 <span className="text-xs px-1.5 py-0.5 rounded bg-orange-50 text-orange-500 whitespace-nowrap">
                                   조퇴 -{ds.earlyLeaveMin}분
                                 </span>
