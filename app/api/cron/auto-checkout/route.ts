@@ -34,12 +34,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: true, processed: 0 })
   }
 
+  // 야근으로 자정을 넘어 퇴근한 경우를 포함하기 위해 dayEnd + 10h까지 조회
+  // (23:59 KST 이후 퇴근해도 미처리로 분류되어 중복 CHECK_OUT 삽입 방지)
+  const checkoutQueryEnd = new Date(new Date(dayEnd).getTime() + 10 * 3600000).toISOString()
   const { data: checkOuts } = await supabase
     .from('attendance_records')
     .select('employee_id, recorded_at')
     .eq('type', 'CHECK_OUT')
     .gte('recorded_at', dayStart)
-    .lte('recorded_at', dayEnd)
+    .lte('recorded_at', checkoutQueryEnd)
 
   // Group check-outs by employee for fast lookup
   const checkOutsByEmployee = new Map<string, Date[]>()

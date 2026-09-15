@@ -177,7 +177,7 @@ export default function AttendanceSummaryView({
                           <td className="px-4 py-3 tabular-nums text-gray-700">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span>{ds?.checkIn ?? <span className="text-gray-300">—</span>}</span>
-                              {ds && ds.lateMin > 0 && (
+                              {ds && ds.lateMin > 0 && !(leave && leave.leave_type === 'PM_HALF') && (
                                 <span className="text-xs px-1.5 py-0.5 rounded bg-red-50 text-red-500 whitespace-nowrap">
                                   지각 +{ds.lateMin}분
                                 </span>
@@ -242,15 +242,17 @@ export default function AttendanceSummaryView({
                       {dates.map(d => {
                         const ds = emp.days[d]
                         const leave = getLeave(emp.id, d)
+                        const isHalfDay = !!(leave && HALF_DAY_TYPES.has(leave.leave_type))
+                        const isPmHalf = !!(leave && leave.leave_type === 'PM_HALF')
                         return (
                           <td key={d} className="px-2 py-3 text-center">
                             {ds ? (
                               <div className="flex flex-col items-center gap-0.5">
                                 <span className={`text-xs tabular-nums ${workColor(ds.workMin)}`}>{fmtWork(ds.workMin)}</span>
-                                {(ds.lateMin > 0 || ds.earlyLeaveMin > 0) && (
+                                {((ds.lateMin > 0 && !isPmHalf) || (ds.earlyLeaveMin > 0 && !isHalfDay)) && (
                                   <div className="flex gap-0.5">
-                                    {ds.lateMin > 0 && <span className="w-1.5 h-1.5 rounded-full bg-red-400" title={`지각 ${ds.lateMin}분`} />}
-                                    {ds.earlyLeaveMin > 0 && <span className="w-1.5 h-1.5 rounded-full bg-orange-400" title={`조퇴 ${ds.earlyLeaveMin}분`} />}
+                                    {ds.lateMin > 0 && !isPmHalf && <span className="w-1.5 h-1.5 rounded-full bg-red-400" title={`지각 ${ds.lateMin}분`} />}
+                                    {ds.earlyLeaveMin > 0 && !isHalfDay && <span className="w-1.5 h-1.5 rounded-full bg-orange-400" title={`조퇴 ${ds.earlyLeaveMin}분`} />}
                                   </div>
                                 )}
                               </div>
@@ -297,8 +299,14 @@ export default function AttendanceSummaryView({
                       <td className="px-4 py-3 font-medium text-gray-900">{emp.name}</td>
                       {weekGroups.map(wg => {
                         const weekMin = wg.reduce((s, d) => s + (emp.days[d]?.workMin ?? 0), 0)
-                        const hasLate = wg.some(d => (emp.days[d]?.lateMin ?? 0) > 0)
-                        const hasEarly = wg.some(d => (emp.days[d]?.earlyLeaveMin ?? 0) > 0)
+                        const hasLate = wg.some(d => {
+                          const lv = getLeave(emp.id, d)
+                          return (emp.days[d]?.lateMin ?? 0) > 0 && !(lv && lv.leave_type === 'PM_HALF')
+                        })
+                        const hasEarly = wg.some(d => {
+                          const lv = getLeave(emp.id, d)
+                          return (emp.days[d]?.earlyLeaveMin ?? 0) > 0 && !(lv && HALF_DAY_TYPES.has(lv.leave_type))
+                        })
                         return (
                           <td key={wg[0]} className="px-3 py-3 text-center">
                             <div className="flex flex-col items-center gap-0.5">

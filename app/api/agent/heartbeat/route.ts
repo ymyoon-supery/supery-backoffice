@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
 
   const { data: employee, error: empError } = await admin
     .from('employees')
-    .select('id, agent_auto_break')
+    .select('id, agent_auto_break, last_heartbeat')
     .eq('agent_api_key', apiKey)
     .maybeSingle()
 
@@ -170,6 +170,14 @@ export async function POST(req: NextRequest) {
               checkoutAt = lastActivityBeforeSleep.toISOString()
             }
           }
+          // suspend_at 없는 콜드부팅: 이전 heartbeat 시각이 어제이면 그 시각을 퇴근 기준으로 사용
+          // (employees.last_heartbeat는 이번 요청 처리 전 값 = 이전 heartbeat)
+          if (!checkoutAt && employee.last_heartbeat) {
+            const lhKSTDate = new Date(new Date(employee.last_heartbeat).getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
+            if (lhKSTDate === yesterdayKSTDate && new Date(employee.last_heartbeat) > new Date(yestRecord.recorded_at)) {
+              checkoutAt = employee.last_heartbeat
+            }
+          }
 
           if (checkoutAt) {
             const { data: existingCheckout } = await admin
@@ -235,6 +243,9 @@ export async function POST(req: NextRequest) {
       }
     }
   }
+
+  // auto-checkout cron이 당일 마지막 활동 시각을 퇴근 기준으로 쓸 수 있도록 갱신
+  await admin.from('employees').update({ last_heartbeat: now.toISOString() }).eq('id', employee.id)
 
   return NextResponse.json({ ok: true })
 }
