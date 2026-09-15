@@ -159,9 +159,11 @@ export async function POST(req: NextRequest) {
           (yestType === 'BREAK_START' && yestRecord.note === 'PC 비활동 자동 휴식')
 
         if (needsCheckout) {
-          // 퇴근 시각 결정: suspend_at - idle_at_suspend가 어제 날짜에 해당하고
-          // 마지막 서버 기록보다 이후면 절전 기반 시각이 더 정확
-          let checkoutAt = yestRecord.recorded_at
+          // 퇴근 시각: suspend_at 기반 마지막 활동 시각이 어제 날짜이고 마지막 서버 기록보다 이후일 때만 기록
+          // yestRecord.recorded_at(CHECK_IN·BREAK_END 시각)은 퇴근 시각이 아니므로 fallback 금지 —
+          // 그렇게 하면 "출근 시각 = 퇴근 시각" 오기록이 발생함
+          // 신뢰 신호 없음 → auto-checkout cron(02:00 KST)이 처리
+          let checkoutAt: string | null = null
           if (lastActivityBeforeSleep) {
             const laKSTDate = new Date(lastActivityBeforeSleep.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
             if (laKSTDate === yesterdayKSTDate && lastActivityBeforeSleep > new Date(yestRecord.recorded_at)) {
@@ -169,31 +171,33 @@ export async function POST(req: NextRequest) {
             }
           }
 
-          const { data: existingCheckout } = await admin
-            .from('attendance_records')
-            .select('id, recorded_at, note')
-            .eq('employee_id', employee.id)
-            .eq('type', 'CHECK_OUT')
-            .gte('recorded_at', `${yesterdayKSTDate}T00:00:00+09:00`)
-            .lt('recorded_at', `${kstDate}T00:00:00+09:00`)
-            .maybeSingle()
-          if (!existingCheckout) {
-            await admin.from('attendance_records').insert({
-              employee_id: employee.id,
-              type: 'CHECK_OUT',
-              recorded_at: checkoutAt,
-              note: 'PC 절전/잠금 자동 퇴근',
-              is_field: false,
-            })
-          } else if (
-            existingCheckout.note === 'PC 종료 자동 퇴근' &&
-            new Date(checkoutAt) > new Date(existingCheckout.recorded_at)
-          ) {
-            // prev_session_killed로 기록된 stale 퇴근 시각보다 이후 활동이 있으면 갱신
-            await admin
+          if (checkoutAt) {
+            const { data: existingCheckout } = await admin
               .from('attendance_records')
-              .update({ recorded_at: checkoutAt, note: 'PC 절전/잠금 자동 퇴근' })
-              .eq('id', existingCheckout.id)
+              .select('id, recorded_at, note')
+              .eq('employee_id', employee.id)
+              .eq('type', 'CHECK_OUT')
+              .gte('recorded_at', `${yesterdayKSTDate}T00:00:00+09:00`)
+              .lt('recorded_at', `${kstDate}T00:00:00+09:00`)
+              .maybeSingle()
+            if (!existingCheckout) {
+              await admin.from('attendance_records').insert({
+                employee_id: employee.id,
+                type: 'CHECK_OUT',
+                recorded_at: checkoutAt,
+                note: 'PC 절전/잠금 자동 퇴근',
+                is_field: false,
+              })
+            } else if (
+              existingCheckout.note === 'PC 종료 자동 퇴근' &&
+              new Date(checkoutAt) > new Date(existingCheckout.recorded_at)
+            ) {
+              // prev_session_killed로 기록된 stale 퇴근 시각보다 이후 활동이 있으면 갱신
+              await admin
+                .from('attendance_records')
+                .update({ recorded_at: checkoutAt, note: 'PC 절전/잠금 자동 퇴근' })
+                .eq('id', existingCheckout.id)
+            }
           }
         }
       }

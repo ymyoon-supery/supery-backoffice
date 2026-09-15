@@ -72,6 +72,7 @@ export async function GET(request: NextRequest) {
 
   // PC 비활동 자동 휴식 BREAK_START가 있으면 그 시각이 실질적 퇴근 시각
   // (PC를 끄지 않고 퇴근 시 heartbeat는 계속 오지만 비활동 감지 시각이 정확한 이탈 시각)
+  // 단, 그 이후 BREAK_END가 있으면(복귀 후 퇴근) BREAK_START는 퇴근 시각이 아님
   const { data: lastBreakStarts } = await supabase
     .from('attendance_records')
     .select('employee_id, recorded_at')
@@ -82,11 +83,27 @@ export async function GET(request: NextRequest) {
     .lte('recorded_at', dayEnd)
     .order('recorded_at', { ascending: false })
 
-  // 직원별 마지막 BREAK_START 시각 맵
   const lastBreakStartMap = new Map<string, string>()
   for (const bs of lastBreakStarts ?? []) {
     if (!lastBreakStartMap.has(bs.employee_id)) {
       lastBreakStartMap.set(bs.employee_id, bs.recorded_at)
+    }
+  }
+
+  // 직원별 마지막 BREAK_END 시각 — BREAK_START 이후 복귀 여부 판별용
+  const { data: lastBreakEnds } = await supabase
+    .from('attendance_records')
+    .select('employee_id, recorded_at')
+    .in('employee_id', employeeIds)
+    .eq('type', 'BREAK_END')
+    .gte('recorded_at', dayStart)
+    .lte('recorded_at', dayEnd)
+    .order('recorded_at', { ascending: false })
+
+  const lastBreakEndMap = new Map<string, string>()
+  for (const be of lastBreakEnds ?? []) {
+    if (!lastBreakEndMap.has(be.employee_id)) {
+      lastBreakEndMap.set(be.employee_id, be.recorded_at)
     }
   }
 
@@ -114,10 +131,16 @@ export async function GET(request: NextRequest) {
       heartbeatMs <= dayEndMs
 
     // 퇴근 시각 결정: PC 비활동 감지 시각 우선, 없으면 마지막 heartbeat
-    const checkoutAt = lastBreakStart ?? (heartbeatInRange ? lastHeartbeat : null)
+    // lastBreakStart는 그 이후 BREAK_END가 없을 때만 사용 — BREAK_END가 있으면 복귀했으므로 퇴근 시각이 아님
+    const lastBreakEnd = lastBreakEndMap.get(record.employee_id)
+    const effectiveBreakStart =
+      lastBreakStart && (!lastBreakEnd || new Date(lastBreakStart) > new Date(lastBreakEnd))
+        ? lastBreakStart
+        : null
+    const checkoutAt = effectiveBreakStart ?? (heartbeatInRange ? lastHeartbeat : null)
 
     if (checkoutAt) {
-      const note = lastBreakStart
+      const note = effectiveBreakStart
         ? '자동 퇴근 (PC 비활동 감지 시각 기준)'
         : '자동 퇴근 (마지막 활동 기준)'
       const { error } = await supabase.from('attendance_records').insert({
