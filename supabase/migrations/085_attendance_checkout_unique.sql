@@ -11,7 +11,7 @@ WHERE id IN (
     SELECT
       id,
       ROW_NUMBER() OVER (
-        PARTITION BY employee_id, (recorded_at AT TIME ZONE 'Asia/Seoul')::date
+        PARTITION BY employee_id, CAST(recorded_at AT TIME ZONE 'Asia/Seoul' AS date)
         ORDER BY recorded_at DESC, id DESC
       ) AS rn
     FROM attendance_records
@@ -22,5 +22,5 @@ WHERE id IN (
 
 -- 직원 × KST 날짜 기준으로 CHECK_OUT 하루 1건만 허용
 CREATE UNIQUE INDEX IF NOT EXISTS idx_attendance_one_checkout_per_day
-  ON attendance_records (employee_id, (recorded_at AT TIME ZONE 'Asia/Seoul')::date)
+  ON attendance_records (employee_id, CAST(recorded_at AT TIME ZONE 'Asia/Seoul' AS date))
   WHERE type = 'CHECK_OUT';
