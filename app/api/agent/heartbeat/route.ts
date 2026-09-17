@@ -213,10 +213,12 @@ export async function POST(req: NextRequest) {
 
     // 활동 재개 감지 → 자동 업무 복귀
     // note 정확 일치로 수동 기록과 구분 + 최소 5분 휴식 후에만 삽입 (idle 스파이크로 인한 무한 BREAK 루프 방지)
+    // suspend_at이 있으면 절전 wake 이벤트 → GetLastInputInfo()가 OS에 의해 리셋된 것이므로 BREAK_END 생성 안 함
     if (
       lastType === 'BREAK_START' &&
       lastRecord?.note === 'PC 비활동 자동 휴식' &&
-      idleSeconds < 60
+      idleSeconds < 60 &&
+      !suspendAtStr
     ) {
       const breakDurationSec = (now.getTime() - new Date(lastRecord!.recorded_at).getTime()) / 1000
       if (breakDurationSec >= MIN_BREAK_DURATION_SEC) {
@@ -244,8 +246,16 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // auto-checkout cron이 당일 마지막 활동 시각을 퇴근 기준으로 쓸 수 있도록 갱신
-  await admin.from('employees').update({ last_heartbeat: now.toISOString() }).eq('id', employee.id)
+  // last_heartbeat: cron용 마지막 heartbeat 시각
+  // last_activity_at: 실제 사람이 키보드/마우스를 사용한 마지막 시각
+  //   - suspend_at 있음(절전 wake): idle이 OS에 의해 리셋된 것이므로 last_activity_at 갱신 안 함
+  //   - idle < 15분: 사람이 최근 활동 중 → now - idle_seconds = 실제 마지막 활동 시각
+  //   - idle >= 15분: 자리 비운 상태 → 더 이상 갱신하지 않음 (자리 비운 시점이 이미 저장됨)
+  const activityUpdate: Record<string, string> = { last_heartbeat: now.toISOString() }
+  if (!suspendAtStr && idleSeconds < INACTIVITY_THRESHOLD) {
+    activityUpdate.last_activity_at = new Date(now.getTime() - idleSeconds * 1000).toISOString()
+  }
+  await admin.from('employees').update(activityUpdate).eq('id', employee.id)
 
   return NextResponse.json({ ok: true })
 }
