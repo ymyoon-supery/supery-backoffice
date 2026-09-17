@@ -128,10 +128,8 @@ export async function GET(request: NextRequest) {
     const dayStartMs = new Date(dayStart).getTime()
     const dayEndMs = new Date(dayEnd).getTime()
     const heartbeatMs = lastHeartbeat ? new Date(lastHeartbeat).getTime() : null
-    const heartbeatInRange =
-      heartbeatMs !== null &&
-      heartbeatMs >= dayStartMs &&
-      heartbeatMs <= dayEndMs
+    // PC를 끄지 않고 퇴근하면 heartbeat가 자정을 넘어 계속 오므로 dayEnd 이후 값도 유효 신호로 처리
+    const heartbeatActive = heartbeatMs !== null && heartbeatMs >= dayStartMs
 
     // 퇴근 시각 결정: PC 비활동 감지 시각 우선, 없으면 마지막 heartbeat
     // lastBreakStart는 그 이후 BREAK_END가 없을 때만 사용 — BREAK_END가 있으면 복귀했으므로 퇴근 시각이 아님
@@ -140,12 +138,18 @@ export async function GET(request: NextRequest) {
       lastBreakStart && (!lastBreakEnd || new Date(lastBreakStart) > new Date(lastBreakEnd))
         ? lastBreakStart
         : null
-    const checkoutAt = effectiveBreakStart ?? (heartbeatInRange ? lastHeartbeat : null)
+    // heartbeat가 dayEnd를 넘긴 경우(자정 이후까지 PC 켜둠) → dayEnd로 캡핑
+    const heartbeatCheckoutAt = heartbeatActive
+      ? (heartbeatMs! <= dayEndMs ? lastHeartbeat! : dayEnd)
+      : null
+    const checkoutAt = effectiveBreakStart ?? heartbeatCheckoutAt
 
     if (checkoutAt) {
       const note = effectiveBreakStart
         ? '자동 퇴근 (PC 비활동 감지 시각 기준)'
-        : '자동 퇴근 (마지막 활동 기준)'
+        : heartbeatMs! > dayEndMs
+          ? '자동 퇴근 (PC 미종료 - 자정 기준 마감)'
+          : '자동 퇴근 (마지막 활동 기준)'
       const { error } = await supabase.from('attendance_records').insert({
         employee_id: record.employee_id,
         type: 'CHECK_OUT',
@@ -156,7 +160,7 @@ export async function GET(request: NextRequest) {
       })
       if (!error) {
         autoCheckouts++
-        if (heartbeatInRange) {
+        if (heartbeatActive) {
           const { error: clearError } = await supabase
             .from('employees')
             .update({ last_heartbeat: null })
