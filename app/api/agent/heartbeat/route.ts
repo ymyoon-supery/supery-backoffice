@@ -9,6 +9,7 @@ const admin = createClient(
 const WORKING_TYPES = new Set(['CHECK_IN', 'BREAK_END', 'FIELD_END'])
 const INACTIVITY_THRESHOLD = 15 * 60
 const MIN_BREAK_DURATION_SEC = 5 * 60  // 자동 BREAK_END 삽입 전 최소 휴식 시간 (짧은 idle 스파이크 방지)
+const MAX_BREAK_DURATION_FOR_AUTO_RETURN_SEC = 3 * 60 * 60  // 3시간 이상 자리 비움 = 퇴근으로 간주 → BREAK_END 생성 안 함
 const MAX_IDLE_SECONDS = 6 * 60 * 60   // idle_seconds 최대값 클램프
 
 export async function POST(req: NextRequest) {
@@ -219,7 +220,7 @@ export async function POST(req: NextRequest) {
       idleSeconds < 60
     ) {
       const breakDurationSec = (now.getTime() - new Date(lastRecord!.recorded_at).getTime()) / 1000
-      if (breakDurationSec >= MIN_BREAK_DURATION_SEC) {
+      if (breakDurationSec >= MIN_BREAK_DURATION_SEC && breakDurationSec < MAX_BREAK_DURATION_FOR_AUTO_RETURN_SEC) {
         // Race 방지: 최근 2분 내 자동 BREAK_END가 이미 있으면 스킵
         // (동시 heartbeat가 두 건 도달하거나 네트워크 재시도 시 중복 삽입 방지)
         const recentBreakEndWindow = new Date(now.getTime() - 2 * 60 * 1000).toISOString()
