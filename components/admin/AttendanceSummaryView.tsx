@@ -43,16 +43,16 @@ function getWorkMode(empId: string, date: string, rawRecords: any[]): {
     .filter((r) => r.employee_id === empId && toKSTDate(r.recorded_at) === date)
     .sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime())
 
+  const lastRec = dayRecs[dayRecs.length - 1]
+  const isCurrentlyField = lastRec?.type === 'FIELD_START'
+
   const checkIn = dayRecs.find((r) => r.type === 'CHECK_IN')
-  if (!checkIn) return { checkInType: null, isCurrentlyField: false }
+  if (!checkIn) return { checkInType: null, isCurrentlyField }
 
   const checkInType: 'office' | 'remote' | 'field' =
     checkIn.is_field ? 'field'
     : (checkIn.note ?? '').startsWith('재택') ? 'remote'
     : 'office'
-
-  const lastRec = dayRecs[dayRecs.length - 1]
-  const isCurrentlyField = lastRec?.type === 'FIELD_START'
 
   return { checkInType, isCurrentlyField }
 }
