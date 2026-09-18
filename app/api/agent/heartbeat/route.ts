@@ -159,23 +159,31 @@ export async function POST(req: NextRequest) {
           (yestType === 'BREAK_START' && yestRecord.note === 'PC 비활동 자동 휴식')
 
         if (needsCheckout) {
-          // 퇴근 시각: suspend_at 기반 마지막 활동 시각이 어제 날짜이고 마지막 서버 기록보다 이후일 때만 기록
-          // yestRecord.recorded_at(CHECK_IN·BREAK_END 시각)은 퇴근 시각이 아니므로 fallback 금지 —
-          // 그렇게 하면 "출근 시각 = 퇴근 시각" 오기록이 발생함
-          // 신뢰 신호 없음 → auto-checkout cron(02:00 KST)이 처리
+          // auto-break 여부: BREAK_START 이후 heartbeat는 무인 auto-wake 발생 가능
+          // → last_heartbeat가 auto-wake로 오염되었을 수 있으므로 별도 처리
+          const isAutoBreak = yestType === 'BREAK_START' && yestRecord.note === 'PC 비활동 자동 휴식'
+
           let checkoutAt: string | null = null
           if (lastActivityBeforeSleep) {
             const laKSTDate = new Date(lastActivityBeforeSleep.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
-            if (laKSTDate === yesterdayKSTDate && lastActivityBeforeSleep > new Date(yestRecord.recorded_at)) {
+            // auto-break 케이스: lastActivityBeforeSleep이 BREAK_START보다 이전이어도 허용
+            // (auto-wake 이전 사용자의 실제 마지막 활동 시각)
+            if (laKSTDate === yesterdayKSTDate && (isAutoBreak || lastActivityBeforeSleep > new Date(yestRecord.recorded_at))) {
               checkoutAt = lastActivityBeforeSleep.toISOString()
             }
           }
-          // suspend_at 없는 콜드부팅: 이전 heartbeat 시각이 어제이면 그 시각을 퇴근 기준으로 사용
-          // (employees.last_heartbeat는 이번 요청 처리 전 값 = 이전 heartbeat)
-          if (!checkoutAt && employee.last_heartbeat) {
-            const lhKSTDate = new Date(new Date(employee.last_heartbeat).getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
-            if (lhKSTDate === yesterdayKSTDate && new Date(employee.last_heartbeat) > new Date(yestRecord.recorded_at)) {
-              checkoutAt = employee.last_heartbeat
+          if (!checkoutAt) {
+            if (isAutoBreak) {
+              // BREAK_START 이후 heartbeat는 무인 auto-wake 발생 가능 → last_heartbeat 사용 금지
+              // BREAK_START recorded_at이 실질적 마지막 활동 경계
+              checkoutAt = yestRecord.recorded_at
+            } else if (employee.last_heartbeat) {
+              // suspend_at 없는 콜드부팅: 이전 heartbeat 시각이 어제이면 그 시각을 퇴근 기준으로 사용
+              // (employees.last_heartbeat는 이번 요청 처리 전 값 = 이전 heartbeat)
+              const lhKSTDate = new Date(new Date(employee.last_heartbeat).getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
+              if (lhKSTDate === yesterdayKSTDate && new Date(employee.last_heartbeat) > new Date(yestRecord.recorded_at)) {
+                checkoutAt = employee.last_heartbeat
+              }
             }
           }
 
