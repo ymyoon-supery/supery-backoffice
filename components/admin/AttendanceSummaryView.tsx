@@ -8,6 +8,7 @@ import {
 } from 'date-fns'
 import AttendanceEditor from './AttendanceEditor'
 import type { DaySummary } from '@/lib/attendance/calc'
+import { toKSTDate } from '@/lib/attendance/calc'
 
 type EmpSummary = {
   id: string
@@ -22,6 +23,39 @@ const LEAVE_ABBR: Record<string, string> = {
 // 반나절 휴가: 오전/오후 중 한쪽만 쉬고 나머지 시간은 근무
 const HALF_DAY_TYPES = new Set(['AM_HALF', 'PM_HALF', 'HALF_DAY'])
 const DAY_KO = ['일', '월', '화', '수', '목', '금', '토']
+
+const WORK_MODE_LABEL: Record<'office' | 'remote' | 'field', string> = {
+  office: '사무실',
+  remote: '재택',
+  field: '외근',
+}
+const WORK_MODE_STYLE: Record<'office' | 'remote' | 'field', string> = {
+  office: 'bg-blue-50 text-blue-600',
+  remote: 'bg-purple-50 text-purple-600',
+  field: 'bg-orange-50 text-orange-600',
+}
+
+function getWorkMode(empId: string, date: string, rawRecords: any[]): {
+  checkInType: 'office' | 'remote' | 'field' | null
+  isCurrentlyField: boolean
+} {
+  const dayRecs = rawRecords
+    .filter((r) => r.employee_id === empId && toKSTDate(r.recorded_at) === date)
+    .sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime())
+
+  const checkIn = dayRecs.find((r) => r.type === 'CHECK_IN')
+  if (!checkIn) return { checkInType: null, isCurrentlyField: false }
+
+  const checkInType: 'office' | 'remote' | 'field' =
+    checkIn.is_field ? 'field'
+    : (checkIn.note ?? '').startsWith('재택') ? 'remote'
+    : 'office'
+
+  const lastRec = dayRecs[dayRecs.length - 1]
+  const isCurrentlyField = lastRec?.type === 'FIELD_START'
+
+  return { checkInType, isCurrentlyField }
+}
 
 function fmtWork(min: number): string {
   if (min <= 0) return '—'
