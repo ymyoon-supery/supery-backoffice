@@ -198,7 +198,30 @@ export default function AttendanceSummaryView({
                   const leave = getLeave(emp.id, dates[0])
                   return (
                     <tr key={emp.id} className="hover:bg-gray-50/50">
-                      <td className="px-4 py-3 font-medium text-gray-900">{emp.name}</td>
+                      <td className="px-4 py-3">
+                        {(() => {
+                          const wm = getWorkMode(emp.id, dates[0], rawRecords)
+                          return (
+                            <>
+                              <span className="font-medium text-gray-900">{emp.name}</span>
+                              {(wm.checkInType || wm.isCurrentlyField) && (
+                                <div className="flex gap-1 mt-0.5 flex-wrap">
+                                  {wm.checkInType && (
+                                    <span className={`text-xs px-1.5 py-0.5 rounded ${WORK_MODE_STYLE[wm.checkInType]}`}>
+                                      {WORK_MODE_LABEL[wm.checkInType]}
+                                    </span>
+                                  )}
+                                  {wm.isCurrentlyField && (
+                                    <span className="text-xs px-1.5 py-0.5 rounded bg-yellow-50 text-yellow-700">
+                                      외근중
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </>
+                          )
+                        })()}
+                      </td>
                       {leave && !ds && !HALF_DAY_TYPES.has(leave.leave_type) ? (
                         <>
                           <td colSpan={3} className="px-4 py-3">
