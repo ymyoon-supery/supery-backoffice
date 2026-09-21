@@ -135,6 +135,40 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // 절전 wake 후 idle이 OS에 의해 리셋된 경우 — suspend_at 기반 자리비움 감지
+    // idle-based 블록은 idle < 15분이면 스킵하므로, suspend_at이 있을 때 별도 처리
+    // (외근 중 이동 시 노트북 닫기/열기 케이스)
+    if (suspendAtStr && lastActivityBeforeSleep && lastType && WORKING_TYPES.has(lastType) && idleSeconds < INACTIVITY_THRESHOLD) {
+      const sleepDurationSec = (now.getTime() - lastActivityBeforeSleep.getTime()) / 1000
+      if (sleepDurationSec >= INACTIVITY_THRESHOLD) {
+        const lastRecordAt = new Date(lastRecord!.recorded_at)
+        if (lastActivityBeforeSleep >= lastRecordAt) {
+          const breakStartKSTDate = new Date(lastActivityBeforeSleep.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
+          if (breakStartKSTDate === kstDate) {
+            // Race 방지: lastActivityBeforeSleep 전후 5분 내 자동 BREAK_START가 이미 있으면 스킵
+            const breakRaceWindow = new Date(lastActivityBeforeSleep.getTime() - 5 * 60 * 1000).toISOString()
+            const { data: recentAutoBreak } = await admin
+              .from('attendance_records')
+              .select('id')
+              .eq('employee_id', employee.id)
+              .eq('type', 'BREAK_START')
+              .eq('note', 'PC 비활동 자동 휴식')
+              .gte('recorded_at', breakRaceWindow)
+              .maybeSingle()
+            if (!recentAutoBreak) {
+              await admin.from('attendance_records').insert({
+                employee_id: employee.id,
+                type: 'BREAK_START',
+                recorded_at: lastActivityBeforeSleep.toISOString(),
+                note: 'PC 비활동 자동 휴식',
+                is_field: false,
+              })
+            }
+          }
+        }
+      }
+    }
+
     // 오늘 기록이 없고 어제 미종료 세션이 있으면 퇴근 자동 기록
     // — 쿼리가 gte(오늘 00:00)이므로 어제 마지막 기록(BREAK_START/BREAK_END/CHECK_IN 등)은
     //   lastRecord=null로 보임. 날짜가 바뀐 첫 heartbeat에서 전날을 별도 조회해 처리.
