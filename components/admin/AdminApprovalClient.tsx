@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import { AlertCircle, ChevronLeft, ChevronRight, ArrowUpDown, ChevronDown } from 'lucide-react'
 import { approveLeave } from '@/app/(dashboard)/approval/leave/actions'
 import { approveExpense } from '@/app/(dashboard)/approval/expense/actions'
-import { approveHomeLocationRequest, updateExpensePaymentStatus, fullApproveLeave, fullApproveExpense, fullRejectLeave, fullRejectExpense, cancelExpenseApproval } from '@/app/(admin)/admin/approval/actions'
+import { approveHomeLocationRequest, updateExpensePaymentStatus, fullApproveLeave, fullApproveExpense, fullRejectLeave, fullRejectExpense, cancelExpenseApproval, cancelLeaveApproval } from '@/app/(admin)/admin/approval/actions'
 import type { ApprovalItem } from '@/app/(admin)/admin/approval/page'
 import ExpenseDetailSheet from '@/components/admin/ExpenseDetailSheet'
 import ExpenseSearchFilter from '@/components/approval/ExpenseSearchFilter'
@@ -160,6 +160,16 @@ export default function AdminApprovalClient({
       toast.success('승인이 취소되었습니다.')
       setCancellingId(null)
       setCancelReason('')
+      router.refresh()
+    })
+  }
+
+  function handleCancelLeaveApproval(item: ApprovalItem) {
+    startTransition(async () => {
+      const res = await cancelLeaveApproval(item.requestId)
+      if (res.error) { toast.error(res.error); return }
+      toast.success('연차 승인이 취소되었습니다.')
+      setCancellingId(null)
       router.refresh()
     })
   }
@@ -539,6 +549,15 @@ export default function AdminApprovalClient({
                               승인취소
                             </button>
                           )}
+                          {item.status === 'APPROVED' && item.kind === 'leave' && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setCancellingId(item.stepId) }}
+                              disabled={isPending}
+                              className="text-xs text-orange-500 hover:text-orange-700 underline"
+                            >
+                              승인취소
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -560,6 +579,20 @@ export default function AdminApprovalClient({
                         className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-orange-200"
                       />
                       <button onClick={() => handleCancelApproval(item)} disabled={isPending || !cancelReason.trim()}
+                        className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 whitespace-nowrap">
+                        취소 확인
+                      </button>
+                      <button onClick={() => setCancellingId(null)} className="px-3 py-1.5 text-xs text-gray-500">
+                        닫기
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {cancellingId === item.stepId && item.kind === 'leave' && (
+                  <div className="bg-orange-50/30 border-l-[3px] border-l-orange-300 px-4 py-3">
+                    <p className="text-xs text-orange-700 font-medium mb-2">연차 승인을 취소하면 잔여 연차가 복원됩니다.</p>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => handleCancelLeaveApproval(item)} disabled={isPending}
                         className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 whitespace-nowrap">
                         취소 확인
                       </button>
@@ -818,6 +851,15 @@ export default function AdminApprovalClient({
                               승인취소
                             </button>
                           )}
+                          {item.status === 'APPROVED' && item.kind === 'leave' && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setCancellingId(item.stepId) }}
+                              disabled={isPending}
+                              className="text-xs text-orange-500 hover:text-orange-700 underline transition-colors"
+                            >
+                              승인취소
+                            </button>
+                          )}
                         </div>
                       )}
                     </td>
@@ -839,6 +881,22 @@ export default function AdminApprovalClient({
                             className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-orange-200"
                           />
                           <button onClick={() => handleCancelApproval(item)} disabled={isPending || !cancelReason.trim()}
+                            className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 whitespace-nowrap transition-colors">
+                            취소 확인
+                          </button>
+                          <button onClick={() => setCancellingId(null)} className="px-3 py-1.5 text-xs text-gray-500">
+                            닫기
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  {cancellingId === item.stepId && item.kind === 'leave' && (
+                    <tr className="bg-orange-50/30 border-l-[3px] border-l-orange-300">
+                      <td colSpan={5} className="px-6 py-3">
+                        <p className="text-xs text-orange-700 font-medium mb-2">연차 승인을 취소하면 잔여 연차가 복원됩니다.</p>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => handleCancelLeaveApproval(item)} disabled={isPending}
                             className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 whitespace-nowrap transition-colors">
                             취소 확인
                           </button>

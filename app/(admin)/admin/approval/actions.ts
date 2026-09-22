@@ -128,6 +128,19 @@ export async function cancelExpenseApproval(reportId: string, comment: string) {
   return { error: null }
 }
 
+export async function cancelLeaveApproval(requestId: string) {
+  const supabase = await requireAdminClient()
+  if (!supabase) return { error: '권한이 없습니다.' }
+
+  const { error } = await supabase.rpc('admin_cancel_leave_approval', {
+    p_request_id: requestId,
+  })
+  if (error) return { error: error.message }
+
+  revalidateTag(CACHE_TAGS.approvalInbox)
+  return { error: null }
+}
+
 export async function approveHomeLocationRequest(
   requestId: string,
   approved: boolean,
