@@ -169,6 +169,58 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // heartbeat 공백 감지 — suspend_at 없는 PC 절전/에이전트 재시작 케이스
+    // 이전 last_heartbeat(DB 저장값)와 now의 차이가 15분 이상이고 현재 사용자가 활동 중이면
+    // 해당 공백 기간을 자리비움으로 처리. idle-based·suspend-based 블록이 처리하지 못하는
+    // "절전 후 wake, idle 리셋, suspend_at 미전송" 상황을 보완.
+    if (
+      employee.last_heartbeat &&
+      !suspendAtStr &&
+      lastType &&
+      WORKING_TYPES.has(lastType) &&
+      idleSeconds < INACTIVITY_THRESHOLD
+    ) {
+      const prevHeartbeat = new Date(employee.last_heartbeat)
+      const gapSeconds = (now.getTime() - prevHeartbeat.getTime()) / 1000
+      if (gapSeconds >= INACTIVITY_THRESHOLD) {
+        const lastRecordAt = new Date(lastRecord!.recorded_at)
+        const breakStartMs = Math.max(prevHeartbeat.getTime(), lastRecordAt.getTime())
+        const breakStartAt = new Date(breakStartMs)
+        const breakStartKSTDate = new Date(breakStartMs + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
+        if (breakStartKSTDate === kstDate) {
+          // Race 방지: breakStartAt 기준 30분 내 자동 BREAK_START가 이미 있으면 스킵
+          const breakRaceWindow = new Date(breakStartMs - 30 * 60 * 1000).toISOString()
+          const { data: existingGapBreak } = await admin
+            .from('attendance_records')
+            .select('id')
+            .eq('employee_id', employee.id)
+            .eq('type', 'BREAK_START')
+            .eq('note', 'PC 비활동 자동 휴식')
+            .gte('recorded_at', breakRaceWindow)
+            .maybeSingle()
+          if (!existingGapBreak) {
+            await admin.from('attendance_records').insert({
+              employee_id: employee.id,
+              type: 'BREAK_START',
+              recorded_at: breakStartAt.toISOString(),
+              note: 'PC 비활동 자동 휴식',
+              is_field: false,
+            })
+            // idle < 60s이면 사용자가 이미 복귀한 상태 → BREAK_END도 함께 삽입
+            if (idleSeconds < 60) {
+              await admin.from('attendance_records').insert({
+                employee_id: employee.id,
+                type: 'BREAK_END',
+                recorded_at: now.toISOString(),
+                note: 'PC 활동 감지 자동 업무 복귀',
+                is_field: false,
+              })
+            }
+          }
+        }
+      }
+    }
+
     // 오늘 기록이 없고 어제 미종료 세션이 있으면 퇴근 자동 기록
     // — 쿼리가 gte(오늘 00:00)이므로 어제 마지막 기록(BREAK_START/BREAK_END/CHECK_IN 등)은
     //   lastRecord=null로 보임. 날짜가 바뀐 첫 heartbeat에서 전날을 별도 조회해 처리.
