@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
 
   const { data: employee, error: empError } = await admin
     .from('employees')
-    .select('id, agent_auto_break, last_heartbeat')
+    .select('id, agent_auto_break, last_heartbeat, last_activity_at')
     .eq('agent_api_key', apiKey)
     .maybeSingle()
 
@@ -263,12 +263,23 @@ export async function POST(req: NextRequest) {
               // BREAK_START 이후 heartbeat는 무인 auto-wake 발생 가능 → last_heartbeat 사용 금지
               // BREAK_START recorded_at이 실질적 마지막 활동 경계
               checkoutAt = yestRecord.recorded_at
-            } else if (employee.last_heartbeat) {
-              // suspend_at 없는 콜드부팅: 이전 heartbeat 시각이 어제이면 그 시각을 퇴근 기준으로 사용
-              // (employees.last_heartbeat는 이번 요청 처리 전 값 = 이전 heartbeat)
-              const lhKSTDate = new Date(new Date(employee.last_heartbeat).getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
-              if (lhKSTDate === yesterdayKSTDate && new Date(employee.last_heartbeat) > new Date(yestRecord.recorded_at)) {
-                checkoutAt = employee.last_heartbeat
+            } else {
+              // suspend_at 없는 화면잠금/콜드부팅:
+              // last_activity_at(실제 키보드·마우스 활동 시각) 우선 — 화면잠금 후 PC가 밤새 켜져 있어도
+              // last_heartbeat는 23:59까지 오염되지만 last_activity_at은 실제 마지막 활동 시각을 보존함.
+              // last_activity_at이 없거나 어제가 아니면 last_heartbeat로 폴백.
+              const la = employee.last_activity_at as string | null
+              if (la) {
+                const laKSTDate = new Date(new Date(la).getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
+                if (laKSTDate === yesterdayKSTDate && new Date(la) > new Date(yestRecord.recorded_at)) {
+                  checkoutAt = la
+                }
+              }
+              if (!checkoutAt && employee.last_heartbeat) {
+                const lhKSTDate = new Date(new Date(employee.last_heartbeat).getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
+                if (lhKSTDate === yesterdayKSTDate && new Date(employee.last_heartbeat) > new Date(yestRecord.recorded_at)) {
+                  checkoutAt = employee.last_heartbeat
+                }
               }
             }
           }
