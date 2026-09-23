@@ -3,7 +3,6 @@
 import { useState, useRef } from 'react'
 import { Printer, Paperclip } from 'lucide-react'
 import { toast } from 'sonner'
-import { createClient } from '@/lib/supabase/client'
 import { addExpenseAttachmentUrls } from '@/app/(admin)/admin/approval/actions'
 
 function maskCardNumber(num: string): string {
@@ -162,18 +161,17 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
     if (!files.length || !data.id) return
     setUploading(true)
     try {
-      const supabase = createClient()
-      const newPaths: string[] = []
-      for (const file of files) {
-        const ext = file.name.split('.').pop()
-        const path = `expense-reports/${data.id}/${Date.now()}_${crypto.randomUUID().replace(/-/g, '')}.${ext}`
-        const { error } = await supabase.storage.from('receipts').upload(path, file, { upsert: false })
-        if (error) { toast.error(`업로드 실패: ${error.message}`); setUploading(false); return }
-        newPaths.push(path)
-      }
-      const result = await addExpenseAttachmentUrls(data.id, newPaths)
-      if (result.error) { toast.error(result.error); setUploading(false); return }
-      setAttachmentUrls(prev => [...prev, ...newPaths])
+      const formData = new FormData()
+      formData.append('reportId', data.id)
+      files.forEach(f => formData.append('files', f))
+
+      const res = await fetch('/api/storage/receipt-upload', { method: 'POST', body: formData })
+      const json = await res.json()
+      if (!res.ok) { toast.error(json.error ?? '업로드 실패'); return }
+
+      const result = await addExpenseAttachmentUrls(data.id, json.paths as string[])
+      if (result.error) { toast.error(result.error); return }
+      setAttachmentUrls(prev => [...prev, ...(json.paths as string[])])
       toast.success('첨부파일이 추가됐습니다.')
     } finally {
       setUploading(false)
