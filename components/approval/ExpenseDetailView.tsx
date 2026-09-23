@@ -1,6 +1,10 @@
 'use client'
 
-import { Printer } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { Printer, Paperclip } from 'lucide-react'
+import { toast } from 'sonner'
+import { createClient } from '@/lib/supabase/client'
+import { addExpenseAttachmentUrls } from '@/app/(admin)/admin/approval/actions'
 
 function maskCardNumber(num: string): string {
   const digits = num.replace(/\D/g, '')
@@ -45,6 +49,7 @@ interface Props {
   isPending?: boolean
   approveLabel?: string
   isApproverView?: boolean
+  allowAddAttachment?: boolean
 }
 
 const TAX_TYPE_LABELS: Record<string, string> = {
@@ -142,13 +147,39 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
-import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-export default function ExpenseDetailView({ data, onApprove, onReject, isPending, approveLabel = '승인', isApproverView = false }: Props) {
+export default function ExpenseDetailView({ data, onApprove, onReject, isPending, approveLabel = '승인', isApproverView = false, allowAddAttachment = false }: Props) {
   const [rejectReason, setRejectReason] = useState('')
   const [rejecting, setRejecting] = useState(false)
+  const [attachmentUrls, setAttachmentUrls] = useState<string[]>(data.attachmentUrls)
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
+
+  async function handleAttachFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? [])
+    if (!files.length || !data.id) return
+    setUploading(true)
+    try {
+      const supabase = createClient()
+      const newPaths: string[] = []
+      for (const file of files) {
+        const ext = file.name.split('.').pop()
+        const path = `expense-reports/${data.id}/${Date.now()}_${crypto.randomUUID().replace(/-/g, '')}.${ext}`
+        const { error } = await supabase.storage.from('receipts').upload(path, file, { upsert: false })
+        if (error) { toast.error(`업로드 실패: ${error.message}`); setUploading(false); return }
+        newPaths.push(path)
+      }
+      const result = await addExpenseAttachmentUrls(data.id, newPaths)
+      if (result.error) { toast.error(result.error); setUploading(false); return }
+      setAttachmentUrls(prev => [...prev, ...newPaths])
+      toast.success('첨부파일이 추가됐습니다.')
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
 
   const resubmitUrl = data.expenseType && PERSONAL_EXPENSE_TYPES.includes(data.expenseType)
     ? '/approval/personal/new'
@@ -394,11 +425,34 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
             </div>
 
             {/* Attachments */}
-            {data.attachmentUrls.length > 0 && (
+            {(attachmentUrls.length > 0 || allowAddAttachment) && (
               <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">증빙파일</p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">증빙파일</p>
+                  {allowAddAttachment && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading}
+                        className="no-print flex items-center gap-1 text-xs text-primary hover:text-primary/80 disabled:opacity-50 transition-colors"
+                      >
+                        <Paperclip size={12} />
+                        {uploading ? '업로드 중...' : '파일 추가'}
+                      </button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        multiple
+                        accept="image/*,.pdf"
+                        className="hidden"
+                        onChange={handleAttachFiles}
+                      />
+                    </>
+                  )}
+                </div>
                 <div className="flex flex-wrap gap-2">
-                  {data.attachmentUrls.map((url, i) => {
+                  {attachmentUrls.map((url, i) => {
                     const href = url.startsWith('https://')
                       ? url
                       : `/api/storage/receipt?path=${encodeURIComponent(url)}`
@@ -414,6 +468,9 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
                       </a>
                     )
                   })}
+                  {attachmentUrls.length === 0 && (
+                    <p className="text-xs text-gray-400">첨부파일 없음</p>
+                  )}
                 </div>
               </div>
             )}

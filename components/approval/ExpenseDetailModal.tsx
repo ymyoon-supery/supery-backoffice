@@ -10,9 +10,10 @@ interface Props {
   onApprove?: () => void
   onReject?: (reason?: string) => void
   isPending?: boolean
+  allowAddAttachment?: boolean
 }
 
-export default function ExpenseDetailModal({ data, onClose, onApprove, onReject, isPending }: Props) {
+export default function ExpenseDetailModal({ data, onClose, onApprove, onReject, isPending, allowAddAttachment }: Props) {
   useEffect(() => {
     if (!data) return
     document.body.style.overflow = 'hidden'
@@ -56,6 +57,7 @@ export default function ExpenseDetailModal({ data, onClose, onApprove, onReject,
           onApprove={onApprove}
           onReject={onReject}
           isPending={isPending}
+          allowAddAttachment={allowAddAttachment}
         />
       </div>
     </div>

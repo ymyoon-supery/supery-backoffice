@@ -128,6 +128,29 @@ export async function cancelExpenseApproval(reportId: string, comment: string) {
   return { error: null }
 }
 
+export async function addExpenseAttachmentUrls(reportId: string, newPaths: string[]) {
+  const supabase = await requireAdminClient()
+  if (!supabase) return { error: '권한이 없습니다.' }
+
+  const { data: rep } = await supabase
+    .from('expense_reports')
+    .select('attachment_urls')
+    .eq('id', reportId)
+    .single()
+
+  if (!rep) return { error: '결의서를 찾을 수 없습니다.' }
+
+  const existing = (rep.attachment_urls ?? []) as string[]
+  const { error } = await supabase
+    .from('expense_reports')
+    .update({ attachment_urls: [...existing, ...newPaths] })
+    .eq('id', reportId)
+
+  if (error) return { error: error.message }
+  revalidateTag(CACHE_TAGS.approvalInbox)
+  return { error: null }
+}
+
 export async function cancelLeaveApproval(requestId: string) {
   const supabase = await requireAdminClient()
   if (!supabase) return { error: '권한이 없습니다.' }

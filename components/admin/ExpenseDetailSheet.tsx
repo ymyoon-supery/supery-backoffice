@@ -97,6 +97,7 @@ export default function ExpenseDetailSheet({
             isPending={isPending}
             approveLabel={isFullApprove ? '전결' : '승인'}
             isApproverView
+            allowAddAttachment
           />
         </div>
       </div>
