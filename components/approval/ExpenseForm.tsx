@@ -367,6 +367,7 @@ function ExpenseTab({
 
   const showVat = !NO_VAT_EVIDENCE_TYPES.includes(evidenceType)
   const rowCalcs = lineItems.map(r => calcVat(r.amountRaw, showVat ? r.vatType : 'NONE'))
+  const hasAnyVat = showVat && lineItems.some(r => r.vatType !== 'NONE')
   const totalSupply = rowCalcs.reduce((s, r) => s + r.supply, 0)
   const totalVat = rowCalcs.reduce((s, r) => s + r.vat, 0)
   const totalAmount = rowCalcs.reduce((s, r) => s + r.total, 0)
@@ -673,7 +674,7 @@ function ExpenseTab({
               })}
             </tbody>
             <tfoot className="border-t border-gray-200 bg-gray-50 divide-y divide-gray-100">
-              {showVat && <>
+              {hasAnyVat && <>
               <tr>
                 <td colSpan={2} className="px-3 py-1.5 text-xs text-gray-500">공급가액 합계</td>
                 <td colSpan={3} className="px-3 py-1.5 text-right text-xs text-gray-600 tabular-nums">
@@ -690,7 +691,7 @@ function ExpenseTab({
               </tr>
               </>}
               <tr className="border-t border-gray-200">
-                <td colSpan={2} className="px-3 py-2 text-xs font-semibold text-gray-700">{showVat ? '최종합계 (부가세포함)' : '지출합계'}</td>
+                <td colSpan={2} className="px-3 py-2 text-xs font-semibold text-gray-700">{hasAnyVat ? '최종합계 (부가세포함)' : '지출합계'}</td>
                 <td colSpan={showVat ? 3 : 2} className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums">
                   {totalAmount > 0 ? totalAmount.toLocaleString('ko-KR') + '원' : '—'}
                 </td>
