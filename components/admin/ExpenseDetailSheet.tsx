@@ -62,6 +62,7 @@ export default function ExpenseDetailSheet({
     comment: item.comment ?? null,
     docNumber: item.docNumber ?? null,
     expenseType: item.expenseType ?? null,
+    id: item.requestId,
   }
 
   return (
