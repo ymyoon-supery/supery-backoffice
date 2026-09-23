@@ -368,8 +368,10 @@ function ExpenseTab({
   const showVat = !NO_VAT_EVIDENCE_TYPES.includes(evidenceType)
   const rowCalcs = lineItems.map(r => calcVat(r.amountRaw, showVat ? r.vatType : 'NONE'))
   const hasAnyVat = showVat && lineItems.some(r => r.vatType !== 'NONE')
-  const totalSupply = rowCalcs.reduce((s, r) => s + r.supply, 0)
-  const totalVat = rowCalcs.reduce((s, r) => s + r.vat, 0)
+  const hasNoneVat = showVat && lineItems.some(r => r.vatType === 'NONE')
+  const totalTaxableSupply = rowCalcs.reduce((s, r, i) => lineItems[i].vatType !== 'NONE' ? s + r.supply : s, 0)
+  const totalTaxableVat = rowCalcs.reduce((s, r, i) => lineItems[i].vatType !== 'NONE' ? s + r.vat : s, 0)
+  const totalNonTaxable = rowCalcs.reduce((s, r, i) => lineItems[i].vatType === 'NONE' ? s + r.total : s, 0)
   const totalAmount = rowCalcs.reduce((s, r) => s + r.total, 0)
 
   const canSubmit =
@@ -678,18 +680,27 @@ function ExpenseTab({
               <tr>
                 <td colSpan={2} className="px-3 py-1.5 text-xs text-gray-500">공급가액 합계</td>
                 <td colSpan={3} className="px-3 py-1.5 text-right text-xs text-gray-600 tabular-nums">
-                  {totalSupply > 0 ? totalSupply.toLocaleString('ko-KR') + '원' : '—'}
+                  {totalTaxableSupply > 0 ? totalTaxableSupply.toLocaleString('ko-KR') + '원' : '—'}
                 </td>
                 <td colSpan={2} />
               </tr>
               <tr>
                 <td colSpan={2} className="px-3 py-1.5 text-xs text-gray-500">부가세 합계</td>
                 <td colSpan={3} className="px-3 py-1.5 text-right text-xs text-gray-600 tabular-nums">
-                  {totalVat > 0 ? totalVat.toLocaleString('ko-KR') + '원' : '—'}
+                  {totalTaxableVat > 0 ? totalTaxableVat.toLocaleString('ko-KR') + '원' : '—'}
                 </td>
                 <td colSpan={2} />
               </tr>
               </>}
+              {hasNoneVat && (
+              <tr>
+                <td colSpan={2} className="px-3 py-1.5 text-xs text-gray-500">비과세합</td>
+                <td colSpan={3} className="px-3 py-1.5 text-right text-xs text-gray-600 tabular-nums">
+                  {totalNonTaxable > 0 ? totalNonTaxable.toLocaleString('ko-KR') + '원' : '—'}
+                </td>
+                <td colSpan={2} />
+              </tr>
+              )}
               <tr className="border-t border-gray-200">
                 <td colSpan={2} className="px-3 py-2 text-xs font-semibold text-gray-700">{hasAnyVat ? '최종합계 (부가세포함)' : '지출합계'}</td>
                 <td colSpan={showVat ? 3 : 2} className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums">
