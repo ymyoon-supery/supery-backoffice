@@ -1,8 +1,8 @@
 """
-Supery 근태 에이전트 v1.3.11
+Supery 근태 에이전트 v1.3.12
 - Windows ctypes GetLastInputInfo 방식 (백신 친화적, 후킹 없음)
 - 15분 PC 비활동 시 자동 휴식 기록
-- 활동 재개 시 자동 업무 복귀 기록
+- 활동 재개 시 자동 업무 복귀 기록 (activity_ticks 연속 확인으로 시스템 이벤트 오기록 방지)
 - 시스템 트레이 상주 / Task Scheduler 로그온 작업 등록 (높은 우선순위)
 - 워킹데이(월~금) PC 시작 시 출근 확인 팝업 (3배 크기, 시간 제한 없음, 웹 출근 여부 서버 확인)
 - PC 종료/재시작 시 자동 퇴근 기록 (WM_ENDSESSION 숨김 창 + atexit 이중 보장)
@@ -38,12 +38,14 @@ API_BASE = "https://office.supery.co.kr/api"
 WORKSYNC_URL = "https://office.supery.co.kr"
 # ──────────────────────────────────────────────
 
-VERSION = "1.3.11"
+VERSION = "1.3.12"
 APP_NAME = "SuperyAgent"
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.json")
 LOG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.log")
 SESSION_PATH = os.path.join(os.path.expanduser("~"), ".supery_session.json")
-HEARTBEAT_INTERVAL = 60  # 1분마다 체크
+HEARTBEAT_INTERVAL = 60   # heartbeat 전송 주기 (초)
+ACTIVITY_POLL_INTERVAL = 15   # idle 샘플링 간격 (초) — 4회 누적 후 1회 전송
+ACTIVITY_IDLE_THRESHOLD = 60  # 이 값 미만이면 활성 샘플로 카운트
 
 KST = timezone(timedelta(hours=9))
 
@@ -842,20 +844,35 @@ def api_post(endpoint: str, data: dict) -> bool:
 def heartbeat_loop() -> None:
     # 썬더링 허드 방지: 여러 PC가 동시에 시작할 때 요청이 몰리지 않도록 초기 지터
     time.sleep(random.uniform(0, 30))
+
+    ticks_per_hb = HEARTBEAT_INTERVAL // ACTIVITY_POLL_INTERVAL  # 60 // 15 = 4
+    activity_ticks = 0  # 이번 주기에서 idle < ACTIVITY_IDLE_THRESHOLD 였던 샘플 수
+    poll_count = 0
+
     while running:
         try:
             idle = get_idle_seconds()
-            api_post("agent/heartbeat", {
-                "idle_seconds": int(idle),
-                "device": platform.node(),
-                "version": VERSION,
-            })
-            # API 성공 여부 관계없이 시각 기록 — 네트워크 오류로 heartbeat 실패해도
-            # PC는 이 시점에 켜져 있었으므로 last_heartbeat_at을 항상 최신으로 유지
-            update_session_last_heartbeat()
+            if idle < ACTIVITY_IDLE_THRESHOLD:
+                activity_ticks += 1
+            poll_count += 1
+
+            if poll_count >= ticks_per_hb:
+                # 4번 샘플 완료 → heartbeat 전송
+                # activity_ticks: 0~4 (4샘플 중 활성 횟수) — 서버에서 시스템 이벤트 false positive 필터링에 사용
+                api_post("agent/heartbeat", {
+                    "idle_seconds": int(idle),
+                    "activity_ticks": activity_ticks,
+                    "device": platform.node(),
+                    "version": VERSION,
+                })
+                # API 성공 여부 관계없이 시각 기록 — 네트워크 오류로 heartbeat 실패해도
+                # PC는 이 시점에 켜져 있었으므로 last_heartbeat_at을 항상 최신으로 유지
+                update_session_last_heartbeat()
+                activity_ticks = 0
+                poll_count = 0
         except Exception as e:
             logging.warning(f"[heartbeat] {e}")
-        time.sleep(HEARTBEAT_INTERVAL)
+        time.sleep(ACTIVITY_POLL_INTERVAL)
 
 
 # ── 최초 실행 설정 ───────────────────────────────

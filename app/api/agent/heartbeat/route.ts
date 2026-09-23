@@ -10,6 +10,9 @@ const WORKING_TYPES = new Set(['CHECK_IN', 'BREAK_END', 'FIELD_END'])
 const INACTIVITY_THRESHOLD = 15 * 60
 const MIN_BREAK_DURATION_SEC = 5 * 60  // 자동 BREAK_END 삽입 전 최소 휴식 시간 (짧은 idle 스파이크 방지)
 const MAX_IDLE_SECONDS = 6 * 60 * 60   // idle_seconds 최대값 클램프
+// BREAK_END 활동 확인 창: 구형 에이전트(activity_ticks 없음) 폴백용
+// last_activity_at이 이 시간(초) 이내여야 "연속 활동 확인됨"으로 판단
+const HEARTBEAT_CONFIRMATION_WINDOW = 3 * 60
 
 export async function POST(req: NextRequest) {
   const apiKey = req.headers.get('x-agent-key')?.trim()
@@ -27,6 +30,9 @@ export async function POST(req: NextRequest) {
   // idle_seconds를 [0, 6시간]으로 클램프 — 버그/악의적 클라이언트의 큰 값이 과거 시각 삽입을 유발하지 않도록
   const rawIdle = Number(body.idle_seconds) || 0
   const idleSeconds: number = Math.max(0, Math.min(rawIdle, MAX_IDLE_SECONDS))
+  // activity_ticks: 에이전트 v1.3.12+에서 전송. 60초 구간 내 15초마다 샘플링 → idle<60s인 횟수(0~4).
+  // null이면 구형 에이전트 → server-side last_activity_at 폴백(Option A)으로 처리.
+  const activityTicks: number | null = typeof body.activity_ticks === 'number' ? (body.activity_ticks as number) : null
   const deviceName = (body.device as string) || 'Unknown'
   const now = new Date()
 
@@ -327,25 +333,38 @@ export async function POST(req: NextRequest) {
     ) {
       const breakDurationSec = (now.getTime() - new Date(lastRecord!.recorded_at).getTime()) / 1000
       if (breakDurationSec >= MIN_BREAK_DURATION_SEC) {
-        // Race 방지: 최근 2분 내 자동 BREAK_END가 이미 있으면 스킵
-        // (동시 heartbeat가 두 건 도달하거나 네트워크 재시도 시 중복 삽입 방지)
-        const recentBreakEndWindow = new Date(now.getTime() - 2 * 60 * 1000).toISOString()
-        const { data: existingBreakEnd } = await admin
-          .from('attendance_records')
-          .select('id')
-          .eq('employee_id', employee.id)
-          .eq('type', 'BREAK_END')
-          .eq('note', 'PC 활동 감지 자동 업무 복귀')
-          .gte('recorded_at', recentBreakEndWindow)
-          .maybeSingle()
-        if (!existingBreakEnd) {
-          await admin.from('attendance_records').insert({
-            employee_id: employee.id,
-            type: 'BREAK_END',
-            recorded_at: now.toISOString(),
-            note: 'PC 활동 감지 자동 업무 복귀',
-            is_field: false,
-          })
+        // 시스템 이벤트(Windows 업데이트·알림 등)가 idle 타이머를 1회 리셋하는 false positive 방지.
+        // B(신규 에이전트): activity_ticks — 60초 구간 4샘플 중 2회 이상 활성이어야 실제 복귀로 확정.
+        // A(구형 에이전트): last_activity_at — 이전 heartbeat도 활성이었는지 시간 범위로 검증.
+        const isConfirmedActive = activityTicks !== null
+          ? activityTicks >= 2
+          : (() => {
+              const la = employee.last_activity_at as string | null
+              if (!la) return false
+              return (now.getTime() - new Date(la).getTime()) / 1000 < HEARTBEAT_CONFIRMATION_WINDOW
+            })()
+
+        if (isConfirmedActive) {
+          // Race 방지: 최근 2분 내 자동 BREAK_END가 이미 있으면 스킵
+          // (동시 heartbeat가 두 건 도달하거나 네트워크 재시도 시 중복 삽입 방지)
+          const recentBreakEndWindow = new Date(now.getTime() - 2 * 60 * 1000).toISOString()
+          const { data: existingBreakEnd } = await admin
+            .from('attendance_records')
+            .select('id')
+            .eq('employee_id', employee.id)
+            .eq('type', 'BREAK_END')
+            .eq('note', 'PC 활동 감지 자동 업무 복귀')
+            .gte('recorded_at', recentBreakEndWindow)
+            .maybeSingle()
+          if (!existingBreakEnd) {
+            await admin.from('attendance_records').insert({
+              employee_id: employee.id,
+              type: 'BREAK_END',
+              recorded_at: now.toISOString(),
+              note: 'PC 활동 감지 자동 업무 복귀',
+              is_field: false,
+            })
+          }
         }
       }
     }
