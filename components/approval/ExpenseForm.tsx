@@ -315,7 +315,7 @@ async function uploadFiles(
 
 // ─── Tab 1: 지출결의서 ────────────────────────────────────────────────────────
 
-type ExpenseRow = { item: string; date: string; amountRaw: string; vatType: 'INCLUSIVE' | 'EXCLUSIVE'; note: string }
+type ExpenseRow = { item: string; date: string; amountRaw: string; vatType: 'INCLUSIVE' | 'EXCLUSIVE' | 'NONE'; note: string }
 
 function calcVat(amountRaw: string, vatType: 'INCLUSIVE' | 'EXCLUSIVE' | 'NONE') {
   const raw = Number(amountRaw.replace(/[^0-9]/g, '')) || 0
@@ -359,7 +359,7 @@ function ExpenseTab({
       const incMatch = n.match(/^부가세포함\s*\(공급가액\s+[\d,]+원\)(?:\s*\/\s*(.*))?$/)
       if (excMatch) return { item: li.item, date: li.date, amountRaw: excMatch[1], vatType: 'EXCLUSIVE' as const, note: excMatch[2] ?? '' }
       if (incMatch) return { item: li.item, date: li.date, amountRaw: li.amount ? li.amount.toLocaleString('ko-KR') : '', vatType: 'INCLUSIVE' as const, note: incMatch[1] ?? '' }
-      return { item: li.item, date: li.date, amountRaw: li.amount ? li.amount.toLocaleString('ko-KR') : '', vatType: 'EXCLUSIVE' as const, note: n }
+      return { item: li.item, date: li.date, amountRaw: li.amount ? li.amount.toLocaleString('ko-KR') : '', vatType: 'NONE' as const, note: n }
     })
   })
   const [attachments, setAttachments] = useState<File[]>([])
@@ -406,11 +406,11 @@ function ExpenseTab({
 
       const items: LineItem[] = lineItems.map((r, idx) => {
         const calc = rowCalcs[idx]
-        const vatNote = showVat
-          ? r.vatType === 'EXCLUSIVE'
+        const vatNote = !showVat || r.vatType === 'NONE'
+          ? null
+          : r.vatType === 'EXCLUSIVE'
             ? `공급가액 ${calc.supply.toLocaleString('ko-KR')}원 + 부가세 ${calc.vat.toLocaleString('ko-KR')}원`
             : `부가세포함 (공급가액 ${calc.supply.toLocaleString('ko-KR')}원)`
-          : null
         return {
           item: r.item.trim(),
           date: r.date,
@@ -640,6 +640,10 @@ function ExpenseTab({
                         <button type="button" onClick={() => updateRow(idx, 'vatType', 'INCLUSIVE')}
                           className={`px-2 py-1 rounded text-xs font-medium border transition-colors ${row.vatType === 'INCLUSIVE' ? 'bg-primary text-white border-primary' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
                           포함
+                        </button>
+                        <button type="button" onClick={() => updateRow(idx, 'vatType', 'NONE')}
+                          className={`px-2 py-1 rounded text-xs font-medium border transition-colors ${row.vatType === 'NONE' ? 'bg-gray-500 text-white border-gray-500' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
+                          비과세
                         </button>
                       </div>
                       {calc.vat > 0 && (

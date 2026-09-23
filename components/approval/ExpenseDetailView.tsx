@@ -128,13 +128,6 @@ function parseVatFromNote(note: string | undefined, total: number | undefined) {
     }
   }
 
-  // 금액이 있는데 VAT 정보가 없으면 부가세 포함으로 기본 처리
-  if (vatLabel === null && t > 0) {
-    supply   = Math.round(t * 100 / 110)
-    vat      = t - supply
-    vatLabel = '포함'
-  }
-
   return { supply, vat, total: t, vatLabel, userNote }
 }
 
