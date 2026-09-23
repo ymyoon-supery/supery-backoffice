@@ -67,6 +67,8 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
 
 const NO_CARD_EVIDENCE_TYPES = ['TAX_INVOICE', 'ELECTRONIC_INVOICE', 'BUSINESS_RECEIPT']
 const CARD_ONLY_EVIDENCE_TYPES = ['CORPORATE_CARD']
+// 전자계산서/인보이스는 면세 거래 — 부가세 항목 자체가 없음
+const NO_VAT_EVIDENCE_TYPES = ['ELECTRONIC_INVOICE']
 
 function getAllowedPaymentMethods(evidenceType: string, lockedEvidence?: string): PaymentMethod[] {
   if (lockedEvidence) return ['TRANSFER', 'CASH']
@@ -315,9 +317,10 @@ async function uploadFiles(
 
 type ExpenseRow = { item: string; date: string; amountRaw: string; vatType: 'INCLUSIVE' | 'EXCLUSIVE'; note: string }
 
-function calcVat(amountRaw: string, vatType: 'INCLUSIVE' | 'EXCLUSIVE') {
+function calcVat(amountRaw: string, vatType: 'INCLUSIVE' | 'EXCLUSIVE' | 'NONE') {
   const raw = Number(amountRaw.replace(/[^0-9]/g, '')) || 0
   if (!raw) return { supply: 0, vat: 0, total: 0 }
+  if (vatType === 'NONE') return { supply: raw, vat: 0, total: raw }
   if (vatType === 'EXCLUSIVE') {
     const vat = Math.round(raw * 0.1)
     return { supply: raw, vat, total: raw + vat }
@@ -362,7 +365,8 @@ function ExpenseTab({
   const [attachments, setAttachments] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
 
-  const rowCalcs = lineItems.map(r => calcVat(r.amountRaw, r.vatType))
+  const showVat = !NO_VAT_EVIDENCE_TYPES.includes(evidenceType)
+  const rowCalcs = lineItems.map(r => calcVat(r.amountRaw, showVat ? r.vatType : 'NONE'))
   const totalSupply = rowCalcs.reduce((s, r) => s + r.supply, 0)
   const totalVat = rowCalcs.reduce((s, r) => s + r.vat, 0)
   const totalAmount = rowCalcs.reduce((s, r) => s + r.total, 0)
@@ -402,9 +406,11 @@ function ExpenseTab({
 
       const items: LineItem[] = lineItems.map((r, idx) => {
         const calc = rowCalcs[idx]
-        const vatNote = r.vatType === 'EXCLUSIVE'
-          ? `공급가액 ${calc.supply.toLocaleString('ko-KR')}원 + 부가세 ${calc.vat.toLocaleString('ko-KR')}원`
-          : `부가세포함 (공급가액 ${calc.supply.toLocaleString('ko-KR')}원)`
+        const vatNote = showVat
+          ? r.vatType === 'EXCLUSIVE'
+            ? `공급가액 ${calc.supply.toLocaleString('ko-KR')}원 + 부가세 ${calc.vat.toLocaleString('ko-KR')}원`
+            : `부가세포함 (공급가액 ${calc.supply.toLocaleString('ko-KR')}원)`
+          : null
         return {
           item: r.item.trim(),
           date: r.date,
@@ -604,8 +610,8 @@ function ExpenseTab({
                 <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[14%] whitespace-nowrap">지출일</th>
                 <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500">지출항목</th>
                 <th className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 w-[16%] whitespace-nowrap">금액(원)</th>
-                <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500 w-[16%]">부가세</th>
-                <th className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 w-[14%] whitespace-nowrap">합계(원)</th>
+                {showVat && <th className="px-3 py-2.5 text-center text-xs font-medium text-gray-500 w-[16%]">부가세</th>}
+                <th className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 w-[14%] whitespace-nowrap">{showVat ? '합계(원)' : '소계(원)'}</th>
                 <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-[12%]">비고</th>
                 <th className="w-[4%]" />
               </tr>
@@ -624,6 +630,7 @@ function ExpenseTab({
                     <td className="px-2 py-1.5">
                       <input type="text" inputMode="numeric" value={row.amountRaw} onChange={e => updateRow(idx, 'amountRaw', formatKRWInput(e.target.value))} placeholder="0" className="w-full text-sm px-2 py-1.5 rounded border border-transparent focus:border-gray-300 focus:outline-none bg-transparent hover:bg-gray-50 focus:bg-white text-right" />
                     </td>
+                    {showVat && (
                     <td className="px-2 py-1.5">
                       <div className="flex gap-1 justify-center">
                         <button type="button" onClick={() => updateRow(idx, 'vatType', 'EXCLUSIVE')}
@@ -641,6 +648,7 @@ function ExpenseTab({
                         </p>
                       )}
                     </td>
+                    )}
                     <td className="px-2 py-1.5 text-right">
                       <span className={`text-sm tabular-nums ${calc.total > 0 ? 'font-semibold text-gray-900' : 'text-gray-300'}`}>
                         {calc.total > 0 ? calc.total.toLocaleString('ko-KR') : '—'}
@@ -661,6 +669,7 @@ function ExpenseTab({
               })}
             </tbody>
             <tfoot className="border-t border-gray-200 bg-gray-50 divide-y divide-gray-100">
+              {showVat && <>
               <tr>
                 <td colSpan={2} className="px-3 py-1.5 text-xs text-gray-500">공급가액 합계</td>
                 <td colSpan={3} className="px-3 py-1.5 text-right text-xs text-gray-600 tabular-nums">
@@ -675,9 +684,10 @@ function ExpenseTab({
                 </td>
                 <td colSpan={2} />
               </tr>
+              </>}
               <tr className="border-t border-gray-200">
-                <td colSpan={2} className="px-3 py-2 text-xs font-semibold text-gray-700">최종합계 (부가세포함)</td>
-                <td colSpan={3} className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums">
+                <td colSpan={2} className="px-3 py-2 text-xs font-semibold text-gray-700">{showVat ? '최종합계 (부가세포함)' : '지출합계'}</td>
+                <td colSpan={showVat ? 3 : 2} className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums">
                   {totalAmount > 0 ? totalAmount.toLocaleString('ko-KR') + '원' : '—'}
                 </td>
                 <td colSpan={2} />

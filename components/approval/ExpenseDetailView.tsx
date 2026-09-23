@@ -169,13 +169,14 @@ export default function ExpenseDetailView({ data, onApprove, onReject, isPending
     ? parseWithholdingFromNote(data.lineItems[0]?.note)
     : null
 
+  const isElectronicInvoice = data.evidenceType === 'ELECTRONIC_INVOICE'
   const rowVats = isWithholding
     ? data.lineItems.map(li => {
         const { userNote } = parseWithholdingFromNote(li.note)
         return { supply: li.amount ?? 0, vat: 0, total: li.amount ?? 0, vatLabel: null as string | null, userNote }
       })
-    : isCondolence
-    ? data.lineItems.map(li => ({ supply: li.amount ?? 0, vat: 0, total: li.amount ?? 0, vatLabel: null as string | null, userNote: '' }))
+    : isCondolence || isElectronicInvoice
+    ? data.lineItems.map(li => ({ supply: li.amount ?? 0, vat: 0, total: li.amount ?? 0, vatLabel: null as string | null, userNote: li.note ?? '' }))
     : data.lineItems.map(li => parseVatFromNote(li.note, li.amount))
   const totalSupply = rowVats.reduce((s, r) => s + r.supply, 0)
   const totalVat    = rowVats.reduce((s, r) => s + r.vat, 0)
