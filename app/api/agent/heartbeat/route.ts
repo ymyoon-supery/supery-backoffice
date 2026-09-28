@@ -10,9 +10,6 @@ const WORKING_TYPES = new Set(['CHECK_IN', 'BREAK_END', 'FIELD_END'])
 const INACTIVITY_THRESHOLD = 15 * 60
 const MIN_BREAK_DURATION_SEC = 5 * 60  // 자동 BREAK_END 삽입 전 최소 휴식 시간 (짧은 idle 스파이크 방지)
 const MAX_IDLE_SECONDS = 6 * 60 * 60   // idle_seconds 최대값 클램프
-// BREAK_END 활동 확인 창: 구형 에이전트(activity_ticks 없음) 폴백용
-// last_activity_at이 이 시간(초) 이내여야 "연속 활동 확인됨"으로 판단
-const HEARTBEAT_CONFIRMATION_WINDOW = 3 * 60
 
 export async function POST(req: NextRequest) {
   const apiKey = req.headers.get('x-agent-key')?.trim()
@@ -334,15 +331,13 @@ export async function POST(req: NextRequest) {
       const breakDurationSec = (now.getTime() - new Date(lastRecord!.recorded_at).getTime()) / 1000
       if (breakDurationSec >= MIN_BREAK_DURATION_SEC) {
         // 시스템 이벤트(Windows 업데이트·알림 등)가 idle 타이머를 1회 리셋하는 false positive 방지.
-        // B(신규 에이전트): activity_ticks — 60초 구간 4샘플 중 2회 이상 활성이어야 실제 복귀로 확정.
-        // A(구형 에이전트): last_activity_at — 이전 heartbeat도 활성이었는지 시간 범위로 검증.
+        // B(신규 에이전트, v1.3.12+): activity_ticks — 60초 구간 4샘플 중 2회 이상 활성이어야 실제 복귀로 확정.
+        // A(구형 에이전트): last_activity_at은 idle >= 15분 구간(휴식 중)에는 업데이트되지 않으므로
+        //   복귀 첫 heartbeat에서 항상 3분 창을 초과 → BREAK_END 영구 미삽입 회귀 발생.
+        //   구형 에이전트는 idleSeconds < 60 조건 자체가 충분한 필터이므로 gate 제거.
         const isConfirmedActive = activityTicks !== null
           ? activityTicks >= 2
-          : (() => {
-              const la = employee.last_activity_at as string | null
-              if (!la) return false
-              return (now.getTime() - new Date(la).getTime()) / 1000 < HEARTBEAT_CONFIRMATION_WINDOW
-            })()
+          : true
 
         if (isConfirmedActive) {
           // Race 방지: 최근 2분 내 자동 BREAK_END가 이미 있으면 스킵
