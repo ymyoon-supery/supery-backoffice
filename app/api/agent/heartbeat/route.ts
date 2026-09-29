@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import {
+  decideAgentHeartbeat,
+  type AgentHeartbeatCtx,
+  type AgentHeartbeatInput,
+} from '@/lib/attendance/decide-heartbeat'
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 )
 
-const WORKING_TYPES = new Set(['CHECK_IN', 'BREAK_END', 'FIELD_END'])
 const INACTIVITY_THRESHOLD = 15 * 60
-const MIN_BREAK_DURATION_SEC = 5 * 60  // 자동 BREAK_END 삽입 전 최소 휴식 시간 (짧은 idle 스파이크 방지)
-const MAX_IDLE_SECONDS = 6 * 60 * 60   // idle_seconds 최대값 클램프
+const MAX_IDLE_SECONDS = 6 * 60 * 60
 
 export async function POST(req: NextRequest) {
   const apiKey = req.headers.get('x-agent-key')?.trim()
@@ -28,25 +31,19 @@ export async function POST(req: NextRequest) {
   const rawIdle = Number(body.idle_seconds) || 0
   const idleSeconds: number = Math.max(0, Math.min(rawIdle, MAX_IDLE_SECONDS))
   // activity_ticks: 에이전트 v1.3.12+에서 전송. 60초 구간 내 15초마다 샘플링 → idle<60s인 횟수(0~4).
-  // null이면 구형 에이전트 → server-side last_activity_at 폴백(Option A)으로 처리.
+  // null이면 구형 에이전트 → isConfirmedActive gate 제거(idle<60 자체가 충분한 필터)
   const activityTicks: number | null = typeof body.activity_ticks === 'number' ? (body.activity_ticks as number) : null
   const deviceName = (body.device as string) || 'Unknown'
   const now = new Date()
 
-  // 절전 wake heartbeat 전용: suspend_at(절전 진입 시각) - idle_at_suspend(절전 당시 유휴초) = 실제 마지막 활동 시각
-  // idle_seconds 6시간 클램프로 인한 부정확성을 보정
+  // 절전 wake heartbeat 전용: suspend_at - idle_at_suspend = 실제 마지막 활동 시각
   const suspendAtStr = body.suspend_at as string | undefined
-  // idle_at_suspend도 MAX_IDLE_SECONDS 클램프 — idle_seconds와 동일한 보호
   const idleAtSuspend = Math.max(0, Math.min(Number(body.idle_at_suspend) || 0, MAX_IDLE_SECONDS))
-  // suspend_at이 유효하지 않은 날짜 문자열인 경우 NaN → null로 처리
-  // Invalid Date를 그대로 쓰면 .toISOString()에서 RangeError 크래시 발생
   const suspendAtMs = suspendAtStr ? new Date(suspendAtStr).getTime() : NaN
   const lastActivityBeforeSleep: Date | null =
     !isNaN(suspendAtMs) ? new Date(suspendAtMs - idleAtSuspend * 1000) : null
 
-  // 설치 현황 last_seen_at 업데이트
-  // SELECT+INSERT 레이스 방지: UPDATE-first 패턴 — 기존 행이 있으면 UPDATE(원자적),
-  // 없으면(첫 등록) INSERT. 동시 INSERT 충돌은 에러 무시(unique constraint가 막아줌).
+  // 설치 현황 last_seen_at 업데이트 (UPDATE-first 패턴)
   const { data: updated } = await admin
     .from('agent_installations')
     .update({ last_seen_at: now.toISOString(), app_version: body.version || null })
@@ -62,314 +59,95 @@ export async function POST(req: NextRequest) {
       registered_at: now.toISOString(),
       last_seen_at: now.toISOString(),
     })
-    // 동시 첫 heartbeat로 unique 충돌 시 에러 무시 — 다음 heartbeat에서 UPDATE 경로로 처리됨
   }
 
-  // 자동 휴식 감지가 꺼진 직원(외근직 등)은 이하 로직 스킵
   const autoBreakEnabled = employee.agent_auto_break !== false
 
   if (autoBreakEnabled) {
-    // 오늘 마지막 근태 기록 조회
     const kstDate = new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
-    const { data: lastRecord } = await admin
-      .from('attendance_records')
-      .select('type, recorded_at, note')
-      .eq('employee_id', employee.id)
-      .gte('recorded_at', `${kstDate}T00:00:00+09:00`)
-      .order('recorded_at', { ascending: false })
-      .order('id', { ascending: false })  // 동일 recorded_at 시 id 높은 것(나중 삽입) 우선
-      .limit(1)
-      .maybeSingle()
+    const yesterdayKSTDate = new Date(now.getTime() + 9 * 60 * 60 * 1000 - 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    const todayStart = `${kstDate}T00:00:00+09:00`
+    const yesterdayStart = `${yesterdayKSTDate}T00:00:00+09:00`
 
-    const lastType = lastRecord?.type ?? null
-
-    // 15분 이상 비활동 → 자동 휴식 시작
-    if (lastType && WORKING_TYPES.has(lastType) && idleSeconds >= INACTIVITY_THRESHOLD) {
-      const lastActivityAt = new Date(now.getTime() - idleSeconds * 1000)
-      const lastRecordAt = new Date(lastRecord!.recorded_at)
-
-      // Stale heartbeat 방지: 비활동 시작 시점이 마지막 기록보다 이전이면 지연 도착한 heartbeat → 스킵
-      // (예: BREAK_END 직후 도착한 오래된 high-idle heartbeat가 새 BREAK_START를 만드는 것 차단)
-      if (lastActivityAt >= lastRecordAt) {
-        const breakStartAt = new Date(Math.max(lastActivityAt.getTime(), lastRecordAt.getTime()))
-        const breakStartKSTDate = new Date(breakStartAt.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
-
-        if (breakStartKSTDate < kstDate) {
-          // 자정을 넘긴 절전/화면잠금: 전날 마지막 활동 시각을 퇴근으로 기록
-          const { data: existingCheckout } = await admin
-            .from('attendance_records')
-            .select('id')
-            .eq('employee_id', employee.id)
-            .eq('type', 'CHECK_OUT')
-            .gte('recorded_at', `${breakStartKSTDate}T00:00:00+09:00`)
-            .lt('recorded_at', `${kstDate}T00:00:00+09:00`)
-            .maybeSingle()
-          if (!existingCheckout) {
-            await admin.from('attendance_records').insert({
-              employee_id: employee.id,
-              type: 'CHECK_OUT',
-              recorded_at: breakStartAt.toISOString(),
-              note: 'PC 절전/잠금 자동 퇴근',
-              is_field: false,
-            })
-          }
-        } else {
-          // 당일 비활동: 기존 BREAK_START 로직
-          // Race Condition 방지: 최근 30분 내 자동 BREAK_START가 이미 있으면 스킵
-          const recentWindow = new Date(now.getTime() - 30 * 60 * 1000).toISOString()
-          const { data: recentAutoBreak } = await admin
-            .from('attendance_records')
-            .select('id')
-            .eq('employee_id', employee.id)
-            .eq('type', 'BREAK_START')
-            .eq('note', 'PC 비활동 자동 휴식')
-            .gte('recorded_at', recentWindow)
-            .maybeSingle()
-          if (!recentAutoBreak) {
-            await admin.from('attendance_records').insert({
-              employee_id: employee.id,
-              type: 'BREAK_START',
-              recorded_at: breakStartAt.toISOString(),
-              note: 'PC 비활동 자동 휴식',
-              is_field: false,
-            })
-          }
-        }
-      }
-    }
-
-    // 절전 wake 후 idle이 OS에 의해 리셋된 경우 — suspend_at 기반 자리비움 감지
-    // idle-based 블록은 idle < 15분이면 스킵하므로, suspend_at이 있을 때 별도 처리
-    // (외근 중 이동 시 노트북 닫기/열기 케이스)
-    if (suspendAtStr && lastActivityBeforeSleep && lastType && WORKING_TYPES.has(lastType) && idleSeconds < INACTIVITY_THRESHOLD) {
-      const sleepDurationSec = (now.getTime() - lastActivityBeforeSleep.getTime()) / 1000
-      if (sleepDurationSec >= INACTIVITY_THRESHOLD) {
-        const lastRecordAt = new Date(lastRecord!.recorded_at)
-        if (lastActivityBeforeSleep >= lastRecordAt) {
-          const breakStartKSTDate = new Date(lastActivityBeforeSleep.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
-          if (breakStartKSTDate === kstDate) {
-            // Race 방지: lastActivityBeforeSleep 전후 5분 내 자동 BREAK_START가 이미 있으면 스킵
-            const breakRaceWindow = new Date(lastActivityBeforeSleep.getTime() - 5 * 60 * 1000).toISOString()
-            const { data: recentAutoBreak } = await admin
-              .from('attendance_records')
-              .select('id')
-              .eq('employee_id', employee.id)
-              .eq('type', 'BREAK_START')
-              .eq('note', 'PC 비활동 자동 휴식')
-              .gte('recorded_at', breakRaceWindow)
-              .maybeSingle()
-            if (!recentAutoBreak) {
-              await admin.from('attendance_records').insert({
-                employee_id: employee.id,
-                type: 'BREAK_START',
-                recorded_at: lastActivityBeforeSleep.toISOString(),
-                note: 'PC 비활동 자동 휴식',
-                is_field: false,
-              })
-            }
-          }
-        }
-      }
-    }
-
-    // heartbeat 공백 감지 — suspend_at 없는 PC 절전/에이전트 재시작 케이스
-    // 이전 last_heartbeat(DB 저장값)와 now의 차이가 15분 이상이고 현재 사용자가 활동 중이면
-    // 해당 공백 기간을 자리비움으로 처리. idle-based·suspend-based 블록이 처리하지 못하는
-    // "절전 후 wake, idle 리셋, suspend_at 미전송" 상황을 보완.
-    if (
-      employee.last_heartbeat &&
-      !suspendAtStr &&
-      lastType &&
-      WORKING_TYPES.has(lastType) &&
-      idleSeconds < INACTIVITY_THRESHOLD
-    ) {
-      const prevHeartbeat = new Date(employee.last_heartbeat)
-      const gapSeconds = (now.getTime() - prevHeartbeat.getTime()) / 1000
-      if (gapSeconds >= INACTIVITY_THRESHOLD) {
-        const lastRecordAt = new Date(lastRecord!.recorded_at)
-        const breakStartMs = Math.max(prevHeartbeat.getTime(), lastRecordAt.getTime())
-        const breakStartAt = new Date(breakStartMs)
-        const breakStartKSTDate = new Date(breakStartMs + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
-        if (breakStartKSTDate === kstDate) {
-          // Race 방지: breakStartAt 기준 30분 내 자동 BREAK_START가 이미 있으면 스킵
-          const breakRaceWindow = new Date(breakStartMs - 30 * 60 * 1000).toISOString()
-          const { data: existingGapBreak } = await admin
-            .from('attendance_records')
-            .select('id')
-            .eq('employee_id', employee.id)
-            .eq('type', 'BREAK_START')
-            .eq('note', 'PC 비활동 자동 휴식')
-            .gte('recorded_at', breakRaceWindow)
-            .maybeSingle()
-          if (!existingGapBreak) {
-            await admin.from('attendance_records').insert({
-              employee_id: employee.id,
-              type: 'BREAK_START',
-              recorded_at: breakStartAt.toISOString(),
-              note: 'PC 비활동 자동 휴식',
-              is_field: false,
-            })
-            // idle < 60s이면 사용자가 이미 복귀한 상태 → BREAK_END도 함께 삽입
-            if (idleSeconds < 60) {
-              await admin.from('attendance_records').insert({
-                employee_id: employee.id,
-                type: 'BREAK_END',
-                recorded_at: now.toISOString(),
-                note: 'PC 활동 감지 자동 업무 복귀',
-                is_field: false,
-              })
-            }
-          }
-        }
-      }
-    }
-
-    // 오늘 기록이 없고 어제 미종료 세션이 있으면 퇴근 자동 기록
-    // — 쿼리가 gte(오늘 00:00)이므로 어제 마지막 기록(BREAK_START/BREAK_END/CHECK_IN 등)은
-    //   lastRecord=null로 보임. 날짜가 바뀐 첫 heartbeat에서 전날을 별도 조회해 처리.
-    if (!lastRecord) {
-      const yesterdayKSTDate = new Date(now.getTime() + 9 * 60 * 60 * 1000 - 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-      const { data: yestRecord } = await admin
+    // 오늘 기록(전체) + 어제 기록(최대 20개) 동시 조회 — race guard는 전체 오늘 기록을 참조
+    const [{ data: todayRaw }, { data: yestRaw }] = await Promise.all([
+      admin
         .from('attendance_records')
-        .select('type, recorded_at, note')
+        .select('id, type, recorded_at, note, origin')
         .eq('employee_id', employee.id)
-        .gte('recorded_at', `${yesterdayKSTDate}T00:00:00+09:00`)
-        .lt('recorded_at', `${kstDate}T00:00:00+09:00`)
+        .gte('recorded_at', todayStart)
+        .order('recorded_at', { ascending: false })
+        .order('id', { ascending: false }),
+      admin
+        .from('attendance_records')
+        .select('id, type, recorded_at, note, origin')
+        .eq('employee_id', employee.id)
+        .gte('recorded_at', yesterdayStart)
+        .lt('recorded_at', todayStart)
         .order('recorded_at', { ascending: false })
         .order('id', { ascending: false })
-        .limit(1)
-        .maybeSingle()
+        .limit(20),
+    ])
 
-      if (yestRecord) {
-        const yestType = yestRecord.type
-        // WORKING_TYPES(CHECK_IN/BREAK_END/FIELD_END)이거나 자동 휴식 BREAK_START면 미종료로 판단
-        const needsCheckout =
-          WORKING_TYPES.has(yestType) ||
-          (yestType === 'BREAK_START' && yestRecord.note === 'PC 비활동 자동 휴식')
+    const todayRecords = todayRaw ?? []
+    const yestLastRecord = yestRaw?.[0] ?? null
+    const yestCheckout = yestRaw?.find(r => r.type === 'CHECK_OUT') ?? null
 
-        if (needsCheckout) {
-          // auto-break 여부: BREAK_START 이후 heartbeat는 무인 auto-wake 발생 가능
-          // → last_heartbeat가 auto-wake로 오염되었을 수 있으므로 별도 처리
-          const isAutoBreak = yestType === 'BREAK_START' && yestRecord.note === 'PC 비활동 자동 휴식'
+    const ctx: AgentHeartbeatCtx = {
+      kstDate,
+      yesterdayKSTDate,
+      now,
+      lastHeartbeat: employee.last_heartbeat as string | null,
+      lastActivityAt: employee.last_activity_at as string | null,
+      todayRecords,
+      yestLastRecord,
+      yestCheckout,
+    }
 
-          let checkoutAt: string | null = null
-          if (lastActivityBeforeSleep) {
-            const laKSTDate = new Date(lastActivityBeforeSleep.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
-            // auto-break 케이스: lastActivityBeforeSleep이 BREAK_START보다 이전이어도 허용
-            // (auto-wake 이전 사용자의 실제 마지막 활동 시각)
-            if (laKSTDate === yesterdayKSTDate && (isAutoBreak || lastActivityBeforeSleep > new Date(yestRecord.recorded_at))) {
-              checkoutAt = lastActivityBeforeSleep.toISOString()
-            }
-          }
-          if (!checkoutAt) {
-            if (isAutoBreak) {
-              // BREAK_START 이후 heartbeat는 무인 auto-wake 발생 가능 → last_heartbeat 사용 금지
-              // BREAK_START recorded_at이 실질적 마지막 활동 경계
-              checkoutAt = yestRecord.recorded_at
-            } else {
-              // suspend_at 없는 화면잠금/콜드부팅:
-              // last_activity_at(실제 키보드·마우스 활동 시각) 우선 — 화면잠금 후 PC가 밤새 켜져 있어도
-              // last_heartbeat는 23:59까지 오염되지만 last_activity_at은 실제 마지막 활동 시각을 보존함.
-              // last_activity_at이 없거나 어제가 아니면 last_heartbeat로 폴백.
-              const la = employee.last_activity_at as string | null
-              if (la) {
-                const laKSTDate = new Date(new Date(la).getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
-                if (laKSTDate === yesterdayKSTDate && new Date(la) > new Date(yestRecord.recorded_at)) {
-                  checkoutAt = la
-                }
-              }
-              if (!checkoutAt && employee.last_heartbeat) {
-                const lhKSTDate = new Date(new Date(employee.last_heartbeat).getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
-                if (lhKSTDate === yesterdayKSTDate && new Date(employee.last_heartbeat) > new Date(yestRecord.recorded_at)) {
-                  checkoutAt = employee.last_heartbeat
-                }
-              }
-            }
-          }
+    const input: AgentHeartbeatInput = {
+      idleSeconds,
+      activityTicks,
+      suspendAtStr,
+      lastActivityBeforeSleep,
+    }
 
-          if (checkoutAt) {
-            const { data: existingCheckout } = await admin
-              .from('attendance_records')
-              .select('id, recorded_at, note')
-              .eq('employee_id', employee.id)
-              .eq('type', 'CHECK_OUT')
-              .gte('recorded_at', `${yesterdayKSTDate}T00:00:00+09:00`)
-              .lt('recorded_at', `${kstDate}T00:00:00+09:00`)
-              .maybeSingle()
-            if (!existingCheckout) {
-              await admin.from('attendance_records').insert({
-                employee_id: employee.id,
-                type: 'CHECK_OUT',
-                recorded_at: checkoutAt,
-                note: 'PC 절전/잠금 자동 퇴근',
-                is_field: false,
-              })
-            } else if (
-              existingCheckout.note === 'PC 종료 자동 퇴근' &&
-              new Date(checkoutAt) > new Date(existingCheckout.recorded_at)
-            ) {
-              // prev_session_killed로 기록된 stale 퇴근 시각보다 이후 활동이 있으면 갱신
-              await admin
-                .from('attendance_records')
-                .update({ recorded_at: checkoutAt, note: 'PC 절전/잠금 자동 퇴근' })
-                .eq('id', existingCheckout.id)
-            }
-          }
-        }
+    const { decisions, logs } = decideAgentHeartbeat(ctx, input)
+
+    // 결정 실행
+    for (const d of decisions) {
+      if (d.action === 'insert') {
+        await admin.from('attendance_records').insert({
+          employee_id: employee.id,
+          type: d.type,
+          recorded_at: d.recorded_at,
+          note: d.note,
+          origin: d.origin,
+          is_field: false,
+        })
+      } else {
+        await admin
+          .from('attendance_records')
+          .update({ recorded_at: d.recorded_at, note: d.note })
+          .eq('id', d.id)
       }
     }
 
-    // 활동 재개 감지 → 자동 업무 복귀
-    // note 정확 일치로 수동 기록과 구분 + 최소 5분 휴식 후에만 삽입 (idle 스파이크로 인한 무한 BREAK 루프 방지)
-    // suspend_at이 있으면 절전 wake 이벤트 → GetLastInputInfo()가 OS에 의해 리셋된 것이므로 BREAK_END 생성 안 함
-    if (
-      lastType === 'BREAK_START' &&
-      lastRecord?.note === 'PC 비활동 자동 휴식' &&
-      idleSeconds < 60 &&
-      !suspendAtStr
-    ) {
-      const breakDurationSec = (now.getTime() - new Date(lastRecord!.recorded_at).getTime()) / 1000
-      if (breakDurationSec >= MIN_BREAK_DURATION_SEC) {
-        // 시스템 이벤트(Windows 업데이트·알림 등)가 idle 타이머를 1회 리셋하는 false positive 방지.
-        // B(신규 에이전트, v1.3.12+): activity_ticks — 60초 구간 4샘플 중 2회 이상 활성이어야 실제 복귀로 확정.
-        // A(구형 에이전트): last_activity_at은 idle >= 15분 구간(휴식 중)에는 업데이트되지 않으므로
-        //   복귀 첫 heartbeat에서 항상 3분 창을 초과 → BREAK_END 영구 미삽입 회귀 발생.
-        //   구형 에이전트는 idleSeconds < 60 조건 자체가 충분한 필터이므로 gate 제거.
-        const isConfirmedActive = activityTicks !== null
-          ? activityTicks >= 2
-          : true
-
-        if (isConfirmedActive) {
-          // Race 방지: 최근 2분 내 자동 BREAK_END가 이미 있으면 스킵
-          // (동시 heartbeat가 두 건 도달하거나 네트워크 재시도 시 중복 삽입 방지)
-          const recentBreakEndWindow = new Date(now.getTime() - 2 * 60 * 1000).toISOString()
-          const { data: existingBreakEnd } = await admin
-            .from('attendance_records')
-            .select('id')
-            .eq('employee_id', employee.id)
-            .eq('type', 'BREAK_END')
-            .eq('note', 'PC 활동 감지 자동 업무 복귀')
-            .gte('recorded_at', recentBreakEndWindow)
-            .maybeSingle()
-          if (!existingBreakEnd) {
-            await admin.from('attendance_records').insert({
-              employee_id: employee.id,
-              type: 'BREAK_END',
-              recorded_at: now.toISOString(),
-              note: 'PC 활동 감지 자동 업무 복귀',
-              is_field: false,
-            })
-          }
-        }
-      }
-    }
+    // 디버그 로그 (fire-and-forget — 응답 지연 없음)
+    void Promise.resolve(admin.from('heartbeat_debug_log').insert({
+      employee_id: employee.id,
+      payload: {
+        idle_seconds: idleSeconds,
+        activity_ticks: activityTicks,
+        suspend_at: suspendAtStr ?? null,
+        version: body.version ?? null,
+      },
+      last_type: todayRecords[0]?.type ?? null,
+      logs,
+    })).catch(() => {})
   }
 
   // last_heartbeat: cron용 마지막 heartbeat 시각
   // last_activity_at: 실제 사람이 키보드/마우스를 사용한 마지막 시각
-  //   - suspend_at 있음(절전 wake): idle이 OS에 의해 리셋된 것이므로 last_activity_at 갱신 안 함
-  //   - idle < 15분: 사람이 최근 활동 중 → now - idle_seconds = 실제 마지막 활동 시각
-  //   - idle >= 15분: 자리 비운 상태 → 더 이상 갱신하지 않음 (자리 비운 시점이 이미 저장됨)
   const activityUpdate: Record<string, string> = { last_heartbeat: now.toISOString() }
   if (!suspendAtStr && idleSeconds < INACTIVITY_THRESHOLD) {
     activityUpdate.last_activity_at = new Date(now.getTime() - idleSeconds * 1000).toISOString()

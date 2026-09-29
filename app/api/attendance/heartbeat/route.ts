@@ -1,9 +1,14 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import {
+  decideBrowserHeartbeat,
+  type BrowserHeartbeatCtx,
+} from '@/lib/attendance/decide-heartbeat'
 
-// Types where employee is actively working (not on break/field/done)
-const WORKING_TYPES = new Set(['CHECK_IN', 'BREAK_END', 'FIELD_END'])
+// 5분 이내에 PC 에이전트 heartbeat가 있으면 브라우저 휴식 감지 생략
+// (에이전트가 더 정확한 idle_seconds 데이터를 가지고 있음)
+const AGENT_ACTIVE_WINDOW_MS = 5 * 60 * 1000
 
 export async function POST(_request: NextRequest) {
   const supabase = await createClient()
@@ -15,72 +20,63 @@ export async function POST(_request: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   )
 
-  const { data: settings } = await admin
-    .from('company_settings')
-    .select('inactivity_minutes')
-    .single()
-  const INACTIVITY_MS = (settings?.inactivity_minutes ?? 15) * 60 * 1000
+  const [settingsRes, employeeRes] = await Promise.all([
+    admin.from('company_settings').select('inactivity_minutes').single(),
+    supabase.from('employees').select('id, last_heartbeat, agent_auto_break').eq('auth_user_id', user.id).single(),
+  ])
 
-  const { data: employee } = await supabase
-    .from('employees')
-    .select('id, last_heartbeat')
-    .eq('auth_user_id', user.id)
-    .single()
-
+  const { data: employee } = employeeRes
   if (!employee) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  const INACTIVITY_MS = (settingsRes.data?.inactivity_minutes ?? 15) * 60 * 1000
 
   const now = new Date()
   const kstDate = new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
   const dayStart = `${kstDate}T00:00:00+09:00`
 
-  // Today's last attendance record
   const { data: lastRecord } = await supabase
     .from('attendance_records')
-    .select('type, recorded_at, note')
+    .select('id, type, recorded_at, note, origin')
     .eq('employee_id', employee.id)
     .gte('recorded_at', dayStart)
     .order('recorded_at', { ascending: false })
+    .order('id', { ascending: false })
     .limit(1)
     .maybeSingle()
 
-  const lastType = lastRecord?.type ?? null
+  // PC 에이전트 활성 여부: last_heartbeat가 5분 이내이고 agent_auto_break가 켜져 있는 경우
+  const agentIsActive =
+    employee.agent_auto_break !== false &&
+    !!employee.last_heartbeat &&
+    now.getTime() - new Date(employee.last_heartbeat).getTime() < AGENT_ACTIVE_WINDOW_MS
 
-  // Detect missed break: employee was working but browser went away
-  if (employee.last_heartbeat && lastType && WORKING_TYPES.has(lastType)) {
-    const lastHeartbeatMs = new Date(employee.last_heartbeat).getTime()
-    const lastRecordMs = new Date(lastRecord!.recorded_at).getTime()
+  const ctx: BrowserHeartbeatCtx = {
+    kstDate,
+    now,
+    lastHeartbeat: employee.last_heartbeat as string | null,
+    lastRecord: lastRecord ?? null,
+    inactivityMs: INACTIVITY_MS,
+    agentIsActive,
+  }
 
-    // Effective inactivity = time since the LATER of (last heartbeat, last working event)
-    // This prevents false positives when employee just returned from a frontend-detected break:
-    // in that case lastRecord (BREAK_END) is very recent even though last_heartbeat is stale
-    const lastActiveMs = Math.max(lastHeartbeatMs, lastRecordMs)
-    const inactiveMs = now.getTime() - lastActiveMs
+  const { decisions } = decideBrowserHeartbeat(ctx)
 
-    if (inactiveMs > INACTIVITY_MS) {
-      const breakStartTime = new Date(lastActiveMs + INACTIVITY_MS)
-
-      // Retroactively insert BREAK_START at (last active + 15 min)
+  for (const d of decisions) {
+    if (d.action === 'insert') {
       await admin.from('attendance_records').insert({
         employee_id: employee.id,
-        type: 'BREAK_START',
-        recorded_at: breakStartTime.toISOString(),
-        note: '자동 휴식 (비활동 감지)',
-        is_field: false,
-      })
-
-      // Insert BREAK_END at now (employee just came back)
-      await admin.from('attendance_records').insert({
-        employee_id: employee.id,
-        type: 'BREAK_END',
-        recorded_at: now.toISOString(),
-        note: '자동 업무 복귀',
+        type: d.type,
+        recorded_at: d.recorded_at,
+        note: d.note,
+        origin: d.origin,
         is_field: false,
       })
     }
   }
 
-  // Update last_heartbeat only while employee is actively working
-  if (lastType && WORKING_TYPES.has(lastType)) {
+  // last_heartbeat는 WORKING_TYPE 상태일 때만 갱신 (에이전트 last_heartbeat와 충돌 방지)
+  const WORKING_TYPES = new Set(['CHECK_IN', 'BREAK_END', 'FIELD_END'])
+  if (lastRecord && WORKING_TYPES.has(lastRecord.type)) {
     await supabase
       .from('employees')
       .update({ last_heartbeat: now.toISOString() })
