@@ -22,7 +22,7 @@ export async function POST(_request: NextRequest) {
 
   const [settingsRes, employeeRes] = await Promise.all([
     admin.from('company_settings').select('inactivity_minutes').single(),
-    supabase.from('employees').select('id, last_heartbeat, agent_auto_break').eq('auth_user_id', user.id).single(),
+    supabase.from('employees').select('id, last_heartbeat, last_agent_heartbeat, agent_auto_break').eq('auth_user_id', user.id).single(),
   ])
 
   const { data: employee } = employeeRes
@@ -44,11 +44,11 @@ export async function POST(_request: NextRequest) {
     .limit(1)
     .maybeSingle()
 
-  // PC 에이전트 활성 여부: last_heartbeat가 5분 이내이고 agent_auto_break가 켜져 있는 경우
+  // PC 에이전트 활성 여부: last_agent_heartbeat가 5분 이내이고 agent_auto_break가 켜져 있는 경우
   const agentIsActive =
     employee.agent_auto_break !== false &&
-    !!employee.last_heartbeat &&
-    now.getTime() - new Date(employee.last_heartbeat).getTime() < AGENT_ACTIVE_WINDOW_MS
+    !!employee.last_agent_heartbeat &&
+    now.getTime() - new Date(employee.last_agent_heartbeat as string).getTime() < AGENT_ACTIVE_WINDOW_MS
 
   const ctx: BrowserHeartbeatCtx = {
     kstDate,

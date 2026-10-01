@@ -70,6 +70,7 @@ export async function POST(req: NextRequest) {
     type: 'CHECK_OUT',
     recorded_at: recordedAt,
     note: 'PC 종료 자동 퇴근',
+    origin: 'agent_auto',
     is_field: false,
   })
 

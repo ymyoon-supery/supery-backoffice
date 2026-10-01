@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
 
   const { data: employee, error: empError } = await admin
     .from('employees')
-    .select('id, agent_auto_break, last_heartbeat, last_activity_at')
+    .select('id, agent_auto_break, last_agent_heartbeat, last_activity_at')
     .eq('agent_api_key', apiKey)
     .maybeSingle()
 
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
       kstDate,
       yesterdayKSTDate,
       now,
-      lastHeartbeat: employee.last_heartbeat as string | null,
+      lastHeartbeat: employee.last_agent_heartbeat as string | null,
       lastActivityAt: employee.last_activity_at as string | null,
       todayRecords,
       yestLastRecord,
@@ -148,7 +148,10 @@ export async function POST(req: NextRequest) {
 
   // last_heartbeat: cron용 마지막 heartbeat 시각
   // last_activity_at: 실제 사람이 키보드/마우스를 사용한 마지막 시각
-  const activityUpdate: Record<string, string> = { last_heartbeat: now.toISOString() }
+  const activityUpdate: Record<string, string> = {
+    last_heartbeat: now.toISOString(),
+    last_agent_heartbeat: now.toISOString(),
+  }
   if (!suspendAtStr && idleSeconds < INACTIVITY_THRESHOLD) {
     activityUpdate.last_activity_at = new Date(now.getTime() - idleSeconds * 1000).toISOString()
   }
