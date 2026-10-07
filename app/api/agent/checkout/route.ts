@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
 
   // 강제 종료 재부팅 시 이전 세션의 실제 마지막 활동 시각을 퇴근 시각으로 사용
   let recordedAt = now.toISOString()
+  let prevSessionResolved = false
   if (reason === 'prev_session_killed' && lastActiveAt) {
     const parsed = new Date(lastActiveAt)
     if (!isNaN(parsed.getTime())) {
@@ -34,8 +35,14 @@ export async function POST(req: NextRequest) {
       // 36시간 이내 과거 && 5분 이내 미래만 허용 — 시계 오류·버그로 인한 비정상 시각 차단
       if (ageMs >= -5 * 60 * 1000 && ageMs <= 36 * 60 * 60 * 1000) {
         recordedAt = parsed.toISOString()
+        prevSessionResolved = true
       }
     }
+  }
+  // prev_session_killed인데 lastActiveAt이 없거나 범위 초과 → 이전 세션 종료 시각 불명.
+  // now를 쓰면 에이전트 시작 시각이 퇴근 시각이 되어 수동 체크인 직후 오퇴근이 삽입됨.
+  if (reason === 'prev_session_killed' && !prevSessionResolved) {
+    return NextResponse.json({ ok: true, skipped: true })
   }
 
   // KST 07:00~23:59 범위에서만 자동 퇴근 처리 (퇴근 시각 기준)
