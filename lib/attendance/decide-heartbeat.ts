@@ -282,6 +282,16 @@ export function decideAgentHeartbeat(
       log('E', 'skipped', `suspend wake — idle reset by OS, not real activity`)
       break
     }
+    // Heartbeat gap guard: 에이전트가 살아있으면 ~60s마다 heartbeat를 보낸다.
+    // gap >= 15min = PC가 절전/재시작 상태였음 → 첫 wake heartbeat의 low-idle은
+    // OS/Windows Update 이벤트이지 실제 사용자 복귀가 아님.
+    if (lastHeartbeat) {
+      const gapSec = (now.getTime() - new Date(lastHeartbeat).getTime()) / 1000
+      if (gapSec >= INACTIVITY_THRESHOLD) {
+        log('E', 'skipped', `heartbeat gap ${Math.round(gapSec)}s — PC woke from sleep/restart, skip false BREAK_END`)
+        break
+      }
+    }
     const breakDurationSec = (now.getTime() - new Date(lastRecord!.recorded_at).getTime()) / 1000
     if (breakDurationSec < MIN_BREAK_DURATION_SEC) {
       log('E', 'skipped', `break duration ${Math.round(breakDurationSec)}s < min ${MIN_BREAK_DURATION_SEC}s`)
