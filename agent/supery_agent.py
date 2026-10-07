@@ -1,8 +1,8 @@
 """
-Supery 근태 에이전트 v1.3.13
-- WH_KEYBOARD_LL / WH_MOUSE_LL 실측 입력 기반 활동 감지 (GetLastInputInfo fallback)
+Supery 근태 에이전트 v1.3.14
+- GetCursorPos 폴링으로 마우스 이동 감지 (백신 오탐 없음, 시스템 영향 없음)
 - 15분 PC 비활동 시 자동 휴식 기록
-- 활동 재개 시 자동 업무 복귀 기록 (key_count/mouse_px 실측값으로 시스템 이벤트 오기록 방지)
+- 활동 재개 시 자동 업무 복귀 기록 (mouse_px 실측값으로 Windows Update 등 오기록 방지)
 - 시스템 트레이 상주 / Task Scheduler 로그온 작업 등록 (높은 우선순위)
 - 워킹데이(월~금) PC 시작 시 출근 확인 팝업 (3배 크기, 시간 제한 없음, 웹 출근 여부 서버 확인)
 - PC 종료/재시작 시 자동 퇴근 기록 (WM_ENDSESSION 숨김 창 + atexit 이중 보장)
@@ -38,7 +38,7 @@ API_BASE = "https://office.supery.co.kr/api"
 WORKSYNC_URL = "https://office.supery.co.kr"
 # ──────────────────────────────────────────────
 
-VERSION = "1.3.13"
+VERSION = "1.3.14"
 APP_NAME = "SuperyAgent"
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.json")
 LOG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.log")
@@ -59,11 +59,6 @@ _shutdown_wnd_proc_cb = None     # WndProc 콜백 GC 방지용 모듈 레벨 참
 _sleep_started_wall: float | None = None  # time.time() at PBT_APMSUSPEND
 _sleep_idle_at_suspend: float = 0.0       # idle_seconds at suspend time
 
-_input_lock = threading.Lock()
-_key_count_accum: int = 0   # v1.3.13+: 마지막 heartbeat 이후 키다운 누적 횟수
-_mouse_px_accum: int = 0    # v1.3.13+: 마지막 heartbeat 이후 마우스 이동 누적 픽셀
-_hook_refs: list = []       # HOOKPROC 콜백 GC 방지용
-_hooks_active: bool = False  # SetWindowsHookExW 성공 여부
 
 
 # ── 단일 인스턴스 잠금 ──────────────────────────
@@ -595,62 +590,15 @@ def on_agent_exit() -> None:
         pass  # 네트워크 종료 중 실패 → exited_cleanly=False 유지
 
 
-def _install_input_hooks() -> None:
-    """WH_KEYBOARD_LL + WH_MOUSE_LL 저수준 훅으로 실제 입력 이벤트 계측.
-    반드시 메시지 펌프가 있는 스레드(_pump)에서 호출해야 훅 콜백이 정상 처리됨.
-    설치 실패 시 조용히 반환 — heartbeat_loop는 activity_ticks fallback으로 동작."""
-    global _hooks_active, _hook_refs
+class _POINT(ctypes.Structure):
+    _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
 
-    WH_KEYBOARD_LL = 13
-    WH_MOUSE_LL = 14
-    WM_KEYDOWN = 0x0100
-    WM_SYSKEYDOWN = 0x0104
-    WM_MOUSEMOVE = 0x0200
-    HOOKPROC = ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_int, ctypes.c_size_t, ctypes.c_size_t)
 
-    class MSLLHOOKSTRUCT(ctypes.Structure):
-        _fields_ = [
-            ("x", ctypes.c_long), ("y", ctypes.c_long),
-            ("mouseData", ctypes.c_ulong), ("flags", ctypes.c_ulong),
-            ("time", ctypes.c_ulong), ("dwExtraInfo", ctypes.c_size_t),
-        ]
-
-    _last_pt = [0, 0]
-
-    def _kb_proc(nCode, wParam, lParam):
-        global _key_count_accum
-        if nCode >= 0 and wParam in (WM_KEYDOWN, WM_SYSKEYDOWN):
-            with _input_lock:
-                _key_count_accum += 1
-        return ctypes.windll.user32.CallNextHookEx(0, nCode, wParam, lParam)
-
-    def _mouse_proc(nCode, wParam, lParam):
-        global _mouse_px_accum
-        if nCode >= 0 and wParam == WM_MOUSEMOVE:
-            ms = ctypes.cast(lParam, ctypes.POINTER(MSLLHOOKSTRUCT)).contents
-            dx = ms.x - _last_pt[0]
-            dy = ms.y - _last_pt[1]
-            dist = int((dx * dx + dy * dy) ** 0.5)
-            if dist > 5:
-                with _input_lock:
-                    _mouse_px_accum += dist
-                _last_pt[0] = ms.x
-                _last_pt[1] = ms.y
-        return ctypes.windll.user32.CallNextHookEx(0, nCode, wParam, lParam)
-
-    try:
-        kb_cb = HOOKPROC(_kb_proc)
-        mouse_cb = HOOKPROC(_mouse_proc)
-        hkb = ctypes.windll.user32.SetWindowsHookExW(WH_KEYBOARD_LL, kb_cb, None, 0)
-        hm = ctypes.windll.user32.SetWindowsHookExW(WH_MOUSE_LL, mouse_cb, None, 0)
-        if hkb and hm:
-            _hook_refs.extend([kb_cb, mouse_cb])  # GC 방지: 모듈 레벨에 보관
-            _hooks_active = True
-            logging.warning("[hooks] 키보드/마우스 훅 설치 완료")
-        else:
-            logging.warning(f"[hooks] 훅 설치 실패: hkb={hkb} hm={hm} — activity_ticks fallback")
-    except Exception as e:
-        logging.warning(f"[hooks] 설치 예외: {e} — activity_ticks fallback")
+def _get_cursor_pos() -> tuple:
+    """현재 마우스 커서 위치 반환 — 훅 없이 안전하게 폴링"""
+    pt = _POINT()
+    ctypes.windll.user32.GetCursorPos(ctypes.byref(pt))
+    return pt.x, pt.y
 
 
 def _register_windows_shutdown_handler() -> None:
@@ -747,7 +695,6 @@ def _register_windows_shutdown_handler() -> None:
         return
 
     def _pump():
-        _install_input_hooks()
         msg = ctypes.wintypes.MSG()
         while ctypes.windll.user32.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
             ctypes.windll.user32.TranslateMessage(ctypes.byref(msg))
@@ -907,19 +854,29 @@ def api_post(endpoint: str, data: dict) -> bool:
 # ── 하트비트 루프 ────────────────────────────────
 
 def heartbeat_loop() -> None:
-    global _key_count_accum, _mouse_px_accum
     # 썬더링 허드 방지: 여러 PC가 동시에 시작할 때 요청이 몰리지 않도록 초기 지터
     time.sleep(random.uniform(0, 30))
 
     ticks_per_hb = HEARTBEAT_INTERVAL // ACTIVITY_POLL_INTERVAL  # 60 // 15 = 4
-    activity_ticks = 0  # 훅 미설치 fallback — idle < ACTIVITY_IDLE_THRESHOLD 샘플 수
+    activity_ticks = 0
     poll_count = 0
+    mouse_px = 0
+    last_cursor = _get_cursor_pos()
 
     while running:
         try:
             idle = get_idle_seconds()
             if idle < ACTIVITY_IDLE_THRESHOLD:
                 activity_ticks += 1
+
+            # 마우스 이동 거리 폴링 — WH_MOUSE_LL 훅 없이 안전하게 추적
+            cx, cy = _get_cursor_pos()
+            dx, dy = cx - last_cursor[0], cy - last_cursor[1]
+            dist = int((dx * dx + dy * dy) ** 0.5)
+            if dist > 10:
+                mouse_px += dist
+                last_cursor = (cx, cy)
+
             poll_count += 1
 
             if poll_count >= ticks_per_hb:
@@ -927,21 +884,14 @@ def heartbeat_loop() -> None:
                     "idle_seconds": int(idle),
                     "device": platform.node(),
                     "version": VERSION,
+                    "mouse_px": mouse_px,
+                    "activity_ticks": activity_ticks,
                 }
-                if _hooks_active:
-                    # v1.3.13+: 실측 키보드/마우스 카운트 스냅샷 후 리셋
-                    with _input_lock:
-                        payload["key_count"] = _key_count_accum
-                        payload["mouse_px"] = _mouse_px_accum
-                        _key_count_accum = 0
-                        _mouse_px_accum = 0
-                else:
-                    # 훅 설치 실패 시 기존 activity_ticks 전송 (서버 하위 호환)
-                    payload["activity_ticks"] = activity_ticks
                 api_post("agent/heartbeat", payload)
                 update_session_last_heartbeat()
                 activity_ticks = 0
                 poll_count = 0
+                mouse_px = 0
         except Exception as e:
             logging.warning(f"[heartbeat] {e}")
         time.sleep(ACTIVITY_POLL_INTERVAL)
