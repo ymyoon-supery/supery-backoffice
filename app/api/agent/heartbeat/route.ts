@@ -33,6 +33,8 @@ export async function POST(req: NextRequest) {
   // activity_ticks: 에이전트 v1.3.12+에서 전송. 60초 구간 내 15초마다 샘플링 → idle<60s인 횟수(0~4).
   // null이면 구형 에이전트 → isConfirmedActive gate 제거(idle<60 자체가 충분한 필터)
   const activityTicks: number | null = typeof body.activity_ticks === 'number' ? (body.activity_ticks as number) : null
+  const keyCount: number | null = typeof body.key_count === 'number' ? (body.key_count as number) : null
+  const mousePx: number | null = typeof body.mouse_px === 'number' ? (body.mouse_px as number) : null
   const deviceName = (body.device as string) || 'Unknown'
   const now = new Date()
 
@@ -107,6 +109,8 @@ export async function POST(req: NextRequest) {
     const input: AgentHeartbeatInput = {
       idleSeconds,
       activityTicks,
+      keyCount,
+      mousePx,
       suspendAtStr,
       lastActivityBeforeSleep,
     }

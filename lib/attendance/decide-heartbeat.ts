@@ -56,6 +56,8 @@ export interface AgentHeartbeatCtx {
 export interface AgentHeartbeatInput {
   idleSeconds: number
   activityTicks: number | null  // null = old agent (pre-v1.3.12)
+  keyCount: number | null       // null = pre-v1.3.13 or hooks failed
+  mousePx: number | null        // null = pre-v1.3.13 or hooks failed
   suspendAtStr: string | undefined
   lastActivityBeforeSleep: Date | null
 }
@@ -72,7 +74,7 @@ export function decideAgentHeartbeat(
     lastHeartbeat, lastActivityAt: employeeLastActivityAt,
     todayRecords, yestLastRecord, yestCheckout,
   } = ctx
-  const { idleSeconds, activityTicks, suspendAtStr, lastActivityBeforeSleep } = input
+  const { idleSeconds, activityTicks, keyCount, mousePx, suspendAtStr, lastActivityBeforeSleep } = input
 
   const lastRecord = todayRecords[0] ?? null
   const lastType = lastRecord?.type ?? null
@@ -294,11 +296,17 @@ export function decideAgentHeartbeat(
       log('E', 'skipped', `break duration ${Math.round(breakDurationSec)}s < min ${MIN_BREAK_DURATION_SEC}s`)
       break
     }
-    // v1.3.12+: activity_ticks >= 2 to confirm real activity (not Windows event resetting idle timer)
-    // Old agent: idle < 60s is sufficient (last_activity_at unavailable during breaks)
-    const isConfirmedActive = activityTicks !== null ? activityTicks >= 2 : true
+    // v1.3.13+: 실측 키보드/마우스 — 키입력 1개↑ 또는 마우스 이동 50px↑
+    // v1.3.12 : activity_ticks >= 2 (60초 4샘플 중 2개↑ idle < 60s)
+    // pre-1.3.12: idle < 60s만으로 판단 (KST guard로 보완)
+    const isConfirmedActive =
+      keyCount !== null || mousePx !== null
+        ? (keyCount ?? 0) >= 1 || (mousePx ?? 0) >= 50
+        : activityTicks !== null
+        ? activityTicks >= 2
+        : true
     if (!isConfirmedActive) {
-      log('E', 'skipped', `activityTicks=${activityTicks} < 2 (possible false positive)`)
+      log('E', 'skipped', `key=${keyCount} px=${mousePx} ticks=${activityTicks} — not confirmed active`)
       break
     }
     const raceWindow = new Date(now.getTime() - 2 * 60 * 1000).toISOString()
@@ -307,7 +315,7 @@ export function decideAgentHeartbeat(
       break
     }
     agentInsert('BREAK_END', now, 'PC 활동 감지 자동 업무 복귀')
-    log('E', 'triggered', `BREAK_END at ${now.toISOString()} (idle=${idleSeconds}s ticks=${activityTicks})`)
+    log('E', 'triggered', `BREAK_END at ${now.toISOString()} (idle=${idleSeconds}s key=${keyCount} px=${mousePx} ticks=${activityTicks})`)
   } while (false)
 
   return { decisions, logs }
