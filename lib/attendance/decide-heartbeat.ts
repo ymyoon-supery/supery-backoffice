@@ -229,27 +229,37 @@ export function decideAgentHeartbeat(
     const isAutoBreak = yestType === 'BREAK_START' && yestLastRecord.note === 'PC 비활동 자동 휴식'
     let checkoutAt: string | null = null
 
-    if (lastActivityBeforeSleep) {
-      const laKSTDate = new Date(lastActivityBeforeSleep.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
-      if (laKSTDate === yesterdayKSTDate && (isAutoBreak || lastActivityBeforeSleep > new Date(yestLastRecord.recorded_at))) {
-        checkoutAt = lastActivityBeforeSleep.toISOString()
-      }
-    }
-    if (!checkoutAt) {
-      if (isAutoBreak) {
-        checkoutAt = yestLastRecord.recorded_at
-      } else {
-        if (employeeLastActivityAt) {
-          const laKSTDate = new Date(new Date(employeeLastActivityAt).getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
-          if (laKSTDate === yesterdayKSTDate && new Date(employeeLastActivityAt) > new Date(yestLastRecord.recorded_at)) {
-            checkoutAt = employeeLastActivityAt
-          }
+    if (isAutoBreak) {
+      // BREAK_START 시각 = 이미 비활동 감지된 시각 → 그대로 퇴근 시각으로 사용
+      checkoutAt = yestLastRecord.recorded_at
+    } else {
+      // 마지막 실제 활동 시각 후보: lastActivityBeforeSleep vs last_activity_at 중 더 이른 것
+      // 이유: lastActivityBeforeSleep은 집에서 활동 후 절전 시 집 시각을 반영할 수 있음.
+      // last_activity_at은 idle < 15min인 정규 heartbeat에서만 갱신되어 집에서 idle이 클 경우 미갱신.
+      // → 둘 중 더 이른 시각이 실제 업무 마지막 활동 시각에 가까움.
+      let lastActivityMs: number | null = null
+
+      if (lastActivityBeforeSleep) {
+        const laKSTDate = new Date(lastActivityBeforeSleep.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
+        if (laKSTDate === yesterdayKSTDate && lastActivityBeforeSleep > new Date(yestLastRecord.recorded_at)) {
+          lastActivityMs = lastActivityBeforeSleep.getTime()
         }
-        if (!checkoutAt && lastHeartbeat) {
-          const lhKSTDate = new Date(new Date(lastHeartbeat).getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
-          if (lhKSTDate === yesterdayKSTDate && new Date(lastHeartbeat) > new Date(yestLastRecord.recorded_at)) {
-            checkoutAt = lastHeartbeat
-          }
+      }
+      if (employeeLastActivityAt) {
+        const laKSTDate = new Date(new Date(employeeLastActivityAt).getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
+        if (laKSTDate === yesterdayKSTDate && new Date(employeeLastActivityAt) > new Date(yestLastRecord.recorded_at)) {
+          const ms = new Date(employeeLastActivityAt).getTime()
+          lastActivityMs = lastActivityMs === null ? ms : Math.min(lastActivityMs, ms)
+        }
+      }
+
+      if (lastActivityMs !== null) {
+        // 마지막 활동 + 15분 = 비활동 감지 임계값 = 실질적 자리 이탈 시각
+        checkoutAt = new Date(lastActivityMs + INACTIVITY_THRESHOLD * 1000).toISOString()
+      } else if (lastHeartbeat) {
+        const lhKSTDate = new Date(new Date(lastHeartbeat).getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
+        if (lhKSTDate === yesterdayKSTDate && new Date(lastHeartbeat) > new Date(yestLastRecord.recorded_at)) {
+          checkoutAt = new Date(new Date(lastHeartbeat).getTime() + INACTIVITY_THRESHOLD * 1000).toISOString()
         }
       }
     }
