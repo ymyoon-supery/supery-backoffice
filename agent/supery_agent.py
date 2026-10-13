@@ -1,5 +1,5 @@
 """
-Supery 근태 에이전트 v1.3.15
+Supery 근태 에이전트 v1.3.16
 - GetCursorPos 폴링으로 마우스 이동 감지 (백신 오탐 없음, 시스템 영향 없음)
 - 화면 잠금 상태 감지 (OpenInputDesktop) — lock screen 입력으로 idle 오염 방지
 - 15분 PC 비활동 시 자동 휴식 기록
