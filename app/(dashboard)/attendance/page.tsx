@@ -61,18 +61,14 @@ export default async function AttendancePage() {
     return format(kst, 'yyyy-MM-dd') === todayStr
   })
 
-  function isAutoRecord(r: { note?: string | null }) {
-    return r.note?.includes('자동 휴식') || r.note?.includes('자동 업무 복귀') || r.note?.includes('외근 복귀 (자동 감지)')
-  }
+  const displayRecords = todayRecords
 
-  const displayRecords = todayRecords.filter(r => !isAutoRecord(r))
-
-  // 오늘 제외한 이번 주 기록, 날짜별 그룹핑 (자동 기록 제외)
+  // 오늘 제외한 이번 주 기록, 날짜별 그룹핑
   const weekByDate = new Map<string, typeof records>()
   for (const r of records) {
     const kst = new Date(new Date(r.recorded_at).getTime() + 9 * 60 * 60 * 1000)
     const dateStr = format(kst, 'yyyy-MM-dd')
-    if (dateStr === todayStr || isAutoRecord(r)) continue
+    if (dateStr === todayStr) continue
     if (!weekByDate.has(dateStr)) weekByDate.set(dateStr, [])
     weekByDate.get(dateStr)!.push(r)
   }

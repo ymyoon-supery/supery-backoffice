@@ -213,6 +213,7 @@ export function decideAgentHeartbeat(
     const yestType = yestLastRecord.type
     const needsCheckout =
       WORKING_TYPES.has(yestType) ||
+      yestType === 'FIELD_START' ||
       (yestType === 'BREAK_START' && yestLastRecord.note === 'PC 비활동 자동 휴식')
     if (!needsCheckout) {
       log('D', 'skipped', `yesterday closed (type=${yestType})`)
@@ -338,6 +339,46 @@ export function decideAgentHeartbeat(
     }
     agentInsert('BREAK_END', now, 'PC 활동 감지 자동 업무 복귀')
     log('E', 'triggered', `BREAK_END at ${now.toISOString()} (idle=${idleSeconds}s key=${keyCount} px=${mousePx} ticks=${activityTicks})`)
+  } while (false)
+
+  // ── Block F: PC 종료 자동 퇴근 후 에이전트 재활성 → CHECK_IN ─────────────────
+  do {
+    if (lastType !== 'CHECK_OUT' || lastRecord?.note !== 'PC 종료 자동 퇴근') {
+      log('F', 'skipped', `lastType=${lastType ?? 'none'} note="${lastRecord?.note ?? 'none'}"`)
+      break
+    }
+    if (idleSeconds >= INACTIVITY_THRESHOLD) {
+      log('F', 'skipped', `idle=${idleSeconds}s >= threshold`)
+      break
+    }
+    const kstHourF = new Date(now.getTime() + 9 * 60 * 60 * 1000).getUTCHours()
+    if (kstHourF < 7 || kstHourF >= 22) {
+      log('F', 'skipped', `KST ${kstHourF}시 — 업무 외 시간대`)
+      break
+    }
+    const isConfirmedActiveF =
+      keyCount !== null || mousePx !== null
+        ? (keyCount ?? 0) >= 1 || (mousePx ?? 0) >= 50
+        : activityTicks !== null
+        ? activityTicks >= 2
+        : true
+    if (!isConfirmedActiveF) {
+      log('F', 'skipped', `key=${keyCount} px=${mousePx} ticks=${activityTicks} — not confirmed active`)
+      break
+    }
+    const checkInAt = new Date(now.getTime() - idleSeconds * 1000)
+    const checkInKSTDate = new Date(checkInAt.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    if (checkInKSTDate !== kstDate) {
+      log('F', 'skipped', `checkIn date ${checkInKSTDate} !== today ${kstDate}`)
+      break
+    }
+    const raceWindowF = new Date(now.getTime() - 5 * 60 * 1000).toISOString()
+    if (hasRecord('CHECK_IN', 'PC 재시작 자동 출근', raceWindowF)) {
+      log('F', 'skipped', `CHECK_IN already exists within 5min`)
+      break
+    }
+    agentInsert('CHECK_IN', checkInAt, 'PC 재시작 자동 출근')
+    log('F', 'triggered', `auto re-checkin at ${checkInAt.toISOString()} after PC 종료 자동 퇴근`)
   } while (false)
 
   return { decisions, logs }
