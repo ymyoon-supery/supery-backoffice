@@ -255,11 +255,23 @@ export function decideAgentHeartbeat(
 
       if (lastActivityMs !== null) {
         // 마지막 활동 + 15분 = 비활동 감지 임계값 = 실질적 자리 이탈 시각
-        checkoutAt = new Date(lastActivityMs + INACTIVITY_THRESHOLD * 1000).toISOString()
+        // GetLastInputInfo는 잠금 화면 입력까지 시스템 전역으로 계측하므로, 잠금 후 lock screen 입력이
+        // last_activity_at을 자정 직전까지 밀어낼 수 있음. + 15분이 다음 날로 넘어가면
+        // CHECK_OUT이 오늘 날짜로 삽입되어 "현재 상태: 퇴근" 오표시 버그 발생.
+        // → + 15분 결과가 yesterdayKSTDate를 벗어나면 raw lastActivityMs 그대로 사용.
+        const candidateMs = lastActivityMs + INACTIVITY_THRESHOLD * 1000
+        const candidateKSTDate = new Date(candidateMs + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
+        checkoutAt = candidateKSTDate === yesterdayKSTDate
+          ? new Date(candidateMs).toISOString()
+          : new Date(lastActivityMs).toISOString()
       } else if (lastHeartbeat) {
         const lhKSTDate = new Date(new Date(lastHeartbeat).getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
         if (lhKSTDate === yesterdayKSTDate && new Date(lastHeartbeat) > new Date(yestLastRecord.recorded_at)) {
-          checkoutAt = new Date(new Date(lastHeartbeat).getTime() + INACTIVITY_THRESHOLD * 1000).toISOString()
+          const candidateMs = new Date(lastHeartbeat).getTime() + INACTIVITY_THRESHOLD * 1000
+          const candidateKSTDate = new Date(candidateMs + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
+          checkoutAt = candidateKSTDate === yesterdayKSTDate
+            ? new Date(candidateMs).toISOString()
+            : lastHeartbeat
         }
       }
     }

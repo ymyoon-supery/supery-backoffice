@@ -1,6 +1,7 @@
 """
-Supery 근태 에이전트 v1.3.14
+Supery 근태 에이전트 v1.3.15
 - GetCursorPos 폴링으로 마우스 이동 감지 (백신 오탐 없음, 시스템 영향 없음)
+- 화면 잠금 상태 감지 (OpenInputDesktop) — lock screen 입력으로 idle 오염 방지
 - 15분 PC 비활동 시 자동 휴식 기록
 - 활동 재개 시 자동 업무 복귀 기록 (mouse_px 실측값으로 Windows Update 등 오기록 방지)
 - 시스템 트레이 상주 / Task Scheduler 로그온 작업 등록 (높은 우선순위)
@@ -38,7 +39,7 @@ API_BASE = "https://office.supery.co.kr/api"
 WORKSYNC_URL = "https://office.supery.co.kr"
 # ──────────────────────────────────────────────
 
-VERSION = "1.3.14"
+VERSION = "1.3.15"
 APP_NAME = "SuperyAgent"
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.json")
 LOG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.log")
@@ -91,8 +92,27 @@ class LASTINPUTINFO(ctypes.Structure):
     _fields_ = [("cbSize", ctypes.c_uint), ("dwTime", ctypes.c_uint)]
 
 
+def _is_session_locked() -> bool:
+    """현재 Windows 세션이 잠금 상태인지 확인.
+    OpenInputDesktop이 NULL을 반환하면 Winlogon 데스크탑(잠금 화면)이 활성 상태."""
+    try:
+        DESKTOP_READOBJECTS = 0x0001
+        h = ctypes.windll.user32.OpenInputDesktop(0, False, DESKTOP_READOBJECTS)
+        if h:
+            ctypes.windll.user32.CloseDesktop(h)
+            return False
+        return True
+    except Exception:
+        return False
+
+
 def get_idle_seconds() -> float:
-    """마우스·키보드 마지막 입력 이후 경과 시간(초) — Windows API 직접 호출"""
+    """마우스·키보드 마지막 입력 이후 경과 시간(초) — Windows API 직접 호출.
+    GetLastInputInfo는 시스템 전역(잠금 화면 포함)을 계측하므로, 화면 잠금 상태에서
+    lock screen 입력이 idle을 리셋해 last_activity_at을 자정 직전까지 오염시키는 버그 방지.
+    잠금 상태로 감지되면 INACTIVITY_THRESHOLD + 1을 반환해 Block A가 정상 발동되도록 함."""
+    if _is_session_locked():
+        return float(INACTIVITY_THRESHOLD + 1)
     info = LASTINPUTINFO()
     info.cbSize = ctypes.sizeof(info)
     ctypes.windll.user32.GetLastInputInfo(ctypes.byref(info))
