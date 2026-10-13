@@ -25,6 +25,25 @@ export async function POST(req: NextRequest) {
   const reason = body.reason as string | undefined
   const lastActiveAt = body.last_active_at as string | undefined
 
+  // 버전 업데이트 재시작 — 직전 30분 이내 'PC 종료 자동 퇴근' CHECK_OUT 취소 후 즉시 반환
+  if (reason === 'agent_update') {
+    const thirtyMinAgo = new Date(now.getTime() - 30 * 60 * 1000).toISOString()
+    const { data: recentCheckout } = await admin
+      .from('attendance_records')
+      .select('id')
+      .eq('employee_id', employee.id)
+      .eq('type', 'CHECK_OUT')
+      .eq('note', 'PC 종료 자동 퇴근')
+      .gte('recorded_at', thirtyMinAgo)
+      .order('recorded_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (recentCheckout) {
+      await admin.from('attendance_records').delete().eq('id', recentCheckout.id)
+    }
+    return NextResponse.json({ ok: true, cancelled: !!recentCheckout })
+  }
+
   // 강제 종료 재부팅 시 이전 세션의 실제 마지막 활동 시각을 퇴근 시각으로 사용
   let recordedAt = now.toISOString()
   let prevSessionResolved = false

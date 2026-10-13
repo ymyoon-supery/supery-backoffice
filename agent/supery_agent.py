@@ -39,7 +39,7 @@ API_BASE = "https://office.supery.co.kr/api"
 WORKSYNC_URL = "https://office.supery.co.kr"
 # ──────────────────────────────────────────────
 
-VERSION = "1.3.15"
+VERSION = "1.3.16"
 APP_NAME = "SuperyAgent"
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.json")
 LOG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.log")
@@ -523,7 +523,7 @@ def check_workday_checkin(is_first_run: bool = False) -> None:
 def mark_session_start() -> None:
     """에이전트 시작 시 세션 파일 생성 — 정상 종료 전까지 exited_cleanly=False 유지"""
     try:
-        data = {"started_at": datetime.now(KST).isoformat(), "exited_cleanly": False}
+        data = {"started_at": datetime.now(KST).isoformat(), "exited_cleanly": False, "version": VERSION}
         with open(SESSION_PATH, "w", encoding="utf-8") as f:
             json.dump(data, f)
     except Exception as e:
@@ -579,6 +579,40 @@ def was_prev_session_force_killed() -> bool:
     except Exception:
         pass
     return False
+
+
+def _get_prev_session_version() -> str | None:
+    """이전 세션의 버전 문자열 반환 — 버전 업데이트 감지용"""
+    try:
+        if os.path.exists(SESSION_PATH):
+            with open(SESSION_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data.get("version")
+    except Exception:
+        pass
+    return None
+
+
+def _cancel_update_checkout() -> None:
+    """버전 업데이트 재시작 — 직전 'PC 종료 자동 퇴근' 기록을 서버에서 취소 요청"""
+    deadline = time.time() + 30
+    attempt = 0
+    while time.time() < deadline:
+        attempt += 1
+        try:
+            resp = requests.post(
+                f"{API_BASE}/agent/checkout",
+                json={"device": platform.node(), "version": VERSION, "reason": "agent_update"},
+                headers={"X-Agent-Key": api_key},
+                timeout=5,
+            )
+            if resp.ok:
+                logging.warning(f"[checkout] agent_update cancel ok (attempt {attempt}): {resp.json()}")
+                return
+        except Exception as e:
+            logging.warning(f"[checkout] agent_update cancel attempt {attempt} failed: {e}")
+        time.sleep(3)
+    logging.warning("[checkout] agent_update cancel failed after 30s")
 
 
 # ── PC 종료 시 자동 퇴근 ────────────────────────
@@ -994,8 +1028,14 @@ def main() -> None:
 
     # 이전 세션이 강제 종료됐으면 서버에 checkout 기록 (atexit 미실행 보완)
     # 네트워크 미준비 상태일 수 있으므로 최대 30초 재시도 후 check_workday_checkin 호출
-    if not is_first_run and was_prev_session_force_killed():
-        checkout_prev_session()
+    if not is_first_run:
+        prev_ver = _get_prev_session_version()
+        version_changed = prev_ver is not None and prev_ver != VERSION
+        if was_prev_session_force_killed():
+            checkout_prev_session()
+        elif version_changed:
+            # 정상 종료(tray quit) 후 버전 업데이트 재시작 — 직전 자동퇴근 취소
+            _cancel_update_checkout()
 
     mark_session_start()
     check_for_update()  # 신버전 있으면 다운로드 후 배치로 재시작 (EXE 실행 시에만)
