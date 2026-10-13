@@ -3,8 +3,8 @@
 import { useState, useTransition } from 'react'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
-import { correctAttendance, resolveAnomaly } from '@/app/(admin)/admin/attendance/actions'
-import { Pencil, AlertTriangle } from 'lucide-react'
+import { correctAttendance, resolveAnomaly, insertAttendanceRecord, deleteAttendanceRecord } from '@/app/(admin)/admin/attendance/actions'
+import { Pencil, AlertTriangle, Trash2, Plus } from 'lucide-react'
 
 const TYPE_LABEL: Record<string, string> = {
   CHECK_IN: '출근',
@@ -57,6 +57,11 @@ export default function AttendanceEditor({ records, employees, leaveRecords }: {
   const [resolvingId, setResolvingId] = useState<string | null>(null)
   const [resolveTime, setResolveTime] = useState('')
   const [resolveNote, setResolveNote] = useState('')
+  const [showInsert, setShowInsert] = useState(false)
+  const [insertEmpId, setInsertEmpId] = useState(employees[0]?.id ?? '')
+  const [insertType, setInsertType] = useState('CHECK_IN')
+  const [insertTime, setInsertTime] = useState('')
+  const [insertNote, setInsertNote] = useState('')
   const [isPending, startTransition] = useTransition()
 
   function startEdit(id: string, currentNote: string) {
@@ -95,8 +100,73 @@ export default function AttendanceEditor({ records, employees, leaveRecords }: {
     })
   }
 
+  function handleDelete(recordId: string) {
+    if (!confirm('이 기록을 삭제하시겠습니까?')) return
+    startTransition(async () => {
+      const result = await deleteAttendanceRecord(recordId)
+      if (result.error) { toast.error(result.error); return }
+      toast.success('삭제되었습니다.')
+    })
+  }
+
+  function handleInsert() {
+    if (!insertEmpId || !insertTime) { toast.error('직원과 시간을 입력해주세요.'); return }
+    startTransition(async () => {
+      const result = await insertAttendanceRecord(insertEmpId, insertType, insertTime, insertNote)
+      if (result.error) { toast.error(result.error); return }
+      toast.success('기록이 추가되었습니다.')
+      setShowInsert(false)
+      setInsertNote('')
+    })
+  }
+
   return (
     <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
+        <span className="text-xs text-gray-400">상세 기록</span>
+        <button
+          onClick={() => setShowInsert(v => !v)}
+          className="flex items-center gap-1 text-xs text-primary font-medium hover:text-primary/80"
+        >
+          <Plus size={13} /> 기록 추가
+        </button>
+      </div>
+      {showInsert && (
+        <div className="px-4 py-3 bg-blue-50/40 border-b border-blue-100 flex flex-wrap gap-3 items-end">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500">직원</label>
+            <select value={insertEmpId} onChange={e => setInsertEmpId(e.target.value)}
+              className="text-sm border border-gray-200 rounded px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-primary/30">
+              {employees.map((e: any) => <option key={e.id} value={e.id}>{e.name}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500">유형</label>
+            <select value={insertType} onChange={e => setInsertType(e.target.value)}
+              className="text-sm border border-gray-200 rounded px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-primary/30">
+              {Object.entries(TYPE_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500">시간 (KST)</label>
+            <input type="datetime-local" value={insertTime} onChange={e => setInsertTime(e.target.value)}
+              className="text-sm border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary/30" />
+          </div>
+          <div className="flex flex-col gap-1 flex-1 min-w-[160px]">
+            <label className="text-xs text-gray-500">메모 (선택)</label>
+            <input type="text" value={insertNote} onChange={e => setInsertNote(e.target.value)}
+              placeholder="관리자 수동 입력"
+              className="text-sm border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary/30" />
+          </div>
+          <div className="flex gap-2">
+            <button onClick={handleInsert} disabled={isPending}
+              className="text-xs bg-primary text-white rounded px-3 py-1.5 font-medium hover:bg-primary/90 disabled:opacity-50">
+              추가
+            </button>
+            <button onClick={() => setShowInsert(false)} className="text-xs text-gray-500 hover:text-gray-700">취소</button>
+          </div>
+        </div>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -106,7 +176,7 @@ export default function AttendanceEditor({ records, employees, leaveRecords }: {
               <th className="px-4 py-3">시간 (KST)</th>
               <th className="px-4 py-3">위치</th>
               <th className="px-4 py-3">비고</th>
-              <th className="px-4 py-3 w-10"></th>
+              <th className="px-4 py-3 w-16"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -170,22 +240,29 @@ export default function AttendanceEditor({ records, employees, leaveRecords }: {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      {r.is_anomaly ? (
-                        resolvingId !== r.id && (
-                          <button
-                            onClick={() => startResolve(r.id, r.recorded_at)}
-                            className="text-xs text-red-600 font-medium hover:text-red-800 border border-red-200 rounded px-2 py-0.5"
-                          >
-                            처리
+                      <div className="flex items-center gap-2">
+                        {r.is_anomaly ? (
+                          resolvingId !== r.id && (
+                            <button
+                              onClick={() => startResolve(r.id, r.recorded_at)}
+                              className="text-xs text-red-600 font-medium hover:text-red-800 border border-red-200 rounded px-2 py-0.5"
+                            >
+                              처리
+                            </button>
+                          )
+                        ) : (
+                          editing !== r.id && (
+                            <button onClick={() => startEdit(r.id, r.note)} className="text-gray-400 hover:text-gray-600">
+                              <Pencil size={14} />
+                            </button>
+                          )
+                        )}
+                        {resolvingId !== r.id && editing !== r.id && (
+                          <button onClick={() => handleDelete(r.id)} disabled={isPending} className="text-gray-300 hover:text-red-500 disabled:opacity-50">
+                            <Trash2 size={14} />
                           </button>
-                        )
-                      ) : (
-                        editing !== r.id && (
-                          <button onClick={() => startEdit(r.id, r.note)} className="text-gray-400 hover:text-gray-600">
-                            <Pencil size={14} />
-                          </button>
-                        )
-                      )}
+                        )}
+                      </div>
                     </td>
                   </tr>
                   {resolvingId === r.id && (
