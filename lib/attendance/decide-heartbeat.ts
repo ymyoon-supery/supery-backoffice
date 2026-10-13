@@ -97,18 +97,51 @@ export function decideAgentHeartbeat(
   }
 
   // ── Block A: idle >= 15min → BREAK_START (당일) or CHECK_OUT (자정 초과) ──
+  // 트리거 1 (primary): idleSeconds >= threshold — GetLastInputInfo 기반
+  // 트리거 2 (secondary): last_activity_at 갭 >= threshold — spurious HID 이벤트 대응
+  //   (무선 마우스 keep-alive 등이 GetLastInputInfo를 리셋해 idle이 threshold에 못 미칠 때)
+  //   route.ts에서 mousePx>=50 || keyCount>=1 조건 충족 시에만 last_activity_at을 갱신하므로
+  //   spurious 이벤트로 오염되지 않음
   do {
-    if (!lastType || !WORKING_TYPES.has(lastType) || idleSeconds < INACTIVITY_THRESHOLD) {
-      log('A', 'skipped', `lastType=${lastType ?? 'none'} idle=${idleSeconds}s`)
+    if (!lastType || !WORKING_TYPES.has(lastType)) {
+      log('A', 'skipped', `lastType=${lastType ?? 'none'}`)
       break
     }
-    const idleStartAt = new Date(now.getTime() - idleSeconds * 1000)
+
+    const lastActMs = employeeLastActivityAt ? new Date(employeeLastActivityAt).getTime() : null
+    const lastActKSTDate = lastActMs
+      ? new Date(lastActMs + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
+      : null
+    const lastActGapSec = lastActMs !== null ? (now.getTime() - lastActMs) / 1000 : null
+
+    let absenceStartAt: Date | null = null
+    let triggerNote = ''
+
+    if (idleSeconds >= INACTIVITY_THRESHOLD) {
+      absenceStartAt = new Date(now.getTime() - idleSeconds * 1000)
+      triggerNote = `idle=${idleSeconds}s`
+    } else if (
+      lastActMs !== null &&
+      lastActGapSec !== null &&
+      lastActGapSec >= INACTIVITY_THRESHOLD &&
+      lastActKSTDate === kstDate
+    ) {
+      // spurious HID로 인해 idleSeconds가 낮지만 확인된 마지막 활동이 15분+ 전
+      absenceStartAt = new Date(lastActMs + INACTIVITY_THRESHOLD * 1000)
+      triggerNote = `laGap=${Math.round(lastActGapSec)}s`
+    }
+
+    if (!absenceStartAt) {
+      log('A', 'skipped', `lastType=${lastType} idle=${idleSeconds}s laGap=${lastActGapSec !== null ? Math.round(lastActGapSec) + 's' : 'null'}`)
+      break
+    }
+
     const lastRecordAt = new Date(lastRecord!.recorded_at)
-    if (idleStartAt < lastRecordAt) {
-      log('A', 'skipped', `stale heartbeat: idleStart < lastRecord(${lastRecordAt.toISOString()})`)
+    if (absenceStartAt < lastRecordAt) {
+      log('A', 'skipped', `stale: absenceStart < lastRecord(${lastRecordAt.toISOString()}) trigger=${triggerNote}`)
       break
     }
-    const breakStartAt = new Date(Math.max(idleStartAt.getTime(), lastRecordAt.getTime()))
+    const breakStartAt = new Date(Math.max(absenceStartAt.getTime(), lastRecordAt.getTime()))
     const breakStartKSTDate = new Date(breakStartAt.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
     if (breakStartKSTDate < kstDate) {
@@ -117,7 +150,7 @@ export function decideAgentHeartbeat(
         break
       }
       agentInsert('CHECK_OUT', breakStartAt, 'PC 절전/잠금 자동 퇴근')
-      log('A', 'triggered', `cross-midnight CHECK_OUT at ${breakStartAt.toISOString()}`)
+      log('A', 'triggered', `cross-midnight CHECK_OUT at ${breakStartAt.toISOString()} (${triggerNote})`)
     } else {
       const raceWindow = new Date(now.getTime() - 30 * 60 * 1000).toISOString()
       if (hasRecord('BREAK_START', 'PC 비활동 자동 휴식', raceWindow)) {
@@ -125,7 +158,7 @@ export function decideAgentHeartbeat(
         break
       }
       agentInsert('BREAK_START', breakStartAt, 'PC 비활동 자동 휴식')
-      log('A', 'triggered', `BREAK_START at ${breakStartAt.toISOString()} (idle=${idleSeconds}s)`)
+      log('A', 'triggered', `BREAK_START at ${breakStartAt.toISOString()} (${triggerNote})`)
     }
   } while (false)
 

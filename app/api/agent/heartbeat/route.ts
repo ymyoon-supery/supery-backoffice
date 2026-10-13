@@ -157,7 +157,16 @@ export async function POST(req: NextRequest) {
     last_agent_heartbeat: now.toISOString(),
   }
   if (!suspendAtStr && idleSeconds < INACTIVITY_THRESHOLD) {
-    activityUpdate.last_activity_at = new Date(now.getTime() - idleSeconds * 1000).toISOString()
+    // v1.3.13+: mousePx/keyCount가 전송되는 경우 확인된 입력에만 last_activity_at 갱신
+    // 무선 마우스 keep-alive, USB polling 등 spurious HID 이벤트가 GetLastInputInfo()를
+    // 리셋해 last_activity_at을 오염시키는 문제를 방지
+    const confirmedInput =
+      keyCount !== null || mousePx !== null
+        ? (keyCount ?? 0) >= 1 || (mousePx ?? 0) >= 50
+        : true  // 구형 에이전트: idle 신뢰
+    if (confirmedInput) {
+      activityUpdate.last_activity_at = new Date(now.getTime() - idleSeconds * 1000).toISOString()
+    }
   }
   await admin.from('employees').update(activityUpdate).eq('id', employee.id)
 
