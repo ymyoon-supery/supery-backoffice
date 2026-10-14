@@ -7,7 +7,7 @@ import {
   Clock, FileText, BarChart2, Users, ClipboardList, Home,
   Bell, FilePlus, CalendarDays, Settings, Megaphone, Inbox,
   Receipt, Package, Loader2, X, BookOpen, FileBarChart, Monitor,
-  CreditCard,
+  CreditCard, Activity,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useMobileSidebar } from './MobileSidebarContext'
@@ -29,6 +29,7 @@ const adminNavGroups = [
       { href: '/admin/reports', label: '52시간 리포트', icon: BarChart2 },
       { href: '/admin/diary', label: '업무 다이어리', icon: BookOpen },
       { href: '/admin/agents', label: 'PC 에이전트', icon: Monitor },
+      { href: '/admin/activity-audit', label: '활동 패턴 분석', icon: Activity },
     ],
   },
   {
