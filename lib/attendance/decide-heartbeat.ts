@@ -233,12 +233,10 @@ export function decideAgentHeartbeat(
     }
   } while (false)
 
-  // ── Block D: 오늘 기록 없음 + 어제 미종료 세션 → CHECK_OUT ───────────────
+  // ── Block D: 어제 미종료 세션 → CHECK_OUT ───────────────────────────────
+  // 오늘 기록이 있어도 실행 — 절전/잠금으로 checkout API가 호출되지 않은 경우
+  // last_activity_at + 15분을 퇴근 시각으로 사용. yestCheckout 존재 여부로 중복 방지.
   do {
-    if (todayRecords.length > 0) {
-      log('D', 'skipped', `today has ${todayRecords.length} records`)
-      break
-    }
     if (!yestLastRecord) {
       log('D', 'skipped', 'no yesterday record')
       break
