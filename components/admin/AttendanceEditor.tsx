@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
-import { correctAttendance, resolveAnomaly, insertAttendanceRecord, deleteAttendanceRecord } from '@/app/(admin)/admin/attendance/actions'
+import { correctAttendance, resolveAnomaly, insertAttendanceRecord, deleteAttendanceRecord, updateAttendanceRecord } from '@/app/(admin)/admin/attendance/actions'
 import { Pencil, AlertTriangle, Trash2, Plus } from 'lucide-react'
 
 const TYPE_LABEL: Record<string, string> = {
@@ -54,6 +54,7 @@ export default function AttendanceEditor({ records, employees, leaveRecords }: {
   })
   const [editing, setEditing] = useState<string | null>(null)
   const [note, setNote] = useState('')
+  const [editTime, setEditTime] = useState('')
   const [resolvingId, setResolvingId] = useState<string | null>(null)
   const [resolveTime, setResolveTime] = useState('')
   const [resolveNote, setResolveNote] = useState('')
@@ -64,14 +65,16 @@ export default function AttendanceEditor({ records, employees, leaveRecords }: {
   const [insertNote, setInsertNote] = useState('')
   const [isPending, startTransition] = useTransition()
 
-  function startEdit(id: string, currentNote: string) {
+  function startEdit(id: string, currentNote: string, currentRecordedAt: string) {
     setEditing(id)
     setNote(currentNote ?? '')
+    const kst = new Date(new Date(currentRecordedAt).getTime() + 9 * 60 * 60 * 1000)
+    setEditTime(kst.toISOString().slice(0, 16))
   }
 
   function handleSave(recordId: string) {
     startTransition(async () => {
-      const result = await correctAttendance(recordId, note)
+      const result = await updateAttendanceRecord(recordId, editTime, note)
       if (result.error) { toast.error(result.error); return }
       toast.success('수정되었습니다.')
       setEditing(null)
@@ -224,12 +227,19 @@ export default function AttendanceEditor({ records, employees, leaveRecords }: {
                     <td className="px-4 py-3 text-gray-500 max-w-[200px] truncate">{r.location ?? '—'}</td>
                     <td className="px-4 py-3">
                       {editing === r.id ? (
-                        <div className="flex gap-2 items-center">
+                        <div className="flex flex-wrap gap-2 items-center">
+                          <input
+                            type="datetime-local"
+                            value={editTime}
+                            onChange={(e) => setEditTime(e.target.value)}
+                            className="text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary/30"
+                          />
                           <input
                             type="text"
                             value={note}
                             onChange={(e) => setNote(e.target.value)}
-                            className="text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary/30 w-40"
+                            placeholder="메모 (선택)"
+                            className="text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary/30 w-32"
                           />
                           <button onClick={() => handleSave(r.id)} disabled={isPending}
                             className="text-xs text-primary font-medium disabled:opacity-50">저장</button>
@@ -252,7 +262,7 @@ export default function AttendanceEditor({ records, employees, leaveRecords }: {
                           )
                         ) : (
                           editing !== r.id && (
-                            <button onClick={() => startEdit(r.id, r.note)} className="text-gray-400 hover:text-gray-600">
+                            <button onClick={() => startEdit(r.id, r.note, r.recorded_at)} className="text-gray-400 hover:text-gray-600">
                               <Pencil size={14} />
                             </button>
                           )

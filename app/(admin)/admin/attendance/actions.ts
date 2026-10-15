@@ -45,6 +45,26 @@ export async function correctAttendance(recordId: string, note: string) {
   return { error: null }
 }
 
+export async function updateAttendanceRecord(recordId: string, recordedAtKST: string, note: string) {
+  const supabase = await requireAdmin()
+  if (!supabase) return { error: '권한이 없습니다.' }
+
+  const kstDate = new Date(recordedAtKST)
+  if (isNaN(kstDate.getTime())) return { error: '유효하지 않은 시간입니다.' }
+  const utcDate = new Date(kstDate.getTime() - 9 * 60 * 60 * 1000)
+
+  const { error } = await supabase
+    .from('attendance_records')
+    .update({ recorded_at: utcDate.toISOString(), note: note || null, is_anomaly: false })
+    .eq('id', recordId)
+
+  if (error) return { error: error.message }
+
+  revalidateTag(CACHE_TAGS.attendance)
+  revalidateTag(CACHE_TAGS.adminReport)
+  return { error: null }
+}
+
 export async function insertAttendanceRecord(
   employeeId: string,
   type: string,
