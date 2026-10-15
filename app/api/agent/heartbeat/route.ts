@@ -164,7 +164,12 @@ export async function POST(req: NextRequest) {
       keyCount !== null || mousePx !== null
         ? (keyCount ?? 0) >= 1 || (mousePx ?? 0) >= 50
         : true  // 구형 에이전트: idle 신뢰
-    if (confirmedInput) {
+    // KST 22:00~07:00은 Windows Update / OS 예약작업이 PC를 깨우는 시간대.
+    // 이 시간대의 heartbeat로 last_activity_at이 오염되면 Block D가 23:xx 오퇴근을 삽입하므로 갱신 생략.
+    // Block E에 적용된 것과 동일한 근거.
+    const kstHour = new Date(now.getTime() + 9 * 60 * 60 * 1000).getUTCHours()
+    const isWorkHour = kstHour >= 7 && kstHour < 22
+    if (confirmedInput && isWorkHour) {
       activityUpdate.last_activity_at = new Date(now.getTime() - idleSeconds * 1000).toISOString()
     }
   }
