@@ -134,6 +134,9 @@ export default function Sidebar({
         ...((isTeamLead || isSupplyManager) && !isAdmin
           ? [{ href: '/approval/pending', label: '결재 관리', icon: ClipboardList, exact: false, badge: pendingCount }]
           : []),
+        ...(isTeamLead || isAdmin
+          ? [{ href: '/approval/weekly-meeting', label: '주간회의', icon: Users, exact: false }]
+          : []),
       ],
     },
     {
