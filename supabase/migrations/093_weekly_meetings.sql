@@ -7,6 +7,7 @@ UPDATE departments SET sort_order = CASE name
   WHEN '기획2팀' THEN 2
   WHEN '기획3팀' THEN 3
   WHEN '커머스팀' THEN 4
+  WHEN '제작팀'  THEN 5
   ELSE 99
 END;
 
