@@ -160,9 +160,11 @@ export async function POST(req: NextRequest) {
     // v1.3.13+: mousePx/keyCount가 전송되는 경우 확인된 입력에만 last_activity_at 갱신
     // 무선 마우스 keep-alive, USB polling 등 spurious HID 이벤트가 GetLastInputInfo()를
     // 리셋해 last_activity_at을 오염시키는 문제를 방지
+    // v1.3.16+: mouse_px=0을 명시 전송 → mousePx !== null로 첫 분기 진입하지만
+    // px=0 && key=null이면 false. activity_ticks를 보조 조건으로 추가해 오탈락 방지.
     const confirmedInput =
       keyCount !== null || mousePx !== null
-        ? (keyCount ?? 0) >= 1 || (mousePx ?? 0) >= 50
+        ? (keyCount ?? 0) >= 1 || (mousePx ?? 0) >= 50 || (activityTicks ?? 0) >= 2
         : true  // 구형 에이전트: idle 신뢰
     // KST 22:00~07:00은 Windows Update / OS 예약작업이 PC를 깨우는 시간대.
     // 이 시간대의 heartbeat로 last_activity_at이 오염되면 Block D가 23:xx 오퇴근을 삽입하므로 갱신 생략.
