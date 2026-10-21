@@ -19,3 +19,9 @@ CREATE INDEX IF NOT EXISTS agent_installations_employee_idx
 
 CREATE INDEX IF NOT EXISTS agent_installations_last_seen_idx
   ON agent_installations(last_seen_at DESC);
+
+-- Data API grants (auto-added by .claude/hooks/auto-migration-grants.js)
+
+GRANT ALL ON TABLE agent_installations TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE agent_installations TO authenticated;
+GRANT SELECT ON TABLE agent_installations TO anon;

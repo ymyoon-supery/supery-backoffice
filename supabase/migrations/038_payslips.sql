@@ -20,3 +20,9 @@ CREATE POLICY "admin_all" ON payslips
   FOR ALL USING (
     (SELECT role FROM employees WHERE auth_user_id = auth.uid()) = 'ADMIN'
   );
+
+-- Data API grants (auto-added by .claude/hooks/auto-migration-grants.js)
+
+GRANT ALL ON TABLE payslips TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE payslips TO authenticated;
+GRANT SELECT ON TABLE payslips TO anon;

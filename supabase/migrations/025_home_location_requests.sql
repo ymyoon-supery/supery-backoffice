@@ -24,3 +24,9 @@ CREATE POLICY "employee_insert_own" ON home_location_requests
   FOR INSERT WITH CHECK (
     employee_id = (SELECT id FROM employees WHERE auth_user_id = auth.uid())
   );
+
+-- Data API grants (auto-added by .claude/hooks/auto-migration-grants.js)
+
+GRANT ALL ON TABLE home_location_requests TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE home_location_requests TO authenticated;
+GRANT SELECT ON TABLE home_location_requests TO anon;

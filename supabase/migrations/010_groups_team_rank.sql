@@ -22,3 +22,9 @@ ALTER TABLE employees ADD CONSTRAINT employees_rank_check
 -- 팀원/팀장 또는 NULL
 ALTER TABLE employees ADD CONSTRAINT employees_position_check
   CHECK (position IS NULL OR position IN ('팀원','팀장'));
+
+-- Data API grants (auto-added by .claude/hooks/auto-migration-grants.js)
+
+GRANT ALL ON TABLE groups TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE groups TO authenticated;
+GRANT SELECT ON TABLE groups TO anon;

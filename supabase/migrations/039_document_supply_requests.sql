@@ -178,3 +178,21 @@ BEGIN
   END IF;
 END;
 $$;
+
+-- Data API grants (auto-added by .claude/hooks/auto-migration-grants.js)
+
+GRANT ALL ON TABLE document_requests TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE document_requests TO authenticated;
+GRANT SELECT ON TABLE document_requests TO anon;
+
+GRANT ALL ON TABLE supply_requests TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE supply_requests TO authenticated;
+GRANT SELECT ON TABLE supply_requests TO anon;
+
+GRANT ALL ON TABLE supply_request_items TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE supply_request_items TO authenticated;
+GRANT SELECT ON TABLE supply_request_items TO anon;
+
+GRANT ALL ON TABLE supply_approval_steps TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE supply_approval_steps TO authenticated;
+GRANT SELECT ON TABLE supply_approval_steps TO anon;

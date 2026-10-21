@@ -19,3 +19,9 @@ CREATE POLICY "admin_all" ON company_settings
       WHERE auth_user_id = auth.uid() AND role = 'ADMIN'
     )
   );
+
+-- Data API grants (auto-added by .claude/hooks/auto-migration-grants.js)
+
+GRANT ALL ON TABLE company_settings TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE company_settings TO authenticated;
+GRANT SELECT ON TABLE company_settings TO anon;

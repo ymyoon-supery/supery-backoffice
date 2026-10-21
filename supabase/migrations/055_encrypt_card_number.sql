@@ -8,3 +8,8 @@ CREATE TABLE expense_card_sensitive_data (
   UNIQUE (expense_report_id)
 );
 ALTER TABLE expense_card_sensitive_data ENABLE ROW LEVEL SECURITY;
+
+-- Data API grants (auto-added by .claude/hooks/auto-migration-grants.js)
+-- No client access: service_role only (no RLS policies for authenticated/anon)
+
+GRANT ALL ON TABLE expense_card_sensitive_data TO service_role;

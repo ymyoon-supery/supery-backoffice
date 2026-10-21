@@ -164,3 +164,37 @@ CREATE TRIGGER trg_leave_requests_updated_at
 CREATE TRIGGER trg_expense_reports_updated_at
   BEFORE UPDATE ON expense_reports
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- Data API grants (auto-added by .claude/hooks/auto-migration-grants.js)
+
+GRANT ALL ON TABLE departments TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE departments TO authenticated;
+GRANT SELECT ON TABLE departments TO anon;
+
+GRANT ALL ON TABLE employees TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE employees TO authenticated;
+GRANT SELECT ON TABLE employees TO anon;
+
+GRANT ALL ON TABLE attendance_records TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE attendance_records TO authenticated;
+GRANT SELECT ON TABLE attendance_records TO anon;
+
+GRANT ALL ON TABLE leave_requests TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE leave_requests TO authenticated;
+GRANT SELECT ON TABLE leave_requests TO anon;
+
+GRANT ALL ON TABLE leave_approval_steps TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE leave_approval_steps TO authenticated;
+GRANT SELECT ON TABLE leave_approval_steps TO anon;
+
+GRANT ALL ON TABLE expense_reports TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE expense_reports TO authenticated;
+GRANT SELECT ON TABLE expense_reports TO anon;
+
+GRANT ALL ON TABLE expense_approval_steps TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE expense_approval_steps TO authenticated;
+GRANT SELECT ON TABLE expense_approval_steps TO anon;
+
+GRANT ALL ON TABLE outbox_events TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE outbox_events TO authenticated;
+GRANT SELECT ON TABLE outbox_events TO anon;

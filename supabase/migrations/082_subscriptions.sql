@@ -38,3 +38,9 @@ CREATE POLICY "subscriptions_admin_all" ON subscriptions
 CREATE TRIGGER trg_subscriptions_updated_at
   BEFORE UPDATE ON subscriptions
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- Data API grants (auto-added by .claude/hooks/auto-migration-grants.js)
+
+GRANT ALL ON TABLE subscriptions TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE subscriptions TO authenticated;
+GRANT SELECT ON TABLE subscriptions TO anon;

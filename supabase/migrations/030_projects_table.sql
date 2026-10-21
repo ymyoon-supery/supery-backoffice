@@ -34,3 +34,9 @@ CREATE POLICY "projects_admin_write"
         AND role = 'ADMIN'
     )
   );
+
+-- Data API grants (auto-added by .claude/hooks/auto-migration-grants.js)
+
+GRANT ALL ON TABLE projects TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE projects TO authenticated;
+GRANT SELECT ON TABLE projects TO anon;

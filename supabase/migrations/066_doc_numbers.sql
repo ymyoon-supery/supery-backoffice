@@ -59,3 +59,9 @@ CREATE TRIGGER trg_supply_requests_doc_number
   BEFORE INSERT ON supply_requests
   FOR EACH ROW WHEN (NEW.doc_number IS NULL)
   EXECUTE FUNCTION trg_assign_doc_number();
+
+-- Data API grants (auto-added by .claude/hooks/auto-migration-grants.js)
+
+GRANT ALL ON TABLE doc_number_counters TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE doc_number_counters TO authenticated;
+GRANT SELECT ON TABLE doc_number_counters TO anon;

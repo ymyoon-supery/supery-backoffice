@@ -10,3 +10,8 @@ CREATE TABLE expense_sensitive_data (
 
 -- 사용자 직접 접근 차단 (서비스 롤만 접근)
 ALTER TABLE expense_sensitive_data ENABLE ROW LEVEL SECURITY;
+
+-- Data API grants (auto-added by .claude/hooks/auto-migration-grants.js)
+-- No client access: service_role only (no RLS policies for authenticated/anon)
+
+GRANT ALL ON TABLE expense_sensitive_data TO service_role;

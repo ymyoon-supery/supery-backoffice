@@ -49,3 +49,9 @@ CREATE POLICY "work_diaries_teamlead_read" ON work_diaries
 CREATE TRIGGER trg_work_diaries_updated_at
   BEFORE UPDATE ON work_diaries
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- Data API grants (auto-added by .claude/hooks/auto-migration-grants.js)
+
+GRANT ALL ON TABLE work_diaries TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE work_diaries TO authenticated;
+GRANT SELECT ON TABLE work_diaries TO anon;

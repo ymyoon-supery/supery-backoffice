@@ -56,3 +56,9 @@ CREATE POLICY "notices_delete" ON notices
         AND (e.role = 'ADMIN' OR e.id = notices.author_id)
     )
   );
+
+-- Data API grants (auto-added by .claude/hooks/auto-migration-grants.js)
+
+GRANT ALL ON TABLE notices TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE notices TO authenticated;
+GRANT SELECT ON TABLE notices TO anon;
