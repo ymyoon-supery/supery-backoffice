@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
     // px=0 && key=null이면 false. activity_ticks를 보조 조건으로 추가해 오탈락 방지.
     const confirmedInput =
       keyCount !== null || mousePx !== null
-        ? (keyCount ?? 0) >= 1 || (mousePx ?? 0) >= 50 || (activityTicks ?? 0) >= 2
+        ? (keyCount ?? 0) >= 1 || (mousePx ?? 0) >= 50
         : true  // 구형 에이전트: idle 신뢰
     // KST 22:00~07:00은 Windows Update / OS 예약작업이 PC를 깨우는 시간대.
     // 이 시간대의 heartbeat로 last_activity_at이 오염되면 Block D가 23:xx 오퇴근을 삽입하므로 갱신 생략.

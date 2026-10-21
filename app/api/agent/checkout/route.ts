@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
 
   const { data: lastRecord, error: recError } = await admin
     .from('attendance_records')
-    .select('type')
+    .select('type, recorded_at, note')
     .eq('employee_id', employee.id)
     .gte('recorded_at', `${kstDate}T00:00:00+09:00`)
     .order('recorded_at', { ascending: false })
@@ -89,6 +89,18 @@ export async function POST(req: NextRequest) {
   // 출근 기록이 없거나 이미 퇴근 상태면 스킵
   if (!lastRecord || !ACTIVE_TYPES.has(lastRecord.type)) {
     return NextResponse.json({ ok: true, skipped: true })
+  }
+
+  // 마지막 기록이 'PC 비활동 자동 휴식' BREAK_START이면 그 시각을 퇴근 시각으로 사용.
+  // PC가 새벽에 Windows Update 등으로 종료된 경우 now를 쓰면 23:xx 오퇴근이 삽입됨.
+  if (lastRecord.type === 'BREAK_START' && lastRecord.note === 'PC 비활동 자동 휴식') {
+    const breakKSTHour = new Date(
+      new Date(lastRecord.recorded_at).getTime() + 9 * 60 * 60 * 1000,
+    ).getUTCHours()
+    if (breakKSTHour < 7) {
+      return NextResponse.json({ ok: true, skipped: true })
+    }
+    recordedAt = lastRecord.recorded_at
   }
 
   const { error } = await admin.from('attendance_records').insert({
