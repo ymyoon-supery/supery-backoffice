@@ -353,11 +353,13 @@ export function decideAgentHeartbeat(
     // v1.3.13+: 실측 키보드/마우스 — 키입력 1개↑ 또는 마우스 이동 50px↑
     // v1.3.12 : activity_ticks >= 2 (60초 4샘플 중 2개↑ idle < 60s)
     // pre-1.3.12: idle < 60s만으로 판단 (KST guard로 보완)
-    // v1.3.16+: mouse_px=0을 명시 전송 → mousePx !== null 조건으로 첫 분기 진입하지만
-    //   px=0 && key=null이면 false가 됨. activity_ticks를 보조 조건으로 추가해 오탈락 방지.
+    // v1.3.16+: mouse_px=0 명시 전송 → 첫 분기에서 key>=1 || px>=50만 판단.
+    // activity_ticks를 첫 분기에 포함하면 OS 백그라운드(무선 마우스 keep-alive 등)가
+    // GetLastInputInfo를 리셋해 ticks>=2 조건이 충족되더라도 false positive가 발생함.
+    // (Block F isConfirmedActiveF와 동일한 기준으로 통일)
     const isConfirmedActive =
       keyCount !== null || mousePx !== null
-        ? (keyCount ?? 0) >= 1 || (mousePx ?? 0) >= 50 || (activityTicks ?? 0) >= 2
+        ? (keyCount ?? 0) >= 1 || (mousePx ?? 0) >= 50
         : activityTicks !== null
         ? activityTicks >= 2
         : true
