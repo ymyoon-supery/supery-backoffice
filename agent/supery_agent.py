@@ -47,6 +47,7 @@ SESSION_PATH = os.path.join(os.path.expanduser("~"), ".supery_session.json")
 HEARTBEAT_INTERVAL = 60   # heartbeat 전송 주기 (초)
 ACTIVITY_POLL_INTERVAL = 15   # idle 샘플링 간격 (초) — 4회 누적 후 1회 전송
 ACTIVITY_IDLE_THRESHOLD = 60  # 이 값 미만이면 활성 샘플로 카운트
+INACTIVITY_THRESHOLD = 15 * 60  # 15분 비활동 시 자동 휴식 발동 기준 (초)
 
 KST = timezone(timedelta(hours=9))
 
