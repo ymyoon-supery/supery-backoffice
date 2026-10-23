@@ -165,15 +165,29 @@ export async function GET(request: NextRequest) {
           : heartbeatMs! > dayEndMs
             ? '자동 퇴근 (PC 미종료 - 자정 기준 마감)'
             : '자동 퇴근 (마지막 활동 기준)'
-      const { error } = await supabase.from('attendance_records').insert({
+      let insertError = (await supabase.from('attendance_records').insert({
         employee_id: record.employee_id,
         type: 'CHECK_OUT',
         recorded_at: checkoutAt,
         note,
         is_field: false,
         is_anomaly: false,
-      })
-      if (!error) {
+      })).error
+
+      // PC 재시작 시 당일 중간 CHECK_OUT이 이미 존재해 유니크 제약 충돌 가능
+      // → 기존 CHECK_OUT을 실제 퇴근 시각으로 업데이트
+      if (insertError?.code === '23505') {
+        const { error: updateError } = await supabase
+          .from('attendance_records')
+          .update({ recorded_at: checkoutAt, note })
+          .eq('employee_id', record.employee_id)
+          .eq('type', 'CHECK_OUT')
+          .gte('recorded_at', dayStart)
+          .lte('recorded_at', dayEnd)
+        insertError = updateError ?? null
+      }
+
+      if (!insertError) {
         autoCheckouts++
         if (heartbeatActive) {
           const { error: clearError } = await supabase
@@ -186,7 +200,7 @@ export async function GET(request: NextRequest) {
           }
         }
       } else {
-        failures.push({ employeeId: record.employee_id, reason: error.message })
+        failures.push({ employeeId: record.employee_id, reason: insertError.message })
       }
     } else {
       const { error } = await supabase.from('attendance_records').insert({
