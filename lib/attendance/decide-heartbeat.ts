@@ -416,6 +416,57 @@ export function decideAgentHeartbeat(
     log('F', 'triggered', `auto re-checkin at ${checkInAt.toISOString()} after PC 종료 자동 퇴근`)
   } while (false)
 
+  // ── Block G: 어제 퇴근 후 오늘 출근 기록 없는 상태에서 활동 감지 → CHECK_IN ──
+  // Block F는 당일 'PC 종료 자동 퇴근' 재시작만 처리.
+  // cron / Block D 자동 퇴근(다른 note) 이후 다음 날 첫 활동을 잡지 못하는 사각지대 해소.
+  do {
+    if (lastType !== null) {
+      log('G', 'skipped', `today has records (lastType=${lastType})`)
+      break
+    }
+    if (!yestCheckout) {
+      log('G', 'skipped', 'no yesterday checkout')
+      break
+    }
+    // idle < 60s: 실제 사람이 막 활동 시작한 신호. Block E와 동일한 임계값으로 false positive 억제.
+    if (idleSeconds >= 60) {
+      log('G', 'skipped', `idle=${idleSeconds}s >= 60s`)
+      break
+    }
+    if (suspendAtStr) {
+      log('G', 'skipped', 'suspend wake — not real work start')
+      break
+    }
+    const kstHourG = new Date(now.getTime() + 9 * 60 * 60 * 1000).getUTCHours()
+    if (kstHourG < 7 || kstHourG >= 22) {
+      log('G', 'skipped', `KST ${kstHourG}시 — 업무 외 시간대`)
+      break
+    }
+    const isConfirmedActiveG =
+      keyCount !== null || mousePx !== null
+        ? (keyCount ?? 0) >= 1 || (mousePx ?? 0) >= 50
+        : activityTicks !== null
+        ? activityTicks >= 2
+        : true
+    if (!isConfirmedActiveG) {
+      log('G', 'skipped', `key=${keyCount} px=${mousePx} ticks=${activityTicks} — not confirmed active`)
+      break
+    }
+    const checkInAt = new Date(now.getTime() - idleSeconds * 1000)
+    const checkInKSTDate = new Date(checkInAt.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    if (checkInKSTDate !== kstDate) {
+      log('G', 'skipped', `checkIn date ${checkInKSTDate} !== today ${kstDate}`)
+      break
+    }
+    const raceWindowG = new Date(now.getTime() - 5 * 60 * 1000).toISOString()
+    if (hasRecord('CHECK_IN', 'PC 활동 감지 자동 출근', raceWindowG)) {
+      log('G', 'skipped', `CHECK_IN already exists within 5min`)
+      break
+    }
+    agentInsert('CHECK_IN', checkInAt, 'PC 활동 감지 자동 출근')
+    log('G', 'triggered', `auto CHECK_IN at ${checkInAt.toISOString()} (yest=${yestCheckout.note} idle=${idleSeconds}s key=${keyCount} px=${mousePx})`)
+  } while (false)
+
   return { decisions, logs }
 }
 
