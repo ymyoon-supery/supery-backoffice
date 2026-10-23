@@ -39,7 +39,7 @@ API_BASE = "https://office.supery.co.kr/api"
 WORKSYNC_URL = "https://office.supery.co.kr"
 # ──────────────────────────────────────────────
 
-VERSION = "1.3.16"
+VERSION = "1.3.17"
 APP_NAME = "SuperyAgent"
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.json")
 LOG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.log")
