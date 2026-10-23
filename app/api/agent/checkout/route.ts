@@ -92,15 +92,16 @@ export async function POST(req: NextRequest) {
   }
 
   // 마지막 기록이 'PC 비활동 자동 휴식' BREAK_START이면 그 시각을 퇴근 시각으로 사용.
-  // PC가 새벽에 Windows Update 등으로 종료된 경우 now를 쓰면 23:xx 오퇴근이 삽입됨.
+  // Windows Update 새벽 종료(now=2~6시)는 위 kstHour<7 조건에서 이미 차단됨.
+  // BREAK_START가 업무 전(< 07:00)이면 Windows Update가 새벽에 삽입한 기록이므로
+  // 그 시각을 퇴근 시각으로 쓰지 않고 실제 종료 시각(now)을 유지.
   if (lastRecord.type === 'BREAK_START' && lastRecord.note === 'PC 비활동 자동 휴식') {
     const breakKSTHour = new Date(
       new Date(lastRecord.recorded_at).getTime() + 9 * 60 * 60 * 1000,
     ).getUTCHours()
-    if (breakKSTHour < 7) {
-      return NextResponse.json({ ok: true, skipped: true })
+    if (breakKSTHour >= 7) {
+      recordedAt = lastRecord.recorded_at
     }
-    recordedAt = lastRecord.recorded_at
   }
 
   const { error } = await admin.from('attendance_records').insert({
