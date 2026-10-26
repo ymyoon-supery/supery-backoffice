@@ -62,15 +62,20 @@ export function detectSuspiciousActivity(samples: HeartbeatSample[]): Suspicious
 
   // ── 탐지 2: IMPOSSIBLE_HOURS ──────────────────────────────────
   // 새벽 00:00~06:00 KST에 idle < 60 (실제 입력 감지)
+  // Windows Update / OS 예약작업은 보통 90분 이내에 완료됨 → 90분 미만은 오탐으로 제외
   const night = sorted.filter(s => kstHour(s.ts) < 6 && s.idle < 60)
   if (night.length >= 2) {
-    flags.push({
-      type: 'IMPOSSIBLE_HOURS',
-      label: '새벽 시간대 활성',
-      detail: `00:00~06:00 KST 구간 ${night.length}회 활성 감지 (${kstHHMM(night[0].ts)} 시작)`,
-      severity: 'high',
-      samples: night.map(s => ({ ts: s.ts, mouse_px: s.mouse_px, key_count: s.key_count, idle: s.idle })),
-    })
+    const nightDurationMin =
+      (new Date(night.at(-1)!.ts).getTime() - new Date(night[0].ts).getTime()) / 60000
+    if (nightDurationMin >= 90) {
+      flags.push({
+        type: 'IMPOSSIBLE_HOURS',
+        label: '새벽 시간대 활성',
+        detail: `00:00~06:00 KST 구간 ${night.length}회 활성 감지 · ${kstHHMM(night[0].ts)}~${kstHHMM(night.at(-1)!.ts)} (${Math.round(nightDurationMin)}분)`,
+        severity: 'high',
+        samples: night.map(s => ({ ts: s.ts, mouse_px: s.mouse_px, key_count: s.key_count, idle: s.idle })),
+      })
+    }
   }
 
   // ── 탐지 3: UNIFORM_MOUSE ─────────────────────────────────────
