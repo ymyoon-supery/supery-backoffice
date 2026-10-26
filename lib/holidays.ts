@@ -71,3 +71,11 @@ export function formatWeekLabel(date: Date): string {
 export function toDateString(date: Date): string {
   return date.toISOString().slice(0, 10)
 }
+
+/** 주어진 날짜(YYYY-MM-DD)가 평일(주말·공휴일 제외)인지 반환 */
+export function isWorkday(dateStr: string): boolean {
+  const d = new Date(dateStr + 'T12:00:00Z')
+  const dow = d.getUTCDay() // 0=일, 6=토
+  if (dow === 0 || dow === 6) return false
+  return !HOLIDAY_SET.has(dateStr)
+}

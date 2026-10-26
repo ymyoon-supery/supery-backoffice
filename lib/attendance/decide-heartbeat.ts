@@ -1,6 +1,8 @@
 // Pure decision functions for attendance heartbeat processing.
 // No DB access — takes preloaded state, returns decisions + debug logs.
 
+import { isWorkday } from '@/lib/holidays'
+
 const WORKING_TYPES = new Set(['CHECK_IN', 'BREAK_END', 'FIELD_END'])
 const INACTIVITY_THRESHOLD = 15 * 60    // seconds
 const MIN_BREAK_DURATION_SEC = 5 * 60   // seconds
@@ -391,6 +393,10 @@ export function decideAgentHeartbeat(
       log('F', 'skipped', `KST ${kstHourF}시 — 업무 외 시간대`)
       break
     }
+    if (!isWorkday(kstDate)) {
+      log('F', 'skipped', `non-workday: ${kstDate}`)
+      break
+    }
     const isConfirmedActiveF =
       keyCount !== null || mousePx !== null
         ? (keyCount ?? 0) >= 1 || (mousePx ?? 0) >= 50
@@ -440,6 +446,10 @@ export function decideAgentHeartbeat(
     const kstHourG = new Date(now.getTime() + 9 * 60 * 60 * 1000).getUTCHours()
     if (kstHourG < 7 || kstHourG >= 22) {
       log('G', 'skipped', `KST ${kstHourG}시 — 업무 외 시간대`)
+      break
+    }
+    if (!isWorkday(kstDate)) {
+      log('G', 'skipped', `non-workday: ${kstDate}`)
       break
     }
     const isConfirmedActiveG =
