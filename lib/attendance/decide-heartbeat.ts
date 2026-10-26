@@ -53,6 +53,7 @@ export interface AgentHeartbeatCtx {
   todayRecords: RecordRow[]    // today's records ordered by recorded_at DESC
   yestLastRecord: RecordRow | null
   yestCheckout: RecordRow | null
+  hasApprovedLeaveToday: boolean  // 당일 승인된 연차/반차 여부
 }
 
 export interface AgentHeartbeatInput {
@@ -75,6 +76,7 @@ export function decideAgentHeartbeat(
     kstDate, yesterdayKSTDate, now,
     lastHeartbeat, lastActivityAt: employeeLastActivityAt,
     todayRecords, yestLastRecord, yestCheckout,
+    hasApprovedLeaveToday,
   } = ctx
   const { idleSeconds, activityTicks, keyCount, mousePx, suspendAtStr, lastActivityBeforeSleep } = input
 
@@ -397,6 +399,10 @@ export function decideAgentHeartbeat(
       log('F', 'skipped', `non-workday: ${kstDate}`)
       break
     }
+    if (hasApprovedLeaveToday) {
+      log('F', 'skipped', `approved leave on ${kstDate}`)
+      break
+    }
     const isConfirmedActiveF =
       keyCount !== null || mousePx !== null
         ? (keyCount ?? 0) >= 1 || (mousePx ?? 0) >= 50
@@ -450,6 +456,10 @@ export function decideAgentHeartbeat(
     }
     if (!isWorkday(kstDate)) {
       log('G', 'skipped', `non-workday: ${kstDate}`)
+      break
+    }
+    if (hasApprovedLeaveToday) {
+      log('G', 'skipped', `approved leave on ${kstDate}`)
       break
     }
     const isConfirmedActiveG =

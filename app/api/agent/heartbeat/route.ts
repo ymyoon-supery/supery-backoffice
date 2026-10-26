@@ -71,8 +71,8 @@ export async function POST(req: NextRequest) {
     const todayStart = `${kstDate}T00:00:00+09:00`
     const yesterdayStart = `${yesterdayKSTDate}T00:00:00+09:00`
 
-    // 오늘 기록(전체) + 어제 기록(최대 20개) 동시 조회 — race guard는 전체 오늘 기록을 참조
-    const [{ data: todayRaw }, { data: yestRaw }] = await Promise.all([
+    // 오늘 기록(전체) + 어제 기록(최대 20개) + 당일 승인 연차/반차 동시 조회
+    const [{ data: todayRaw }, { data: yestRaw }, { data: leaveToday }] = await Promise.all([
       admin
         .from('attendance_records')
         .select('id, type, recorded_at, note, origin')
@@ -89,6 +89,15 @@ export async function POST(req: NextRequest) {
         .order('recorded_at', { ascending: false })
         .order('id', { ascending: false })
         .limit(20),
+      admin
+        .from('leave_requests')
+        .select('id')
+        .eq('employee_id', employee.id)
+        .eq('status', 'APPROVED')
+        .lte('start_date', kstDate)
+        .gte('end_date', kstDate)
+        .limit(1)
+        .maybeSingle(),
     ])
 
     const todayRecords = todayRaw ?? []
@@ -104,6 +113,7 @@ export async function POST(req: NextRequest) {
       todayRecords,
       yestLastRecord,
       yestCheckout,
+      hasApprovedLeaveToday: !!leaveToday,
     }
 
     const input: AgentHeartbeatInput = {
