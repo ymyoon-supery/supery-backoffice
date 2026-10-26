@@ -6,6 +6,7 @@ import { isWorkday } from '@/lib/holidays'
 const WORKING_TYPES = new Set(['CHECK_IN', 'BREAK_END', 'FIELD_END'])
 const INACTIVITY_THRESHOLD = 15 * 60    // seconds
 const MIN_BREAK_DURATION_SEC = 5 * 60   // seconds
+const HALF_DAY_BOUNDARY_MIN = 14 * 60 + 30  // 14:30 KST
 
 // ── Shared types ──────────────────────────────────────────────────────────────
 
@@ -53,7 +54,7 @@ export interface AgentHeartbeatCtx {
   todayRecords: RecordRow[]    // today's records ordered by recorded_at DESC
   yestLastRecord: RecordRow | null
   yestCheckout: RecordRow | null
-  hasApprovedLeaveToday: boolean  // 당일 승인된 연차/반차 여부
+  leaveTodayType: 'FULL_DAY' | 'AM_HALF' | 'PM_HALF' | null  // 당일 승인된 휴가 종류
 }
 
 export interface AgentHeartbeatInput {
@@ -76,7 +77,7 @@ export function decideAgentHeartbeat(
     kstDate, yesterdayKSTDate, now,
     lastHeartbeat, lastActivityAt: employeeLastActivityAt,
     todayRecords, yestLastRecord, yestCheckout,
-    hasApprovedLeaveToday,
+    leaveTodayType,
   } = ctx
   const { idleSeconds, activityTicks, keyCount, mousePx, suspendAtStr, lastActivityBeforeSleep } = input
 
@@ -399,9 +400,17 @@ export function decideAgentHeartbeat(
       log('F', 'skipped', `non-workday: ${kstDate}`)
       break
     }
-    if (hasApprovedLeaveToday) {
-      log('F', 'skipped', `approved leave on ${kstDate}`)
-      break
+    if (leaveTodayType !== null) {
+      const kstNowF = new Date(now.getTime() + 9 * 60 * 60 * 1000)
+      const kstMinF = kstHourF * 60 + kstNowF.getUTCMinutes()
+      const blocked =
+        leaveTodayType === 'FULL_DAY' ||
+        (leaveTodayType === 'AM_HALF' && kstMinF < HALF_DAY_BOUNDARY_MIN) ||
+        (leaveTodayType === 'PM_HALF' && kstMinF >= HALF_DAY_BOUNDARY_MIN)
+      if (blocked) {
+        log('F', 'skipped', `leave=${leaveTodayType} kstMin=${kstMinF}`)
+        break
+      }
     }
     const isConfirmedActiveF =
       keyCount !== null || mousePx !== null
@@ -458,9 +467,17 @@ export function decideAgentHeartbeat(
       log('G', 'skipped', `non-workday: ${kstDate}`)
       break
     }
-    if (hasApprovedLeaveToday) {
-      log('G', 'skipped', `approved leave on ${kstDate}`)
-      break
+    if (leaveTodayType !== null) {
+      const kstNowG = new Date(now.getTime() + 9 * 60 * 60 * 1000)
+      const kstMinG = kstHourG * 60 + kstNowG.getUTCMinutes()
+      const blocked =
+        leaveTodayType === 'FULL_DAY' ||
+        (leaveTodayType === 'AM_HALF' && kstMinG < HALF_DAY_BOUNDARY_MIN) ||
+        (leaveTodayType === 'PM_HALF' && kstMinG >= HALF_DAY_BOUNDARY_MIN)
+      if (blocked) {
+        log('G', 'skipped', `leave=${leaveTodayType} kstMin=${kstMinG}`)
+        break
+      }
     }
     const isConfirmedActiveG =
       keyCount !== null || mousePx !== null

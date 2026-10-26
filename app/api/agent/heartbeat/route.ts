@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
         .limit(20),
       admin
         .from('leave_requests')
-        .select('id')
+        .select('leave_type')
         .eq('employee_id', employee.id)
         .eq('status', 'APPROVED')
         .lte('start_date', kstDate)
@@ -113,7 +113,10 @@ export async function POST(req: NextRequest) {
       todayRecords,
       yestLastRecord,
       yestCheckout,
-      hasApprovedLeaveToday: !!leaveToday,
+      leaveTodayType: leaveToday?.leave_type === 'AM_HALF' ? 'AM_HALF'
+        : leaveToday?.leave_type === 'PM_HALF' ? 'PM_HALF'
+        : leaveToday ? 'FULL_DAY'
+        : null,
     }
 
     const input: AgentHeartbeatInput = {
