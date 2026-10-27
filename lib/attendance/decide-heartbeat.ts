@@ -362,12 +362,17 @@ export function decideAgentHeartbeat(
     // activity_ticks를 첫 분기에 포함하면 OS 백그라운드(무선 마우스 keep-alive 등)가
     // GetLastInputInfo를 리셋해 ticks>=2 조건이 충족되더라도 false positive가 발생함.
     // (Block F isConfirmedActiveF와 동일한 기준으로 통일)
-    // 30분 초과 휴식: AND 조건 + 마우스 임계값 200px로 상향 (keep-alive 오탐 이중 차단)
+    // 30분 초과 휴식 오탐 방지:
+    //   key+mouse 둘 다 있으면 AND + 200px (future agent with key_count)
+    //   mouse만 있으면 200px 단독 (v1.3.17 현재 에이전트 — key_count 미전송)
+    //   short break(≤30min)은 기존 로직 유지
     const longBreakE = breakDurationSec > 30 * 60
     const isConfirmedActive =
       keyCount !== null || mousePx !== null
         ? longBreakE
-          ? (keyCount ?? 0) >= 1 && (mousePx ?? 0) >= 200
+          ? keyCount !== null
+            ? (keyCount ?? 0) >= 1 && (mousePx ?? 0) >= 200
+            : (mousePx ?? 0) >= 200
           : (keyCount ?? 0) >= 1 || (mousePx ?? 0) >= 50
         : activityTicks !== null
         ? activityTicks >= 2
