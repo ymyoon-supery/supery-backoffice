@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
 
   const { data: lastRecord, error: recError } = await admin
     .from('attendance_records')
-    .select('type, recorded_at, note')
+    .select('id, type, recorded_at, note')
     .eq('employee_id', employee.id)
     .gte('recorded_at', `${kstDate}T00:00:00+09:00`)
     .order('recorded_at', { ascending: false })
@@ -95,12 +95,14 @@ export async function POST(req: NextRequest) {
   // Windows Update 새벽 종료(now=2~6시)는 위 kstHour<7 조건에서 이미 차단됨.
   // BREAK_START가 업무 전(< 07:00)이면 Windows Update가 새벽에 삽입한 기록이므로
   // 그 시각을 퇴근 시각으로 쓰지 않고 실제 종료 시각(now)을 유지.
+  // BREAK_START 시각을 퇴근 시각으로 흡수할 때 해당 레코드 삭제 — 동일 시각 중복 기록 방지.
   if (lastRecord.type === 'BREAK_START' && lastRecord.note === 'PC 비활동 자동 휴식') {
     const breakKSTHour = new Date(
       new Date(lastRecord.recorded_at).getTime() + 9 * 60 * 60 * 1000,
     ).getUTCHours()
     if (breakKSTHour >= 7) {
       recordedAt = lastRecord.recorded_at
+      await admin.from('attendance_records').delete().eq('id', lastRecord.id)
     }
   }
 
