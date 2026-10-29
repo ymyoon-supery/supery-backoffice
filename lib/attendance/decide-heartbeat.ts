@@ -35,7 +35,12 @@ export interface UpdateDecision {
   note: string
 }
 
-export type Decision = InsertDecision | UpdateDecision
+export interface DeleteDecision {
+  action: 'delete'
+  id: string
+}
+
+export type Decision = InsertDecision | UpdateDecision | DeleteDecision
 
 export interface DecisionLog {
   block: string
@@ -326,6 +331,10 @@ export function decideAgentHeartbeat(
       break
     }
     decisions.push({ action: 'insert', type: 'CHECK_OUT', recorded_at: checkoutAt, note: 'PC 절전/잠금 자동 퇴근', origin: 'agent_auto' })
+    // BREAK_START를 퇴근 시각으로 흡수할 때 해당 레코드 삭제 — 동일 시각 중복 기록 방지
+    if (isAutoBreak) {
+      decisions.push({ action: 'delete', id: yestLastRecord.id })
+    }
     log('D', 'triggered', `yesterday CHECK_OUT at ${checkoutAt} (yestType=${yestType})`)
   } while (false)
 

@@ -141,6 +141,8 @@ export async function POST(req: NextRequest) {
           origin: d.origin,
           is_field: false,
         })
+      } else if (d.action === 'delete') {
+        await admin.from('attendance_records').delete().eq('id', d.id)
       } else {
         await admin
           .from('attendance_records')
