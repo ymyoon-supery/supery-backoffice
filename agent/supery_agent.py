@@ -1,9 +1,10 @@
 """
-Supery 근태 에이전트 v1.3.16
+Supery 근태 에이전트 v1.3.18
 - GetCursorPos 폴링으로 마우스 이동 감지 (백신 오탐 없음, 시스템 영향 없음)
+- GetAsyncKeyState 폴링으로 키 입력 횟수 측정 — OS 백그라운드와 실제 사용자 구분
 - 화면 잠금 상태 감지 (OpenInputDesktop) — lock screen 입력으로 idle 오염 방지
 - 15분 PC 비활동 시 자동 휴식 기록
-- 활동 재개 시 자동 업무 복귀 기록 (mouse_px 실측값으로 Windows Update 등 오기록 방지)
+- 활동 재개 시 자동 업무 복귀 기록 (key_count + mouse_px 이중 검증으로 Windows Update 오기록 방지)
 - 시스템 트레이 상주 / Task Scheduler 로그온 작업 등록 (높은 우선순위)
 - 워킹데이(월~금) PC 시작 시 출근 확인 팝업 (3배 크기, 시간 제한 없음, 웹 출근 여부 서버 확인)
 - PC 종료/재시작 시 자동 퇴근 기록 (WM_ENDSESSION 숨김 창 + atexit 이중 보장)
@@ -39,7 +40,7 @@ API_BASE = "https://office.supery.co.kr/api"
 WORKSYNC_URL = "https://office.supery.co.kr"
 # ──────────────────────────────────────────────
 
-VERSION = "1.3.17"
+VERSION = "1.3.18"
 APP_NAME = "SuperyAgent"
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.json")
 LOG_PATH = os.path.join(os.path.expanduser("~"), ".supery_agent.log")
@@ -656,6 +657,18 @@ def _get_cursor_pos() -> tuple:
     return pt.x, pt.y
 
 
+def _count_key_presses() -> int:
+    """마지막 호출 이후 눌린 키 수 반환 — GetAsyncKeyState low-order bit 기반.
+    low-order bit=1: 마지막 GetAsyncKeyState 호출 이후 해당 키가 눌렸음.
+    VK 8~189: 일반 키보드 범위 (Backspace~F8 포함, 182개).
+    전역 훅 없이 비트 플래그만 읽으므로 CPU 영향 없음 (~0.2ms/15s)."""
+    count = 0
+    for vk in range(8, 190):
+        if ctypes.windll.user32.GetAsyncKeyState(vk) & 0x0001:
+            count += 1
+    return count
+
+
 def _register_windows_shutdown_handler() -> None:
     """WM_ENDSESSION 수신 전용 숨김 창 등록 — atexit보다 신뢰성 높은 Windows 종료 감지
     TerminateProcess로 강제 종료되기 전, Windows가 종료 승인을 기다리는 단계에서 호출됨"""
@@ -916,6 +929,7 @@ def heartbeat_loop() -> None:
     activity_ticks = 0
     poll_count = 0
     mouse_px = 0
+    key_count = 0
     last_cursor = _get_cursor_pos()
 
     while running:
@@ -932,6 +946,9 @@ def heartbeat_loop() -> None:
                 mouse_px += dist
                 last_cursor = (cx, cy)
 
+            # 키 입력 횟수 폴링 — GetAsyncKeyState low-order bit 누적
+            key_count += _count_key_presses()
+
             poll_count += 1
 
             if poll_count >= ticks_per_hb:
@@ -940,6 +957,7 @@ def heartbeat_loop() -> None:
                     "device": platform.node(),
                     "version": VERSION,
                     "mouse_px": mouse_px,
+                    "key_count": key_count,
                     "activity_ticks": activity_ticks,
                 }
                 api_post("agent/heartbeat", payload)
@@ -947,6 +965,7 @@ def heartbeat_loop() -> None:
                 activity_ticks = 0
                 poll_count = 0
                 mouse_px = 0
+                key_count = 0
         except Exception as e:
             logging.warning(f"[heartbeat] {e}")
         time.sleep(ACTIVITY_POLL_INTERVAL)
