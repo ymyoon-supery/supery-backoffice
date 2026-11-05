@@ -27,6 +27,7 @@ const FLAG_TYPE_LABEL: Record<string, string> = {
   MOUSE_JIGGLER: '마우스 자동화',
   IMPOSSIBLE_HOURS: '새벽 활성',
   UNIFORM_MOUSE: '균일 마우스',
+  SCHEDULED_PATTERN: '예약 패턴',
 }
 
 export default function ActivityAuditClient({
@@ -103,28 +104,51 @@ export default function ActivityAuditClient({
                         <span className="text-xs text-gray-500">{f.detail}</span>
                       </div>
                       <div className="overflow-x-auto">
-                        <table className="text-xs w-full">
-                          <thead>
-                            <tr className="text-gray-400 border-b border-gray-100">
-                              <th className="text-left font-medium pr-5 pb-1">시각 (KST)</th>
-                              <th className="text-left font-medium pr-5 pb-1">idle(s)</th>
-                              <th className="text-left font-medium pr-5 pb-1">mouse_px</th>
-                              <th className="text-left font-medium pb-1">key_count</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {f.samples.map((s, si) => (
-                              <tr key={si} className="border-b border-gray-50 last:border-0">
-                                <td className="pr-5 py-1 tabular-nums text-gray-600">{kstTime(s.ts)}</td>
-                                <td className="pr-5 py-1 tabular-nums text-gray-600">{s.idle}</td>
-                                <td className="pr-5 py-1 tabular-nums text-gray-600">{s.mouse_px ?? '—'}</td>
-                                <td className={`py-1 tabular-nums font-medium ${s.key_count === 0 ? 'text-red-600' : 'text-gray-600'}`}>
-                                  {s.key_count ?? '—'}
-                                </td>
+                        {f.records && f.records.length > 0 ? (
+                          <table className="text-xs w-full">
+                            <thead>
+                              <tr className="text-gray-400 border-b border-gray-100">
+                                <th className="text-left font-medium pr-5 pb-1">날짜</th>
+                                <th className="text-left font-medium pr-5 pb-1">시각 (KST)</th>
+                                <th className="text-left font-medium pb-1">유형</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody>
+                              {f.records.map((r, ri) => (
+                                <tr key={ri} className="border-b border-gray-50 last:border-0">
+                                  <td className="pr-5 py-1 tabular-nums text-gray-500">{r.date}</td>
+                                  <td className="pr-5 py-1 tabular-nums font-medium text-gray-800">{r.time}</td>
+                                  <td className={`py-1 text-xs font-medium ${r.recordType === 'CHECK_OUT' ? 'text-blue-600' : 'text-green-600'}`}>
+                                    {r.recordType === 'CHECK_OUT' ? '퇴근' : '점심복귀'}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        ) : (
+                          <table className="text-xs w-full">
+                            <thead>
+                              <tr className="text-gray-400 border-b border-gray-100">
+                                <th className="text-left font-medium pr-5 pb-1">시각 (KST)</th>
+                                <th className="text-left font-medium pr-5 pb-1">idle(s)</th>
+                                <th className="text-left font-medium pr-5 pb-1">mouse_px</th>
+                                <th className="text-left font-medium pb-1">key_count</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {f.samples.map((s, si) => (
+                                <tr key={si} className="border-b border-gray-50 last:border-0">
+                                  <td className="pr-5 py-1 tabular-nums text-gray-600">{kstTime(s.ts)}</td>
+                                  <td className="pr-5 py-1 tabular-nums text-gray-600">{s.idle}</td>
+                                  <td className="pr-5 py-1 tabular-nums text-gray-600">{s.mouse_px ?? '—'}</td>
+                                  <td className={`py-1 tabular-nums font-medium ${s.key_count === 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                                    {s.key_count ?? '—'}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
                       </div>
                     </div>
                   ))}

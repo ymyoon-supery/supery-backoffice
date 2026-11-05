@@ -7,11 +7,18 @@ export type HeartbeatSample = {
 }
 
 export type SuspiciousFlag = {
-  type: 'MOUSE_JIGGLER' | 'IMPOSSIBLE_HOURS' | 'UNIFORM_MOUSE'
+  type: 'MOUSE_JIGGLER' | 'IMPOSSIBLE_HOURS' | 'UNIFORM_MOUSE' | 'SCHEDULED_PATTERN'
   label: string
   detail: string
   severity: 'high' | 'medium'
   samples: { ts: string; mouse_px: number | null; key_count: number | null; idle: number }[]
+  records?: { date: string; time: string; recordType: 'CHECK_OUT' | 'BREAK_END' }[]
+}
+
+export type ScheduledRecord = {
+  date: string        // YYYY-MM-DD KST
+  recorded_at: string // ISO
+  type: 'CHECK_OUT' | 'BREAK_END'
 }
 
 const KST_MS = 9 * 60 * 60 * 1000
@@ -99,4 +106,91 @@ export function detectSuspiciousActivity(samples: HeartbeatSample[]): Suspicious
   }
 
   return flags
+}
+
+export function detectScheduledPattern(records: ScheduledRecord[]): SuspiciousFlag[] {
+  const TOLERANCE = 3       // ±3분 오차 허용
+  const MIN_DAYS = 5        // 최소 집중 일수
+  const MIN_RATIO = 0.6     // 전체 대상 일수의 60%+
+  const LUNCH_START = 11 * 60 + 30  // 11:30 KST
+  const LUNCH_END   = 14 * 60 + 30  // 14:30 KST
+
+  function toKSTMinutes(isoStr: string): number {
+    const d = new Date(new Date(isoStr).getTime() + KST_MS)
+    return d.getUTCHours() * 60 + d.getUTCMinutes()
+  }
+
+  // 하루 최후 CHECK_OUT 1건
+  const checkoutByDate = new Map<string, string>()
+  for (const r of records) {
+    if (r.type !== 'CHECK_OUT') continue
+    const existing = checkoutByDate.get(r.date)
+    if (!existing || r.recorded_at > existing) checkoutByDate.set(r.date, r.recorded_at)
+  }
+
+  // 점심 복귀 BREAK_END 1건 (11:30~14:30 KST)
+  const lunchByDate = new Map<string, string>()
+  for (const r of records) {
+    if (r.type !== 'BREAK_END') continue
+    const min = toKSTMinutes(r.recorded_at)
+    if (min < LUNCH_START || min > LUNCH_END) continue
+    const existing = lunchByDate.get(r.date)
+    if (!existing || r.recorded_at > existing) lunchByDate.set(r.date, r.recorded_at)
+  }
+
+  function findCluster(byDate: Map<string, string>): {
+    items: { date: string; ts: string }[]
+    centerMin: number
+  } | null {
+    const entries = Array.from(byDate.entries()).map(([date, ts]) => ({
+      date, ts, min: toKSTMinutes(ts),
+    }))
+    if (entries.length < MIN_DAYS) return null
+
+    let best: typeof entries = []
+    for (const pivot of entries) {
+      const cluster = entries.filter(e => Math.abs(e.min - pivot.min) <= TOLERANCE)
+      if (cluster.length > best.length) best = cluster
+    }
+
+    if (best.length < MIN_DAYS || best.length / entries.length < MIN_RATIO) return null
+
+    const centerMin = Math.round(best.reduce((s, e) => s + e.min, 0) / best.length)
+    return { items: best.map(e => ({ date: e.date, ts: e.ts })), centerMin }
+  }
+
+  const checkoutCluster = findCluster(checkoutByDate)
+  const lunchCluster    = findCluster(lunchByDate)
+
+  if (!checkoutCluster && !lunchCluster) return []
+
+  const severity: 'high' | 'medium' = checkoutCluster && lunchCluster ? 'high' : 'medium'
+  const parts: string[] = []
+  const allRecords: { date: string; time: string; recordType: 'CHECK_OUT' | 'BREAK_END' }[] = []
+
+  if (checkoutCluster) {
+    const hh = String(Math.floor(checkoutCluster.centerMin / 60)).padStart(2, '0')
+    const mm = String(checkoutCluster.centerMin % 60).padStart(2, '0')
+    parts.push(`퇴근 ${checkoutCluster.items.length}일 ${hh}:${mm} 전후 집중`)
+    for (const e of [...checkoutCluster.items].sort((a, b) => a.date.localeCompare(b.date))) {
+      allRecords.push({ date: e.date, time: kstHHMM(e.ts), recordType: 'CHECK_OUT' })
+    }
+  }
+  if (lunchCluster) {
+    const hh = String(Math.floor(lunchCluster.centerMin / 60)).padStart(2, '0')
+    const mm = String(lunchCluster.centerMin % 60).padStart(2, '0')
+    parts.push(`점심복귀 ${lunchCluster.items.length}일 ${hh}:${mm} 전후 집중`)
+    for (const e of [...lunchCluster.items].sort((a, b) => a.date.localeCompare(b.date))) {
+      allRecords.push({ date: e.date, time: kstHHMM(e.ts), recordType: 'BREAK_END' })
+    }
+  }
+
+  return [{
+    type: 'SCHEDULED_PATTERN',
+    label: '예약 종료/복귀 의심',
+    detail: parts.join(' · '),
+    severity,
+    samples: [],
+    records: allRecords,
+  }]
 }
