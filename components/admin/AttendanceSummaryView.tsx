@@ -400,6 +400,7 @@ export default function AttendanceSummaryView({
           records={selectedEmpId ? rawRecords.filter((r: any) => r.employee_id === selectedEmpId) : rawRecords}
           employees={allEmployeesForEditor}
           leaveRecords={selectedEmpId ? leaveRecords.filter((r: any) => r.employee_id === selectedEmpId) : leaveRecords}
+          groupByDate={view !== 'day'}
         />
       )}
     </div>
