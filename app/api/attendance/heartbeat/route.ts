@@ -75,11 +75,17 @@ export async function POST(_request: NextRequest) {
   }
 
   // last_heartbeat는 WORKING_TYPE 상태일 때만 갱신 (에이전트 last_heartbeat와 충돌 방지)
+  // last_activity_at: PC 에이전트 미활성 + WORKING_TYPE 상태이면 브라우저 현재 시각으로 갱신
+  // → cron auto-checkout이 브라우저 전용 사용자의 마지막 활동 시각을 올바르게 사용하도록 함
   const WORKING_TYPES = new Set(['CHECK_IN', 'BREAK_END', 'FIELD_END'])
   if (lastRecord && WORKING_TYPES.has(lastRecord.type)) {
+    const updatePayload: Record<string, string> = { last_heartbeat: now.toISOString() }
+    if (!agentIsActive) {
+      updatePayload.last_activity_at = now.toISOString()
+    }
     await supabase
       .from('employees')
-      .update({ last_heartbeat: now.toISOString() })
+      .update(updatePayload)
       .eq('id', employee.id)
   }
 
